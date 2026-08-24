@@ -103,9 +103,9 @@ class Credit {
     amount: amount,
     direction: direction,
     personId: personId,
-    person: person ?? (personId != null && personId == this.personId
-        ? this.person
-        : null),
+    person:
+        person ??
+        (personId != null && personId == this.personId ? this.person : null),
     personName: personName,
     note: note,
     date: date,

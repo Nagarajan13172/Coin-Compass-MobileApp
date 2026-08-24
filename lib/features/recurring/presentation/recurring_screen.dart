@@ -35,6 +35,10 @@ class RecurringScreen extends ConsumerStatefulWidget {
 
 class _RecurringScreenState extends ConsumerState<RecurringScreen> {
   /// Rules with an action in flight — the row swaps its menu for a spinner.
+  ///
+  /// 6.4: only the three *unpredictable* actions still fill this — run, skip
+  /// and post-one. The edit, the pause/resume toggle and the delete repaint
+  /// at once and never spin.
   final Set<String> _busyIds = {};
 
   bool _runningDue = false;

@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../../core/api/api_exception.dart';
 import '../../../core/state/optimistic.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/money.dart';
@@ -36,7 +35,10 @@ class CreditsScreen extends ConsumerStatefulWidget {
 }
 
 class _CreditsScreenState extends ConsumerState<CreditsScreen> {
-  /// Credits with a delete in flight.
+  /// 6.4: always empty now — a delete removes the row on the spot and puts
+  /// it back if the write fails, so no row ever sits spinning. Kept because
+  /// the tile takes it, and a future non-predictable row action would need
+  /// it again.
   final Set<String> _busyIds = {};
 
   @override
@@ -163,70 +165,83 @@ class _SummaryCard extends ConsumerWidget {
     final failed = summary == null && async.hasError;
     final net = summary?.net ?? 0;
 
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Net position',
-            style: TextStyle(fontSize: 13, color: c.mutedForeground),
-          ),
-          const SizedBox(height: 4),
-          if (failed)
+    // 6.4 — this card is a *separate* server aggregate (`GET /credits/summary`),
+    // so it lags an optimistic row by one round trip. The row is the owner's own
+    // change and is shown plainly; what is marked is the opposite case — a total
+    // that has not caught up yet is dimmed rather than sitting confidently on a
+    // figure the owner's edit has already superseded.
+    final settling = ref.watch(creditsWritesProvider).isSettling;
+
+    return Opacity(
+      opacity: settling ? 0.55 : 1,
+      child: AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Text(
-              '—',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.w700,
-                color: c.mutedForeground,
-              ),
-            )
-          else if (summary == null)
-            const LoadingShimmer(width: 140, height: 28)
-          else
-            MoneyText(
-              net,
-              tone: MoneyTone.auto,
-              signed: true,
-              compactAbove: Money.crore,
-              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
+              'Net position',
+              style: TextStyle(fontSize: 13, color: c.mutedForeground),
             ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _Split(
-                  label: 'Owed to you',
-                  amount: summary?.owedToYou,
-                  failed: failed,
-                  accent: c.income,
-                  icon: LucideIcons.handCoins,
-                  tone: MoneyTone.income,
+            const SizedBox(height: 4),
+            if (failed)
+              Text(
+                '—',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w700,
+                  color: c.mutedForeground,
+                ),
+              )
+            else if (summary == null)
+              const LoadingShimmer(width: 140, height: 28)
+            else
+              MoneyText(
+                net,
+                tone: MoneyTone.auto,
+                signed: true,
+                compactAbove: Money.crore,
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-              Container(width: 1, height: 34, color: c.border),
-              Expanded(
-                child: _Split(
-                  label: 'You owe',
-                  amount: summary?.youOwe,
-                  failed: failed,
-                  accent: c.expense,
-                  icon: LucideIcons.wallet,
-                  tone: MoneyTone.expense,
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: _Split(
+                    label: 'Owed to you',
+                    amount: summary?.owedToYou,
+                    failed: failed,
+                    accent: c.income,
+                    icon: LucideIcons.handCoins,
+                    tone: MoneyTone.income,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            net == 0
-                ? 'You are square with everyone.'
-                : (net > 0
-                      ? 'You are owed more than you owe.'
-                      : 'You owe more than you are owed.'),
-            style: TextStyle(fontSize: 12.5, color: c.mutedForeground),
-          ),
-        ],
+                Container(width: 1, height: 34, color: c.border),
+                Expanded(
+                  child: _Split(
+                    label: 'You owe',
+                    amount: summary?.youOwe,
+                    failed: failed,
+                    accent: c.expense,
+                    icon: LucideIcons.wallet,
+                    tone: MoneyTone.expense,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              net == 0
+                  ? 'You are square with everyone.'
+                  : (net > 0
+                        ? 'You are owed more than you owe.'
+                        : 'You owe more than you are owed.'),
+              style: TextStyle(fontSize: 12.5, color: c.mutedForeground),
+            ),
+          ],
+        ),
       ),
     );
   }

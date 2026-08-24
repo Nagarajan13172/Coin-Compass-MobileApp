@@ -126,6 +126,8 @@ class _StockSplitsSheetState extends ConsumerState<StockSplitsSheet> {
     setState(() => _busy.add(_keyOf(split)));
     final messenger = ScaffoldMessenger.of(context);
     try {
+      // Deliberately synchronous (6.4): applying a split rewrites every
+      // affected lot's quantity and price. See lib/core/state/optimistic.dart.
       await ref.read(stocksRepositoryProvider).applySplit(split);
       invalidateStocks(ref);
       messenger

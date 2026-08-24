@@ -70,11 +70,8 @@ final transactionBalanceProvider = FutureProvider<BalanceSnapshot>(
 ///
 /// autoDispose, because the key is a window end: browsing a year of months
 /// would otherwise leave twelve snapshots cached for the whole session.
-final transactionBalanceAsOfProvider =
-    FutureProvider.autoDispose.family<BalanceSnapshot, DateTime?>((
-      ref,
-      asOf,
-    ) async {
+final transactionBalanceAsOfProvider = FutureProvider.autoDispose
+    .family<BalanceSnapshot, DateTime?>((ref, asOf) async {
       final json = await ref
           .watch(apiClientProvider)
           .getJson(

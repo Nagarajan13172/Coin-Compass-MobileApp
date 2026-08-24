@@ -101,7 +101,8 @@ class _EmptyHoldings extends StatelessWidget {
         child: EmptyState(
           icon: LucideIcons.piggyBank,
           title: 'No holdings yet',
-          message: 'Add a deposit, fund, property or anything else you own '
+          message:
+              'Add a deposit, fund, property or anything else you own '
               'and it counts toward your net worth.',
           actionLabel: 'New holding',
           onAction: onAdd,
@@ -126,10 +127,11 @@ class _HoldingsList extends StatelessWidget {
     ];
 
     for (final holdingClass in HoldingClass.values) {
-      final group = holdings
-          .where((holding) => holding.holdingClass == holdingClass)
-          .toList()
-        ..sort((a, b) => b.value.compareTo(a.value));
+      final group =
+          holdings
+              .where((holding) => holding.holdingClass == holdingClass)
+              .toList()
+            ..sort((a, b) => b.value.compareTo(a.value));
       if (group.isEmpty) continue;
 
       children.add(

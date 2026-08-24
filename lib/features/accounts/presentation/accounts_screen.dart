@@ -96,8 +96,7 @@ class AccountsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _refresh(WidgetRef ref) =>
-      refreshCurrentRoute(ref, '/accounts');
+  Future<void> _refresh(WidgetRef ref) => refreshCurrentRoute(ref, '/accounts');
 
   Future<void> _openForm(
     BuildContext context,

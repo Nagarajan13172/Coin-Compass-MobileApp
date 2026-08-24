@@ -56,7 +56,6 @@ import '../../features/transactions/presentation/transactions_providers.dart';
 import '../../features/wealth_lock/domain/wealth_lock.dart';
 import '../../features/wealth_lock/presentation/wealth_lock_providers.dart';
 
-
 /// How long a bump of `onlineRevisionProvider` is ignored after a refresh, so a
 /// flapping connection cannot become a refresh loop.
 const Duration kRecoveryCooldown = Duration(seconds: 10);

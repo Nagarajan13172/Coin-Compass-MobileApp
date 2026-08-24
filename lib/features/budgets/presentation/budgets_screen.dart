@@ -76,8 +76,7 @@ class BudgetsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _refresh(WidgetRef ref) =>
-      refreshCurrentRoute(ref, '/budgets');
+  Future<void> _refresh(WidgetRef ref) => refreshCurrentRoute(ref, '/budgets');
 
   Future<void> _openForm(BuildContext context, {Budget? budget}) =>
       BudgetFormSheet.show(context, budget: budget);

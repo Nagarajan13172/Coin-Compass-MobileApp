@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../../core/api/api_exception.dart';
 import '../../../core/state/optimistic.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/date_x.dart';
@@ -36,7 +35,10 @@ class SplitsScreen extends ConsumerStatefulWidget {
 }
 
 class _SplitsScreenState extends ConsumerState<SplitsScreen> {
-  /// Splits with a delete in flight.
+  /// 6.4: always empty now — a delete removes the row on the spot and puts
+  /// it back if the write fails, so no row ever sits spinning. Kept because
+  /// the tile takes it, and a future non-predictable row action would need
+  /// it again.
   final Set<String> _busyIds = {};
 
   @override

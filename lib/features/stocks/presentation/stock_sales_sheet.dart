@@ -155,6 +155,11 @@ class _StockSalesListState extends ConsumerState<StockSalesList> {
     setState(() => _busyIds.add(sale.id));
     final messenger = ScaffoldMessenger.of(context);
     try {
+      // Deliberately synchronous (6.4): the row's disappearance is
+      // predictable, but removing a sale re-derives the whole position's
+      // realised short/long-term P&L server-side. Row-only optimism would
+      // leave every number around the gap wrong, which is worse than a
+      // spinner. See lib/core/state/optimistic.dart.
       await ref.read(stocksRepositoryProvider).deleteSale(sale.id);
       invalidateStocks(ref);
       messenger

@@ -59,24 +59,34 @@ class FakeStore<T> {
   /// it to assert what the screen shows *while* a write is in flight.
   Completer<void>? gate;
 
+  /// Same, for the read — which is how the *settle* window is held open so a
+  /// test can prove the optimistic value is still on screen while the refetch
+  /// is in flight.
+  Completer<void>? readGate;
+
   Future<List<T>> list() async {
     reads++;
+    final open = readGate;
+    if (open != null) {
+      readGate = null;
+      await open.future;
+    }
     final error = readError;
     if (error != null) throw error;
     return List<T>.of(rows);
   }
 
+  /// Both knobs are consumed the moment a write *enters*, not when it leaves —
+  /// so a second write started while the first is parked on its gate is not
+  /// also caught by the first write's error. That is what makes the
+  /// overlapping-edit test express the case it means.
   Future<void> _await() async {
     final open = gate;
-    if (open != null) {
-      gate = null;
-      await open.future;
-    }
     final error = writeError;
-    if (error != null) {
-      writeError = null;
-      throw error;
-    }
+    gate = null;
+    writeError = null;
+    if (open != null) await open.future;
+    if (error != null) throw error;
   }
 
   /// A write that replaces one row and answers with the server's version.

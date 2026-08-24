@@ -426,6 +426,10 @@ class _PositionDetailSheetState extends ConsumerState<PositionDetailSheet> {
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
     try {
+      // Deliberately synchronous (6.4): deleting a lot re-derives the
+      // position's quantity, average cost and realised P&L through server-side
+      // FIFO matching. Nothing here is predictable but the row itself.
+      // See lib/core/state/optimistic.dart.
       await ref.read(stocksRepositoryProvider).deleteLot(lot.id);
       invalidateStocks(ref);
       messenger
