@@ -3,7 +3,7 @@
      screen API: a themed background plus the launcher icon, masked to a circle
      and animated out when the first frame lands. -->
 <resources>
-    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+    <style name="LaunchTheme" parent="Theme.AppCompat.Light.NoActionBar">
         <item name="android:windowSplashScreenBackground">@color/splash_background</item>
         <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
         <item name="android:windowBackground">@drawable/launch_background</item>

@@ -7,11 +7,21 @@ import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/confirm_sheet.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../auth/presentation/auth_providers.dart';
+import '../../lock/domain/lock_state.dart';
+import '../../lock/presentation/app_lock_setup_sheet.dart';
+import '../../lock/presentation/lock_controller.dart';
 import '../domain/app_settings.dart';
 import 'security_sheets.dart';
 import 'settings_providers.dart';
 
-/// PIN lock, Net Worth lock and two-factor status.
+/// App lock (this phone), PIN lock and Net Worth lock (both web-only), and
+/// two-factor status.
+///
+/// The ordering is deliberate: the app lock goes first because it is the one
+/// that actually locks the device in the owner's hand. The two below it arm the
+/// **web** client and are unrelated — arming the phone must not change how
+/// coincompass.sathishkumar.cloud behaves in a browser, and turning the web PIN
+/// off must not silently unlock this phone.
 ///
 /// Two-factor is read-only here: enrolling needs a QR scan and a 6-digit
 /// confirmation, and disabling one the owner relies on is worse than not
@@ -27,6 +37,7 @@ class SettingsSecurityCard extends ConsumerWidget {
     final c = context.colors;
     final pending = ref.watch(settingsWriteControllerProvider);
     final blocked = pending != null;
+    final lock = ref.watch(appLockControllerProvider);
 
     return AppCard(
       child: Column(
@@ -35,17 +46,106 @@ class SettingsSecurityCard extends ConsumerWidget {
           const SectionHeader(title: 'Security'),
           const SizedBox(height: 12),
 
+          if (lock.failedOpen) ...[
+            _FailOpenBanner(
+              onDismiss: () => ref
+                  .read(appLockControllerProvider.notifier)
+                  .acknowledgeFailOpen(),
+            ),
+            const SizedBox(height: 14),
+          ],
+
+          _SecurityRow(
+            icon: LucideIcons.smartphoneNfc,
+            enabled: lock.enabled,
+            title: 'App lock (this phone)',
+            // Only promise the fingerprint when it is actually armed. The
+            // setup sheet's biometric toggle is opt-in and defaults to off, so
+            // a PIN-only setup was being described as accepting a fingerprint
+            // that would never be offered.
+            description: lock.enabled
+                ? (lock.biometricEnabled
+                      ? 'CoinCompass asks for your fingerprint — or your PIN — '
+                            'when you open it, and again after 30 seconds '
+                            'away. Checked on this phone, so it works with no '
+                            'signal.'
+                      : 'CoinCompass asks for your PIN when you open it, and '
+                            'again after 30 seconds away. It is checked on '
+                            'this phone, so it works with no signal.')
+                : 'Ask for a PIN before CoinCompass opens on this phone. '
+                      'Checked on the device, so it works offline.',
+            actions: lock.enabled
+                ? [
+                    _SmallButton(
+                      label: 'Change PIN',
+                      onPressed: () => AppLockSetupSheet.show(
+                        context,
+                        mode: AppLockSetupMode.change,
+                      ),
+                    ),
+                    _SmallButton(
+                      label: 'Lock now',
+                      onPressed: () => ref
+                          .read(appLockControllerProvider.notifier)
+                          .lockNow(),
+                    ),
+                    _SmallButton(
+                      label: 'Turn off',
+                      destructive: true,
+                      onPressed: () => _disableAppLock(context, ref),
+                    ),
+                  ]
+                : [
+                    _SmallButton(
+                      label: 'Set up app lock',
+                      onPressed: () => AppLockSetupSheet.show(
+                        context,
+                        mode: AppLockSetupMode.enable,
+                      ),
+                    ),
+                  ],
+          ),
+          if (lock.enabled &&
+              lock.biometricAvailability == BiometricAvailability.available)
+            Padding(
+              padding: const EdgeInsets.only(left: 50, top: 4),
+              // A plain Row, not a SwitchListTile: ListTile paints its ink on
+              // the nearest Material, and AppCard puts a coloured DecoratedBox
+              // in between, which Flutter flags as a real error in debug.
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Unlock with fingerprint',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Switch.adaptive(
+                    value: lock.biometricEnabled,
+                    onChanged: (value) => ref
+                        .read(appLockControllerProvider.notifier)
+                        .setBiometricEnabled(value),
+                  ),
+                ],
+              ),
+            ),
+          Divider(color: c.border, height: 24),
+
           _SecurityRow(
             icon: LucideIcons.lockKeyhole,
             enabled: settings.pinEnabled,
-            title: 'PIN lock',
-            // Same honesty rule as the Net Worth lock below: the PIN is
-            // enforced by the web client, not by this app. Phase 6 adds the
-            // lock screen here; until it does, do not claim one exists.
+            title: 'PIN lock (web)',
+            // Still the web client's lock, and still not this app's. The app
+            // lock above has its own PIN, chosen and checked on the device;
+            // these two are deliberately independent, so the copy must not let
+            // either one borrow the other's credit.
             description: settings.pinEnabled
-                ? 'A 4–8 digit PIN is asked for on the web. This app does not '
-                      'ask for it yet.'
-                : 'Ask for a short PIN before CoinCompass opens on the web.',
+                ? 'A 4–8 digit PIN is asked for when you open CoinCompass in a '
+                      'browser. The lock on this phone is the row above.'
+                : 'Ask for a short PIN when you open CoinCompass in a browser.',
             busy:
                 pending == SettingsWrite.pin ||
                 pending == SettingsWrite.disablePin,
@@ -125,12 +225,9 @@ class SettingsSecurityCard extends ConsumerWidget {
 
           const SizedBox(height: 12),
           Text(
-            // Phase 6 adds the lock screen here; until then these flags are
-            // enforced by the web client only, and the card must not imply
-            // otherwise. See PinSheet for the same correction.
-            'These locks gate CoinCompass on the web. This app does not lock '
-            'yet. Your data stays exactly as it is, and neither one is your '
-            'account password.',
+            'The app lock covers this phone. The PIN and Net Worth locks cover '
+            'CoinCompass in a browser. None of them is your account password, '
+            'and none of them changes your data.',
             style: TextStyle(fontSize: 12, color: c.mutedForeground),
           ),
         ],
@@ -138,14 +235,45 @@ class SettingsSecurityCard extends ConsumerWidget {
     );
   }
 
+  /// Turning the lock off asks for the current PIN (or a fingerprint) first.
+  /// A lock anyone holding the unlocked phone can switch off from Settings is
+  /// not a lock. Checked locally — no network.
+  Future<void> _disableAppLock(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await AppLockConfirmSheet.show(
+      context,
+      title: 'Turn off the app lock?',
+      action: 'Turn off',
+    );
+    if (!confirmed) return;
+
+    await ref.read(appLockControllerProvider.notifier).disable();
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text(
+            'App lock turned off. Screenshots and the app-switcher preview '
+            'work normally again.',
+          ),
+        ),
+      );
+  }
+
   Future<void> _disablePin(BuildContext context, WidgetRef ref) async {
     final messenger = ScaffoldMessenger.of(context);
     final confirmed = await ConfirmSheet.show(
       context,
-      title: 'Turn off the PIN lock?',
+      title: 'Turn off the web PIN?',
+      // This row is the SERVER PIN — the one CoinCompass asks for in a browser.
+      // The old copy said "the app will open without asking for a PIN", which
+      // is false whenever the app lock (the row above) is on: turning this off
+      // changes nothing about this phone. Two separate locks, two separate
+      // sentences.
       message:
-          'The app will open without asking for a PIN. You can set a new one '
-          'at any time.',
+          'CoinCompass will stop asking for a PIN when you open it in a '
+          'browser. The app lock on this phone is separate and stays as it '
+          'is. You can set a new web PIN at any time.',
       confirmLabel: 'Turn off',
     );
     if (!confirmed) return;
@@ -378,5 +506,52 @@ class _TwoFactorRow extends ConsumerWidget {
         busy: true,
       ),
     };
+  }
+}
+
+
+/// Shown once when the lock disabled itself because its stored verifier was
+/// missing — a partial prefs wipe, a restore gone wrong.
+///
+/// This fails **open** on purpose, and it will look like a bug to a
+/// security-minded reader. It is not: with no verifier there is no key in the
+/// world that opens the lock, and the data behind it is already gated by an
+/// httpOnly session cookie. Failing closed would brick the owner out of their
+/// own app to defend against a threat that is not in the model.
+class _FailOpenBanner extends StatelessWidget {
+  const _FailOpenBanner({required this.onDismiss});
+
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
+      decoration: BoxDecoration(
+        color: c.warning.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: c.warning.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(LucideIcons.triangleAlert, size: 17, color: c.warning),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'The app lock turned itself off: the saved PIN check was '
+              'missing. Set it up again.',
+              style: TextStyle(fontSize: 12.5, color: c.foreground),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(LucideIcons.x, size: 16),
+            onPressed: onDismiss,
+            visualDensity: VisualDensity.compact,
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -1,7 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- The two window themes descend from Theme.AppCompat, not the framework
+     themes the Flutter template ships. androidx.biometric's LEGACY fingerprint
+     dialog (used when SDK_INT < 28) inflates an androidx.appcompat AlertDialog
+     and throws "your app theme must be Theme.AppCompat or a descendant" under a
+     plain framework theme. On API 28+ BiometricPrompt is used instead and this
+     never fires, so it is not what stands between this build and working
+     biometrics — but minSdk is 24, and on API 24-27 it would crash at the
+     moment of first unlock. AppCompat is already on the classpath transitively
+     (androidx.biometric:1.1.0 -> androidx.appcompat:1.2.0), so this costs no
+     new dependency. NormalTheme matters as much as LaunchTheme:
+     FlutterFragmentActivity.onCreate switches to the NormalTheme meta-data
+     before any dialog could inflate. -->
 <resources>
     <!-- Theme applied to the Android Window while the process is starting when the OS's Dark Mode setting is off -->
-    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+    <style name="LaunchTheme" parent="Theme.AppCompat.Light.NoActionBar">
         <!-- Show a splash screen on the activity. Automatically removed when
              the Flutter engine draws its first frame -->
         <item name="android:windowBackground">@drawable/launch_background</item>
@@ -14,7 +26,7 @@
          running.
 
          This Theme is only used starting with V2 of Flutter's Android embedding. -->
-    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+    <style name="NormalTheme" parent="Theme.AppCompat.Light.NoActionBar">
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
 </resources>

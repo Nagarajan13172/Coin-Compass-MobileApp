@@ -10,6 +10,7 @@ import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'features/auth/presentation/auth_providers.dart';
+import 'features/lock/presentation/app_lock_gate.dart';
 import 'features/settings/data/settings_repository.dart';
 import 'features/settings/domain/app_settings.dart';
 
@@ -111,6 +112,9 @@ class _CoinCompassAppState extends ConsumerState<CoinCompassApp> {
         theme: light,
         darkTheme: dark,
         themeMode: themeMode,
+        // Same gate as below, so a locked cold start paints the lock instead of
+        // the splash rather than flashing one and then the other.
+        builder: (context, child) => AppLockGate(child: child),
         home: const SplashScreen(),
       );
     }
@@ -119,6 +123,16 @@ class _CoinCompassAppState extends ConsumerState<CoinCompassApp> {
       title: 'CoinCompass',
       debugShowCheckedModeBanner: false,
       routerConfig: ref.watch(routerProvider),
+      // The app lock lives here and nowhere else. `builder` is inside
+      // MaterialApp (so Theme, MediaQuery, Directionality and Localizations are
+      // already ancestors) but *outside* the Router, and the `child` it hands
+      // over is the un-mounted Router widget. On a locked cold start the gate
+      // returns the lock alone and that child is never built, so no screen
+      // mounts, no provider fires a GET and there is no frame of the owner's
+      // net worth to leak. A go_router redirect or an Overlay could not make
+      // that promise — both act a frame late, and a pushed route animates over
+      // a visible dashboard. See AppLockGate for the full argument.
+      builder: (context, child) => AppLockGate(child: child),
       theme: light,
       darkTheme: dark,
       themeMode: themeMode,

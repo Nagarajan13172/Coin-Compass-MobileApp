@@ -83,7 +83,45 @@ Two things worth knowing before optimising:
 - Bump `version:` in `pubspec.yaml`. It is `1.0.0+1` today; the `+N` is the
   `versionCode` and Play rejects a repeat.
 - Re-run the `apksigner verify` check above.
-- The manifest already declares `USE_BIOMETRIC` and `USE_FINGERPRINT`, pulled in
-  by the `local_auth` dependency even though phase 6.1 has not wired it up yet.
-  Either land 6.1 or drop the dependency before shipping, so the listing does not
-  ask for a permission the app never uses.
+- `USE_BIOMETRIC` and `USE_FINGERPRINT` are now **used**: phase 6.1 wired the app
+  lock's fingerprint fast path, and both are declared explicitly in
+  `android/app/src/main/AndroidManifest.xml` rather than only merged in from
+  `androidx.biometric` / `local_auth_android`. `<uses-feature
+  android:name="android.hardware.fingerprint" android:required="false"/>` is
+  declared alongside them, because `USE_FINGERPRINT` otherwise implies a
+  *required* hardware feature and would hide the listing from phones without a
+  sensor.
+- **`android.permission.INTERNET` was missing from the release build until 6.1.**
+  The Flutter template only declares it in `src/debug/` and `src/profile/`, "for
+  development", and assumes the app declares its own — this one never did. Every
+  signed release APK built before 6.1 would have failed every API call with
+  `EACCES` on socket(). It is now in `src/main/AndroidManifest.xml`. Re-check it
+  with `aapt2 dump permissions` after any manifest change.
+
+## Size analysis — 2.7 MB of dead font, deliberately not removed (yet)
+
+Measured on `app-arm64-v8a-release.apk` (23.8 MB):
+
+| Component | Size |
+|---|---|
+| `libflutter.so` | 11.04 MB — the engine, unavoidable |
+| `libapp.so` | 8.56 MB — compiled Dart |
+| `LucideVariable-w100…w600.ttf` | **~2.7 MB — entirely unused** |
+| Inter (4 weights) | ~1.2 MB |
+| `lucide.ttf` | 43 KB (tree-shaken from 858 KB) |
+
+`lucide_icons_flutter` declares **seven** font families in its own pubspec: `Lucide`
+plus `Lucide100`…`Lucide600`. The app references **118 distinct icons and zero weight
+variants** — verified by grep, no `LucideIcons.*100`-style constant appears anywhere
+in `lib/`. Flutter's `--tree-shake-icons` shrank the base `lucide.ttf` to 43 KB but
+does not drop an entire font family that has no references at all, so all six variable
+weights ship whole to every device.
+
+**Not removed, on purpose.** The only way to drop them is a `dependency_overrides`
+pointing at a vendored copy of the package with those six families deleted from its
+pubspec — which puts a ~1 MB third-party package in the tree that has to be re-patched
+by hand on every upstream release. That is real, permanent maintenance cost to save
+~11% of an APK that Play delivers per-device anyway.
+
+Revisit if install size becomes a real constraint. The analysis above is the whole
+job; the change itself is half an hour.

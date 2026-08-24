@@ -5,6 +5,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../auth/presentation/auth_providers.dart';
+import '../../lock/presentation/lock_controller.dart';
 import '../data/settings_repository.dart';
 
 /// Which write the Settings screen currently has in flight.
@@ -116,6 +117,13 @@ class SettingsWriteController extends StateNotifier<SettingsWrite?> {
   Future<String?> signOut() => _run(SettingsWrite.signOut, () async {
     await _ref.read(authControllerProvider.notifier).signOut();
     await _ref.read(apiClientProvider).clearSession();
+    // Wipe the app lock too. `LockStore.clear()` documents itself as being
+    // called on sign-out, but only the lock screen's own sign-out did it — so
+    // signing out from Settings left the previous account's PIN verifier and
+    // enabled flag on the phone, and the next person to sign in on that device
+    // met a lock screen wanting a PIN that was never theirs.
+    await _ref.read(lockStoreProvider).clear();
+    _ref.invalidate(appLockControllerProvider);
   }, refreshSettings: false);
 
   /// Runs [action] with [key] pending, refetches settings on success, and

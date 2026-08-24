@@ -279,10 +279,14 @@ void main() {
     await pump(tester);
     await reveal(tester, find.text('Security'));
 
-    expect(find.text('PIN lock'), findsOneWidget);
+    expect(find.text('App lock (this phone)'), findsOneWidget);
+    expect(find.text('PIN lock (web)'), findsOneWidget);
     expect(find.text('Net Worth lock'), findsOneWidget);
     expect(find.text('Two-factor authentication'), findsOneWidget);
-    expect(find.text('Off'), findsNWidgets(3));
+    // Four rows now: the app lock joined the two web locks and 2FA. The app
+    // lock defaults OFF and nothing the server says can change that.
+    expect(find.text('Off'), findsNWidgets(4));
+    expect(find.text('Set up app lock'), findsOneWidget);
     expect(find.text('Set a PIN'), findsOneWidget);
     expect(find.text('Set a passcode'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -599,7 +603,15 @@ void main() {
 
     await revealAndTap(tester, find.text('Turn off').first);
 
-    expect(find.text('Turn off the PIN lock?'), findsOneWidget);
+    // "web PIN", not "PIN lock": this row is the SERVER PIN, and the sheet used
+    // to promise "the app will open without asking for a PIN" — false whenever
+    // the app lock on this phone is on. The two locks are named apart now.
+    expect(find.text('Turn off the web PIN?'), findsOneWidget);
+    expect(
+      find.textContaining('app lock on this phone is separate'),
+      findsOneWidget,
+      reason: 'the sheet must say what it does NOT turn off',
+    );
     await tester.tap(find.text('Cancel'));
     await drain(tester);
 

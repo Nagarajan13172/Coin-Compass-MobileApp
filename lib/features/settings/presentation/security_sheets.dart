@@ -7,7 +7,11 @@ import '../../../core/widgets/app_text_field.dart';
 import '../../../core/widgets/form_sheet_scaffold.dart';
 import 'settings_providers.dart';
 
-/// Set or change the app's PIN lock.
+/// Set or change the **web** client's PIN lock.
+///
+/// This is not the phone's lock. The app lock is a separate PIN, chosen and
+/// checked on the device (see `features/lock/`), and the two are deliberately
+/// independent: arming one must not arm the other.
 ///
 /// The web asks for the new PIN twice and nothing else — there is no
 /// "current PIN" field even in change mode, because the session is already
@@ -84,17 +88,15 @@ class _PinSheetState extends ConsumerState<PinSheet> {
       submitting: busy,
       onSubmit: _submit,
       formError: _error,
-      // Honest copy. The PIN is stored server-side and currently gates the
-      // CoinCompass *web* app; this app has no lock screen yet, so promising
-      // "you will be asked every time the app starts" would be false on the
-      // device the owner is reading it on. The gate ships in Phase 6 — when it
-      // does, this wording changes with it.
+      // Honest copy. This PIN is stored server-side and gates the CoinCompass
+      // *web* client. The phone has its own lock now, with its own PIN — so the
+      // copy has to say which surface this one covers, and point at the other.
       footnote:
           'Your data stays exactly as it is, and this is not your password.',
       children: [
         Text(
-          'Choose 4 to 8 digits. This PIN protects CoinCompass on the web '
-          'today — this app does not lock yet, so it will not ask you for it.',
+          'Choose 4 to 8 digits. This PIN protects CoinCompass in a browser. '
+          'To lock this phone, use App lock at the top of the Security card.',
           style: TextStyle(fontSize: 13.5, color: c.mutedForeground),
         ),
         const SizedBox(height: 16),

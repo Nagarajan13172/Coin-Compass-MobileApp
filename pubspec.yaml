@@ -38,6 +38,13 @@ dependencies:
   # utils
   intl: ^0.20.2
 
+  # PBKDF2-HMAC-SHA256 for the app lock's local PIN verifier. Already resolved
+  # at 3.0.7 transitively (via dio); promoted to a direct dependency because
+  # `depend_on_referenced_packages` rejects importing a transitive one. Pure
+  # Dart, no platform code — it cannot repeat the flutter_secure_storage
+  # compileSdk problem.
+  crypto: ^3.0.7
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

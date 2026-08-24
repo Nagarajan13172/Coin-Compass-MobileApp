@@ -1,4 +1,23 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Every request this app makes goes over the network. The Flutter
+         template only declares INTERNET in the debug and profile manifests
+         "for development"; without it here the RELEASE build's sockets fail
+         with EACCES and every API call dies. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- Merged in anyway by androidx.biometric and local_auth_android; declared
+         explicitly so the app lock's requirements are readable in this file.
+         USE_FINGERPRINT is the pre-API-28 spelling. -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
+    <uses-permission android:name="android.permission.USE_FINGERPRINT"/>
+
+    <!-- USE_FINGERPRINT implies a *required* fingerprint feature, which would
+         hide the app from devices without a sensor. The app lock is optional,
+         so say so. -->
+    <uses-feature
+        android:name="android.hardware.fingerprint"
+        android:required="false"/>
+
     <application
         android:label="@string/app_name"
         android:name="${applicationName}"
