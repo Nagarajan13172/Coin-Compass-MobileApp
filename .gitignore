@@ -1,0 +1,110 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# ---------------------------------------------------------------
+# CoinCompass — project additions
+# ---------------------------------------------------------------
+
+# Build output (any subproject, not just the root)
+**/build/
+.gradle/
+
+# Machine-specific SDK paths (Flutter/Android toolchain locations)
+local.properties
+**/local.properties
+
+# Secrets / environment
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.p8
+*.mobileprovision
+
+# Signing material — never commit these
+key.properties
+**/*.jks
+**/*.keystore
+android/app/upload-keystore.jks
+
+# Firebase / service configs (uncomment if you add Firebase)
+# android/app/google-services.json
+# ios/Runner/GoogleService-Info.plist
+
+# Flutter tooling
+.fvm/
+.flutter-plugins
+.flutter-plugins-dependencies
+**/.dart_tool/
+.packages
+.pub-cache/
+
+# Test & coverage output
+coverage/
+test/failures/
+**/failures/
+*.lcov
+
+# Editors
+.vscode/
+*.code-workspace
+.idea/
+*.iml
+
+# OS cruft
+.DS_Store
+.DS_Store?
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+._*
+
+# Logs & temp
+*.log
+*.tmp
+*.bak
+*~
