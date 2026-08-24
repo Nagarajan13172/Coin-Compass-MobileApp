@@ -32,7 +32,7 @@ class CreditsScreen extends ConsumerStatefulWidget {
 }
 
 class _CreditsScreenState extends ConsumerState<CreditsScreen> {
-  /// Credits with a settle/delete in flight.
+  /// Credits with a delete in flight.
   final Set<String> _busyIds = {};
 
   @override
@@ -115,46 +115,10 @@ class _CreditsScreenState extends ConsumerState<CreditsScreen> {
 
   Future<void> _handleAction(Credit credit, CreditAction action) async {
     switch (action) {
-      case CreditAction.settle:
-        await _setSettled(credit, true);
-      case CreditAction.reopen:
-        await _setSettled(credit, false);
       case CreditAction.edit:
         await CreditFormSheet.show(context, credit: credit);
       case CreditAction.delete:
         await _delete(credit);
-    }
-  }
-
-  Future<void> _setSettled(Credit credit, bool settled) async {
-    if (_busyIds.contains(credit.id)) return;
-    setState(() => _busyIds.add(credit.id));
-
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      await ref
-          .read(creditsRepositoryProvider)
-          .setSettled(credit.id, settled: settled);
-      ref.invalidate(creditsProvider);
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(
-              settled
-                  ? 'Settled with ${credit.displayName}'
-                  : 'Reopened ${credit.displayName}',
-            ),
-          ),
-        );
-    } catch (error) {
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(content: Text(ApiException.from(error).message)),
-        );
-    } finally {
-      if (mounted) setState(() => _busyIds.remove(credit.id));
     }
   }
 
@@ -330,7 +294,7 @@ class _ShortcutRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final people = ref.watch(peopleProvider).valueOrNull;
     final splits = ref.watch(splitsProvider).valueOrNull;
-    final openSplits = splits?.where((split) => !split.settled).length;
+    final splitCount = splits?.length;
 
     return Row(
       children: [
@@ -349,7 +313,9 @@ class _ShortcutRow extends ConsumerWidget {
           child: _ShortcutCard(
             icon: LucideIcons.receipt,
             label: 'Splits',
-            caption: openSplits == null ? 'Shared bills' : '$openSplits open',
+            caption: splitCount == null
+                ? 'Shared bills'
+                : '$splitCount ${splitCount == 1 ? 'bill' : 'bills'}',
             onTap: () => context.go('/credits/splits'),
           ),
         ),
@@ -453,43 +419,23 @@ class _CreditList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final open = credits.where((credit) => !credit.settled).toList()
-      ..sort(_byDateDescending);
-    final settled = credits.where((credit) => credit.settled).toList()
-      ..sort(_byDateDescending);
-
-    Widget tile(Credit credit) => Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: CreditTile(
-        credit: credit,
-        busy: busyIds.contains(credit.id),
-        onAction: (action) => onAction(credit, action),
-        onTap: () => CreditFormSheet.show(context, credit: credit),
-      ),
-    );
+    // One list, newest first: the API has no settled flag, so there is no
+    // closed section to split off.
+    final rows = [...credits]..sort(_byDateDescending);
 
     return Column(
       children: [
         const SizedBox(height: 12),
-        for (final credit in open) tile(credit),
-        if (settled.isNotEmpty) ...[
+        for (final credit in rows)
           Padding(
-            padding: const EdgeInsets.fromLTRB(24, 6, 24, 8),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'SETTLED',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.7,
-                  color: context.colors.mutedForeground,
-                ),
-              ),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: CreditTile(
+              credit: credit,
+              busy: busyIds.contains(credit.id),
+              onAction: (action) => onAction(credit, action),
+              onTap: () => CreditFormSheet.show(context, credit: credit),
             ),
           ),
-          for (final credit in settled) tile(credit),
-        ],
       ],
     );
   }

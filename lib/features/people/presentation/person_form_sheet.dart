@@ -100,7 +100,7 @@ class _PersonFormSheetState extends ConsumerState<PersonFormSheet> {
               setState(() => _relation = value ?? PersonRelation.other),
         ),
         if (_isEdit) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton.icon(

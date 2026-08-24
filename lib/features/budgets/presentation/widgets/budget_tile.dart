@@ -140,27 +140,46 @@ class BudgetTile extends StatelessWidget {
           ),
           if (used != null) ...[
             const SizedBox(height: 10),
+            // Every child shrinks: a blown budget reports percentages in the
+            // millions (1371742% of a ₹9,000 limit), which is far too wide to
+            // sit next to the chip at 360dp. spaceBetween keeps the status on
+            // the left and the headline flush right whatever is left over.
             Row(
+              spacing: 8,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _StatusChip(
-                  label: over
-                      ? 'Over budget'
-                      : (nearLimit ? 'Near limit' : 'On track'),
-                  color: accent,
-                ),
-                if (percent != null) ...[
-                  const SizedBox(width: 8),
-                  Text(
-                    '${percent.round()}% used',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                      color: c.mutedForeground,
-                    ),
-                  ),
-                ],
-                const Spacer(),
                 Flexible(
+                  flex: 5,
+                  child: Row(
+                    spacing: 8,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: _StatusChip(
+                          label: over
+                              ? 'Over budget'
+                              : (nearLimit ? 'Near limit' : 'On track'),
+                          color: accent,
+                        ),
+                      ),
+                      if (percent != null)
+                        Flexible(
+                          child: Text(
+                            '${percent.round()}% used',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: c.mutedForeground,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Flexible(
+                  flex: 4,
                   child: Text(
                     _trailing(used, amount, over),
                     textAlign: TextAlign.right,
@@ -218,6 +237,8 @@ class _StatusChip extends StatelessWidget {
       ),
       child: Text(
         label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: TextStyle(
           fontSize: 11.5,
           fontWeight: FontWeight.w600,

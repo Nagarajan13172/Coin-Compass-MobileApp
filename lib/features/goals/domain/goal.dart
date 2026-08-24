@@ -1,5 +1,9 @@
 import '../../../core/api/json.dart';
 
+/// A savings goal. `POST /goals` declares only name, targetAmount,
+/// savedAmount, targetDate, monthlyContribution, color, icon and currency —
+/// a `note` was being typed and silently dropped, so it is gone
+/// (docs/WRITE_SCHEMAS.md).
 class Goal {
   const Goal({
     required this.id,
@@ -16,7 +20,6 @@ class Goal {
     this.percentFromServer,
     this.completeFromServer,
     this.monthsLeft,
-    this.note,
     this.createdAt,
     this.updatedAt,
   });
@@ -37,7 +40,6 @@ class Goal {
   final num? percentFromServer;
   final bool? completeFromServer;
   final num? monthsLeft;
-  final String? note;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -70,7 +72,6 @@ class Goal {
         ? null
         : J.boolean(json['complete']),
     monthsLeft: J.numberOrNull(json['monthsLeft']),
-    note: J.strOrNull(json['note']),
     createdAt: J.date(json['createdAt']),
     updatedAt: J.date(json['updatedAt']),
   );
@@ -84,6 +85,5 @@ class Goal {
     'color': color,
     'icon': icon,
     'currency': currency,
-    if (note != null) 'note': note,
   };
 }

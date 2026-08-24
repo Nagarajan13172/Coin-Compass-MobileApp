@@ -17,18 +17,13 @@ import 'package:flutter_test/flutter_test.dart';
 /// shapes the API answers list endpoints in.
 void main() {
   group('credits summary', () {
-    Credit credit(
-      CreditDirection direction,
-      num amount, {
-      bool settled = false,
-      num? outstanding,
-    }) => Credit(
-      id: '$direction-$amount',
-      amount: amount,
-      direction: direction,
-      settled: settled,
-      outstanding: outstanding,
-    );
+    Credit credit(CreditDirection direction, num amount, {num? outstanding}) =>
+        Credit(
+          id: '$direction-$amount',
+          amount: amount,
+          direction: direction,
+          outstanding: outstanding,
+        );
 
     test('nets what is owed to you against what you owe', () {
       final summary = CreditsSummary.fromCredits([
@@ -43,14 +38,17 @@ void main() {
       expect(summary.net, 0);
     });
 
-    test('settled entries are closed, so they leave the totals alone', () {
+    test('every entry counts — the API has no settled flag to exclude', () {
+      // A closed loan is recorded as the matching `received` entry, which nets
+      // the original `given` out; nothing is filtered on the way in.
       final summary = CreditsSummary.fromCredits([
         credit(CreditDirection.given, 5000),
-        credit(CreditDirection.given, 9999, settled: true),
+        credit(CreditDirection.received, 5000),
       ]);
 
       expect(summary.given, 5000);
-      expect(summary.net, 5000);
+      expect(summary.owedToYou, 0);
+      expect(summary.net, 0);
     });
 
     test('a server-computed outstanding wins over the original amount', () {

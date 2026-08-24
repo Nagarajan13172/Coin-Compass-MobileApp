@@ -19,6 +19,11 @@ import '../data/goals_repository.dart';
 import '../domain/goal.dart';
 
 /// Create / edit a savings goal. Pops `true` when the list changed.
+///
+/// Every control maps to a key `POST /goals` declares — name, targetAmount,
+/// savedAmount, targetDate, monthlyContribution, color, icon, currency. The
+/// note field is gone: the schema never declared it, so it was typed and
+/// silently dropped (docs/WRITE_SCHEMAS.md).
 class GoalFormSheet extends ConsumerStatefulWidget {
   const GoalFormSheet({super.key, this.goal});
 
@@ -55,9 +60,6 @@ class _GoalFormSheetState extends ConsumerState<GoalFormSheet> {
         ? ''
         : _plainNumber(_existing.monthlyContribution),
   );
-  late final TextEditingController _note = TextEditingController(
-    text: _existing?.note ?? '',
-  );
 
   late DateTime? _targetDate = _existing?.targetDate;
   late String _color = _existing?.color ?? '#6366F1';
@@ -78,7 +80,6 @@ class _GoalFormSheetState extends ConsumerState<GoalFormSheet> {
     _target.dispose();
     _saved.dispose();
     _monthly.dispose();
-    _note.dispose();
     super.dispose();
   }
 
@@ -173,15 +174,6 @@ class _GoalFormSheetState extends ConsumerState<GoalFormSheet> {
           hexes: categoryColorHexes,
           value: _color,
           onChanged: (hex) => setState(() => _color = hex),
-        ),
-        const SizedBox(height: 18),
-        AppTextField(
-          label: 'Note',
-          controller: _note,
-          hint: 'Anything worth remembering (optional)',
-          enabled: !_busy,
-          maxLines: 3,
-          errorText: _apiError?.fieldError('note'),
         ),
       ],
     );
@@ -292,7 +284,6 @@ class _GoalFormSheetState extends ConsumerState<GoalFormSheet> {
       _targetDate == null ? null : DateX.toApi(_targetDate!),
       _existing?.targetDate,
     );
-    WriteBody.putText(body, 'note', _note.text, _existing?.note);
     return body;
   }
 
