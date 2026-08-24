@@ -20,6 +20,7 @@ import '../../transactions/presentation/transactions_screen.dart'
 import '../../transactions/presentation/widgets/transaction_row.dart';
 import 'calendar_providers.dart';
 import 'widgets/month_grid.dart';
+import '../../../core/router/route_refresh.dart';
 
 /// `/calendar` — the month at a glance with a per-day drill-down.
 /// Body only; [AppScaffold] supplies the chrome.
@@ -126,14 +127,8 @@ class CalendarScreen extends ConsumerWidget {
     }
   }
 
-  Future<void> _refresh(WidgetRef ref, DateTime month) async {
-    ref.invalidate(calendarMonthProvider(month));
-    try {
-      await ref.read(calendarMonthProvider(month).future);
-    } catch (_) {
-      // The error state is rendered from the provider; the spinner just stops.
-    }
-  }
+  Future<void> _refresh(WidgetRef ref, DateTime month) =>
+      refreshCurrentRoute(ref, '/calendar');
 }
 
 /// `August 2026        ‹  Today  ›`

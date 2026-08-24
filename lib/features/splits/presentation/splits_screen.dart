@@ -21,6 +21,7 @@ import '../../people/data/people_repository.dart';
 import '../data/splits_repository.dart';
 import '../domain/split.dart';
 import 'split_form_sheet.dart';
+import '../../../core/router/route_refresh.dart';
 
 /// `/credits/splits` — shared expenses: what a bill came to, what your share
 /// was, and what the others still owe.
@@ -89,14 +90,7 @@ class _SplitsScreenState extends ConsumerState<SplitsScreen> {
     );
   }
 
-  Future<void> _refresh() async {
-    ref.invalidate(splitsProvider);
-    try {
-      await ref.read(splitsProvider.future);
-    } catch (_) {
-      // The error state is rendered from the provider; the spinner just stops.
-    }
-  }
+  Future<void> _refresh() => refreshCurrentRoute(ref, '/credits/splits');
 
   Future<void> _delete(Split split) async {
     final confirmed = await ConfirmSheet.show(

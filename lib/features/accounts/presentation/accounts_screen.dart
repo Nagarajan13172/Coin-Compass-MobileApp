@@ -12,10 +12,12 @@ import '../../../core/widgets/loading_shimmer.dart';
 import '../../../core/widgets/money_text.dart';
 import '../../../core/widgets/screen_header.dart';
 import '../../transactions/presentation/transactions_providers.dart';
+import '../../wealth_lock/presentation/wealth_gate.dart';
 import '../data/accounts_repository.dart';
 import '../domain/account.dart';
 import 'account_form_sheet.dart';
 import 'widgets/account_tile.dart';
+import '../../../core/router/route_refresh.dart';
 
 /// Height of the bottom nav bar in [AppScaffold]; a scrollable body has to
 /// clear it because the shell renders with `extendBody: true`.
@@ -94,15 +96,8 @@ class AccountsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _refresh(WidgetRef ref) async {
-    ref.invalidate(accountsProvider);
-    ref.invalidate(transactionBalanceProvider);
-    try {
-      await ref.read(accountsProvider.future);
-    } catch (_) {
-      // The error state is rendered from the provider; the spinner just stops.
-    }
-  }
+  Future<void> _refresh(WidgetRef ref) =>
+      refreshCurrentRoute(ref, '/accounts');
 
   Future<void> _openForm(
     BuildContext context,
@@ -173,10 +168,22 @@ class _AccountSlivers extends StatelessWidget {
   Widget build(BuildContext context) {
     final totals = AccountTotals.of(accounts, balances);
 
+    // The totals card is the Accounts screen's one gated surface. The web
+    // hides its equivalent — `r && <Card className="surface-gradient mb-5 …">`,
+    // bundle @859683 — while keeping every individual account card, so the
+    // per-account balances and the per-type group subtotals below stay: they
+    // are sums of numbers already on screen, not a net worth.
     final children = <Widget>[
-      Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-        child: _TotalsCard(totals: totals),
+      WealthGate(
+        locked: const SizedBox.shrink(),
+        checking: const Padding(
+          padding: EdgeInsets.fromLTRB(20, 12, 20, 0),
+          child: LoadingCard(lines: 3),
+        ),
+        builder: (_) => Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+          child: _TotalsCard(totals: totals),
+        ),
       ),
     ];
 

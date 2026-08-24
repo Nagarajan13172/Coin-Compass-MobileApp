@@ -15,6 +15,7 @@ import '../domain/person.dart';
 import 'group_form_sheet.dart';
 import 'person_form_sheet.dart';
 import 'widgets/person_avatar.dart';
+import '../../../core/router/route_refresh.dart';
 
 /// `/credits/people` — the address book behind credits and splits: everyone you
 /// share money with, and the groups they belong to.
@@ -92,16 +93,8 @@ class PeopleScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _refresh(WidgetRef ref) async {
-    ref
-      ..invalidate(peopleProvider)
-      ..invalidate(personGroupsProvider);
-    try {
-      await ref.read(peopleProvider.future);
-    } catch (_) {
-      // The error state is rendered from the provider; the spinner just stops.
-    }
-  }
+  Future<void> _refresh(WidgetRef ref) =>
+      refreshCurrentRoute(ref, '/credits/people');
 }
 
 class _EmptyPeople extends StatelessWidget {

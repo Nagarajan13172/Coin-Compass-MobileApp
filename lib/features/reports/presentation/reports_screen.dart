@@ -25,6 +25,7 @@ import 'reports_providers.dart';
 import 'widgets/by_account_card.dart';
 import 'widgets/category_breakdown_card.dart';
 import 'widgets/reports_charts.dart';
+import '../../../core/router/route_refresh.dart';
 
 /// `/reports` — income and spending for one window, from six `/reports/*`
 /// reads.
@@ -61,7 +62,7 @@ class ReportsScreen extends ConsumerWidget {
     return RefreshIndicator(
       color: c.primary,
       backgroundColor: c.card,
-      onRefresh: () => refreshReports(ref),
+      onRefresh: () => refreshCurrentRoute(ref, '/reports'),
       child: ListView(
         // Always scrollable, or pull-to-refresh dies on a short page.
         physics: const AlwaysScrollableScrollPhysics(),

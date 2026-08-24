@@ -26,6 +26,7 @@ import 'transactions_providers.dart';
 import 'widgets/quick_add_row.dart';
 import 'widgets/transaction_filters.dart';
 import 'widgets/transaction_row.dart';
+import '../../../core/router/route_refresh.dart';
 
 // The month the ledger is showing now lives beside the query it seeds, in
 // transactions_providers.dart. It is re-exported here because the calendar
@@ -133,12 +134,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     });
   }
 
-  Future<void> _refresh() async {
-    ref.invalidate(transactionBalanceProvider);
-    ref.invalidate(transactionBalanceAsOfProvider);
-    ref.invalidate(transactionTagsProvider);
-    await ref.read(transactionsListProvider.notifier).refresh();
-  }
+  Future<void> _refresh() => refreshCurrentRoute(ref, '/transactions');
 
   /// The sheet resolves to the saved row (null when dismissed or deleted), and
   /// leaves reconciliation to us — so we place it optimistically, or drop it

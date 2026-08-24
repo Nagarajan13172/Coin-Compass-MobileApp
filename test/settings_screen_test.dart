@@ -303,7 +303,11 @@ void main() {
     );
     await reveal(tester, find.text('Security'));
 
-    expect(find.text('On'), findsNWidgets(3));
+    // Two "On" pills, not three: since 6.2 the Net Worth row reports
+    // Locked / Unlocked / Off rather than On / Off, because "on" cannot say
+    // whether the figures are showing right now.
+    expect(find.text('On'), findsNWidgets(2));
+    expect(find.text('Unlocked'), findsOneWidget);
     expect(find.text('Change PIN'), findsOneWidget);
     expect(find.text('Turn off'), findsNWidgets(2));
     // Singular, because there is exactly one code left.

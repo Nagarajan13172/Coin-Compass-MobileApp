@@ -21,6 +21,7 @@ import 'loan_preclose_sheet.dart';
 import 'loans_providers.dart';
 import 'prepayment_planner_sheet.dart';
 import 'widgets/loan_card.dart';
+import '../../../core/router/route_refresh.dart';
 
 /// `/loans` — what is still owed, what it costs every month, and the tools to
 /// pay it off early. Body only; [AppScaffold] supplies the chrome.
@@ -78,14 +79,8 @@ class LoansScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _refresh(WidgetRef ref) async {
-    ref.invalidate(loansProvider);
-    try {
-      await ref.read(loansProvider.future);
-    } catch (_) {
-      // The error state is rendered from the provider; the spinner just stops.
-    }
-  }
+  Future<void> _refresh(WidgetRef ref) =>
+      refreshCurrentRoute(ref, '/loans');
 }
 
 class _EmptyLoans extends StatelessWidget {

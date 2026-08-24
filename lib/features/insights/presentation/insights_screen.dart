@@ -22,6 +22,7 @@ import '../../reports/presentation/period.dart';
 import '../../transactions/presentation/open_transactions.dart';
 import '../domain/insights.dart';
 import 'insights_providers.dart';
+import '../../../core/router/route_refresh.dart';
 
 /// `/insights` — how this period compares with the last one.
 ///
@@ -51,7 +52,7 @@ class InsightsScreen extends ConsumerWidget {
     return RefreshIndicator(
       color: c.primary,
       backgroundColor: c.card,
-      onRefresh: () => refreshInsights(ref),
+      onRefresh: () => refreshCurrentRoute(ref, '/insights'),
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         // The shell's chrome overlaps the body, so the tail pads past the nav

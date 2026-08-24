@@ -29,6 +29,9 @@ import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/splits/presentation/splits_screen.dart';
 import '../../features/stocks/presentation/stocks_screen.dart';
 import '../../features/transactions/presentation/transactions_screen.dart';
+import '../../features/wealth_lock/domain/wealth_lock.dart';
+import '../../features/wealth_lock/presentation/wealth_gate.dart';
+import '../../features/wealth_lock/presentation/wealth_lock_providers.dart';
 import '../theme/app_colors.dart';
 import '../widgets/app_scaffold.dart';
 import 'destinations.dart';
@@ -62,10 +65,11 @@ Widget _screenFor(Destination d) => switch (d.path) {
   '/recurring' => const RecurringScreen(),
   '/calendar' => const CalendarScreen(),
   '/credits' => const CreditsScreen(),
-  // phase 4 — shipped
-  '/net-worth' => const NetWorthScreen(),
+  // phase 4 — shipped. The two wealth screens are wrapped, not just
+  // redirected: see [_wealthGated].
+  '/net-worth' => _wealthGated((_) => const NetWorthScreen()),
   '/loans' => const LoansScreen(),
-  '/stocks' => const StocksScreen(),
+  '/stocks' => _wealthGated((_) => const StocksScreen()),
   '/gold' => const GoldScreen(),
   // phase 5 — shipped
   '/reports' => const ReportsScreen(),
@@ -75,12 +79,32 @@ Widget _screenFor(Destination d) => switch (d.path) {
   _ => PlaceholderScreen(title: d.label, icon: d.icon),
 };
 
+/// Phase 6.2 — the render-level half of the Net Worth gate.
+///
+/// The redirect below already sends a locked user home, but a redirect acts a
+/// frame late: `GoRouter` builds, then redirects. Wrapping the screen means the
+/// widget is never constructed while locked, so its providers never fire
+/// `/networth/history`, `/holdings` or `/stocks/portfolio`, and there is no
+/// frame of the owner's money to leak on a deep link. Same argument 6.1 used
+/// for putting the app lock above the Router instead of trusting a redirect.
+Widget _wealthGated(WidgetBuilder builder) =>
+    WealthGate(checking: const WealthCheckingScreen(), builder: builder);
+
 /// Bridges Riverpod auth state into GoRouter so redirects re-run on sign-in
 /// and sign-out.
+///
+/// It also has to fire when the **wealth lock flag** flips, not only when the
+/// session status does: unlocking does not change `AuthStatus`, so without this
+/// the gated redirect would never re-run and an owner who has just unlocked
+/// would still be bounced off `/net-worth`.
 class _AuthRefresh extends ChangeNotifier {
   _AuthRefresh(this._ref) {
     _sub = _ref.listen<AuthState>(authControllerProvider, (previous, next) {
-      if (previous?.status != next.status) notifyListeners();
+      if (previous?.status != next.status ||
+          previous?.user?.wealthLockEnabled != next.user?.wealthLockEnabled ||
+          previous?.user?.mode != next.user?.mode) {
+        notifyListeners();
+      }
     }, fireImmediately: false);
   }
 
@@ -118,6 +142,23 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // Signed in but sitting on an auth screen — go home.
       if (_isAuthRoute(location)) return '/';
+
+      // The Net Worth gate. Web parity, verbatim:
+      //   function GJ(){ return no() ? <Md/> : <Navigate to="/" replace/> }
+      //
+      // Keyed on `locked` only, never on `checking`: a resume re-reads
+      // /auth/me, and kicking an unlocked owner off the screen they were
+      // reading every time the app comes back would be its own bug. While
+      // `checking` the WealthGate wrapper shows a placeholder instead of a
+      // figure, which is the part that matters.
+      //
+      // Deliberately a pure function of location + visibility, with no
+      // provider writes inside it — a redirect that mutates state re-enters
+      // itself.
+      if (isWealthGatedPath(location) &&
+          ref.read(wealthVisibilityProvider) == WealthVisibility.locked) {
+        return '/';
+      }
       return null;
     },
     routes: [
@@ -148,9 +189,15 @@ final routerProvider = Provider<GoRouter>((ref) {
           // Holdings has no nav slot of its own — the sidebar has exactly 17
           // destinations and the web app reaches savings & investments from
           // Net Worth. Mounting it under /net-worth keeps that entry lit.
+          // Gated with the other two. The web has no /holdings route at all —
+          // it renders holdings inside /net-worth — but it drops the
+          // `holdings` query key on every lock and unlock, and its settings
+          // copy names what is hidden as "Net Worth (holdings & net-worth
+          // totals)". An open route here would be a hole straight through the
+          // gate.
           GoRoute(
             path: HoldingsScreen.routePath,
-            builder: (_, _) => const HoldingsScreen(),
+            builder: (_, _) => _wealthGated((_) => const HoldingsScreen()),
           ),
         ],
       ),

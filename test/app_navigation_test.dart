@@ -132,7 +132,14 @@ void main() {
     tester,
   ) async {
     await boot(tester);
-    await tester.tap(find.text('Transactions').first);
+    // `.last`, not `.first`: the shell paints the body before the nav bar, and
+    // the dashboard's quick-stats card also says "Transactions". That row used
+    // to be ellipsised under the harness's stand-in font, so `.first` happened
+    // to fall through to the nav item; once `flutter_test_config.dart` started
+    // loading real Inter it stopped being clipped, `.first` began tapping a
+    // label inside the scroll view, and this test tapped nothing at all. The
+    // nav is the last widget in the shell's tree order.
+    await tester.tap(find.text('Transactions').last);
     await settle(tester);
     expect(find.byType(TransactionsScreen), findsOneWidget);
   });

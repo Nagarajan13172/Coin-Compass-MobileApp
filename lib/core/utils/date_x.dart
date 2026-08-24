@@ -66,9 +66,16 @@ class DateX {
         '${_fmt('d MMM').format(end)} ${end.year}';
   }
 
-  static String relative(DateTime d) {
-    final diff = DateTime.now().difference(d);
-    if (diff.inSeconds < 60) return 'just now';
+  /// Compact "3m ago" / "2h ago" / "4d ago", falling back to `dd MMM`.
+  ///
+  /// **Clamped forward on purpose.** Phase 6.3 prints this on the staleness
+  /// banner, and a backwards clock jump (or a stamp written while the device
+  /// clock was ahead) would otherwise make the honesty surface itself print
+  /// nonsense — the same class of bug 6.1's review caught on the lock cooldown.
+  /// A future stamp reads "just now", never "-3m ago".
+  static String relative(DateTime d, {DateTime? now}) {
+    final diff = (now ?? DateTime.now()).difference(d);
+    if (diff.isNegative || diff.inSeconds < 60) return 'just now';
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     if (diff.inDays < 7) return '${diff.inDays}d ago';

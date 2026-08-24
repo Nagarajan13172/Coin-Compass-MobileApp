@@ -18,9 +18,24 @@
         android:name="android.hardware.fingerprint"
         android:required="false"/>
 
+    <!-- Phase 6.3. android:allowBackup was NOT DECLARED here, so it defaulted
+         to TRUE, and Android Auto Backup includes filesDir — which holds the
+         PersistCookieJar's mt_session cookie (documented in 6.1's threat
+         model) and, from 6.3 on, up to 14 days of the owner's figures as
+         plaintext JSON under api-cache/. Backup is switched off outright
+         rather than filtered: none of this app's local state is worth
+         restoring to a new device (the cache is regenerable, the cookie should
+         not travel, and the app-lock PIN verifier is deliberately
+         per-install). The API-31+ rules file below says the same thing for
+         cloud backup and device-to-device transfer.
+         MUST be verified with `aapt2 dump xmltree` on the SIGNED artifact, not
+         on this file — 6.1 found a release-only manifest bug exactly that way. -->
     <application
         android:label="@string/app_name"
         android:name="${applicationName}"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round">
         <activity

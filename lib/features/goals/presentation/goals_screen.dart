@@ -17,6 +17,7 @@ import 'goal_contribute_sheet.dart';
 import 'goal_form_sheet.dart';
 import 'widgets/goal_card.dart';
 import 'widgets/goal_ring.dart';
+import '../../../core/router/route_refresh.dart';
 
 /// `/goals` — savings goals with their progress rings and a contribute
 /// shortcut. Body only; [AppScaffold] supplies the chrome.
@@ -74,14 +75,8 @@ class GoalsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _refresh(WidgetRef ref) async {
-    ref.invalidate(goalsProvider);
-    try {
-      await ref.read(goalsProvider.future);
-    } catch (_) {
-      // The error state is rendered from the provider; the spinner just stops.
-    }
-  }
+  Future<void> _refresh(WidgetRef ref) =>
+      refreshCurrentRoute(ref, '/goals');
 }
 
 class _EmptyGoals extends StatelessWidget {

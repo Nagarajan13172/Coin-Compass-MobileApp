@@ -7,7 +7,9 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/error_retry.dart';
 import '../../../../core/widgets/loading_shimmer.dart';
+import '../../../../core/api/response_cache.dart';
 import '../../../../core/widgets/money_text.dart';
+import '../../../../core/widgets/stale_banner.dart';
 import '../../../accounts/data/accounts_repository.dart';
 import '../../../networth/data/networth_repository.dart';
 import '../dashboard_screen.dart';
@@ -98,14 +100,25 @@ class NetWorthCard extends ConsumerWidget {
           const SizedBox(height: 6),
           Row(
             children: [
-              Text(
-                'Sum of $count ${count == 1 ? 'account' : 'accounts'}',
-                style: TextStyle(fontSize: 12.5, color: c.mutedForeground),
+              Flexible(
+                child: Text(
+                  'Sum of $count ${count == 1 ? 'account' : 'accounts'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12.5, color: c.mutedForeground),
+                ),
               ),
               const SizedBox(width: 5),
               Icon(LucideIcons.info, size: 13, color: c.mutedForeground),
             ],
           ),
+          // Phase 6.3 — the one card on the dashboard that earns a per-card
+          // marker. `/networth/history` fails independently of the metals,
+          // accounts and reports reads beside it, so this figure can be hours
+          // old while its siblings are live, and the shell banner alone would
+          // not say WHICH number is the stale one. Renders nothing at all when
+          // net worth is live.
+          const StaleStamp(StaleTag.netWorth),
         ],
       ),
     );

@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/router/route_refresh.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/loading_shimmer.dart';
 import '../../../core/widgets/segmented_period_selector.dart';
-import '../../accounts/data/accounts_repository.dart';
-import '../../gold/data/metals_repository.dart';
-import '../../networth/data/networth_repository.dart';
 import '../../reports/data/reports_repository.dart';
 import '../../reports/domain/report_models.dart';
 import '../../reports/presentation/period.dart';
 import '../../transactions/data/transactions_repository.dart';
-import '../../transactions/presentation/transactions_providers.dart';
+import '../../wealth_lock/presentation/wealth_gate.dart';
 import 'widgets/accounts_preview_card.dart';
 import 'widgets/greeting_header.dart';
 import 'widgets/income_expense_chart.dart';
@@ -88,7 +87,7 @@ class DashboardScreen extends ConsumerWidget {
     return RefreshIndicator(
       color: c.primary,
       backgroundColor: c.card,
-      onRefresh: () => refreshDashboard(ref),
+      onRefresh: () => refreshCurrentRoute(ref, '/'),
       child: ListView(
         // Always scrollable, otherwise pull-to-refresh dies on a short page.
         physics: const AlwaysScrollableScrollPhysics(),
@@ -116,8 +115,7 @@ class DashboardScreen extends ConsumerWidget {
           const SizedBox(height: 16),
           const SummaryCards(),
           const SizedBox(height: 12),
-          const NetWorthCard(),
-          const SizedBox(height: 12),
+          const _GatedNetWorthCard(),
           const QuickStatsCard(),
           const SizedBox(height: 12),
           const IncomeExpenseChart(),
@@ -137,35 +135,31 @@ class DashboardScreen extends ConsumerWidget {
   }
 }
 
-/// Pull-to-refresh: drop every cached read, then wait for them all to settle.
-/// Failures are swallowed here because each card renders its own [ErrorRetry] —
-/// the spinner should stop either way.
-Future<void> refreshDashboard(WidgetRef ref) async {
-  ref
-    ..invalidate(dashboardSummaryProvider)
-    ..invalidate(dashboardTrendProvider)
-    ..invalidate(dashboardCategoryProvider)
-    ..invalidate(accountsProvider)
-    ..invalidate(metalsLatestProvider)
-    ..invalidate(netWorthHistoryProvider)
-    ..invalidate(transactionBalanceProvider)
-    ..invalidate(transactionsPageProvider);
+/// The dashboard's one gated surface: the gradient net-worth hero, its
+/// "Breakdown" link and its "Sum of N accounts" line.
+///
+/// The web hides exactly this card and nothing else on the dashboard —
+/// `f && <Card className="surface-gradient …">`, bundle @798903 — so income,
+/// expense, net, the chart, the accounts preview and the category donut all
+/// stay. Nothing takes its place while locked: a "Net Worth is hidden"
+/// placeholder would advertise the lock to the very person the everyday login
+/// is meant to be shareable with.
+///
+/// Carries its own trailing gap, the same way [MetalsCard] does, so removing
+/// it leaves no hole in the column.
+class _GatedNetWorthCard extends StatelessWidget {
+  const _GatedNetWorthCard();
 
-  await Future.wait(<Future<void>>[
-    _settle(ref.read(dashboardSummaryProvider.future)),
-    _settle(ref.read(dashboardTrendProvider.future)),
-    _settle(ref.read(dashboardCategoryProvider.future)),
-    _settle(ref.read(accountsProvider.future)),
-    _settle(ref.read(metalsLatestProvider.future)),
-    _settle(ref.read(netWorthHistoryProvider.future)),
-    _settle(ref.read(transactionsPageProvider(recentTransactionsQuery).future)),
-  ]);
-}
-
-Future<void> _settle(Future<Object?> future) async {
-  try {
-    await future;
-  } catch (_) {
-    // Handled by the card that owns the read.
+  @override
+  Widget build(BuildContext context) {
+    return WealthGate(
+      locked: const SizedBox.shrink(),
+      checking: const Column(
+        children: [LoadingCard(lines: 2), SizedBox(height: 12)],
+      ),
+      builder: (_) =>
+          const Column(children: [NetWorthCard(), SizedBox(height: 12)]),
+    );
   }
 }
+

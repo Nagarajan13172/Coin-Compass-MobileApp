@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/api/api_client.dart';
+import 'core/api/stale_ledger.dart';
 import 'core/i18n/locale_controller.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
@@ -12,6 +13,7 @@ import 'core/theme/theme_controller.dart';
 import 'features/auth/presentation/auth_providers.dart';
 import 'features/lock/presentation/app_lock_gate.dart';
 import 'features/settings/data/settings_repository.dart';
+import 'features/wealth_lock/presentation/wealth_lock_providers.dart';
 import 'features/settings/domain/app_settings.dart';
 
 Future<void> main() async {
@@ -56,6 +58,22 @@ class _CoinCompassAppState extends ConsumerState<CoinCompassApp> {
     final themeMode = ref.watch(themeControllerProvider);
     final locale = ref.watch(localeControllerProvider);
     final auth = ref.watch(authControllerProvider);
+
+    // ── Phase 6.3, kept alive from the root and nowhere else ────────────────
+    //
+    // `wealthCacheScopeProvider` pushes the Net Worth lock's visibility into
+    // `ResponseCache.wealthScope`. Without a live subscription the cache sits
+    // at its default `unknown` and refuses every wealth-sensitive body in both
+    // directions — so forgetting this costs offline Net Worth, never a wrong
+    // figure. It is watched here rather than in the shell because the shell
+    // unmounts on sign-out, and the scope must be right before the first read
+    // of the next session.
+    //
+    // `cacheEventBridgeProvider` connects the cache's hit/live events to the
+    // stale ledger and the recovery counter.
+    ref
+      ..watch(wealthCacheScopeProvider)
+      ..watch(cacheEventBridgeProvider);
 
     // The account's own `settings.theme`, adopted on a device that has never
     // made a local choice of its own — otherwise a signed-in user whose

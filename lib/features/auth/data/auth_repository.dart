@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_client.dart';
@@ -90,6 +92,7 @@ class AuthRepository {
         code: 'UNEXPECTED_RESPONSE',
       );
     }
+    _rotateCacheScope();
     return SignInSuccess(AppUser.fromJson(map));
   }
 
@@ -127,8 +130,16 @@ class AuthRepository {
       Endpoints.signup,
       body: {'name': name, 'email': email, 'password': password},
     );
+    _rotateCacheScope();
     return AppUser.fromJson(J.map(json));
   }
+
+  /// A new session may belong to a different account, so nothing the previous
+  /// one cached may be addressable. Rotation is synchronous in effect — the new
+  /// scope is in force the moment this returns — while the directory wipe is
+  /// best-effort housekeeping, so it is safe to leave unawaited on the sign-in
+  /// path. Sign-out rotates too, via `ApiClient.clearSession`.
+  void _rotateCacheScope() => unawaited(_api.cache.rotateScope());
 
   Future<void> signOut() async {
     try {
@@ -212,6 +223,7 @@ class AuthRepository {
       Endpoints.twoFactorVerify,
       body: {'method': method, 'code': code},
     );
+    _rotateCacheScope();
     return AppUser.fromJson(J.map(json));
   }
 

@@ -16,16 +16,12 @@ import '../../../core/widgets/error_retry.dart';
 import '../../../core/widgets/loading_shimmer.dart';
 import '../../../core/widgets/screen_header.dart';
 import '../../../core/widgets/section_header.dart';
-import '../../accounts/data/accounts_repository.dart';
-import '../../auth/presentation/auth_providers.dart';
-import '../../categories/data/categories_repository.dart';
-import '../../goals/data/goals_repository.dart';
-import '../../loans/data/loans_repository.dart';
 import '../data/settings_repository.dart';
 import '../domain/app_settings.dart';
 import 'profile_card.dart';
 import 'security_card.dart';
 import 'settings_providers.dart';
+import '../../../core/router/route_refresh.dart';
 
 /// `/settings` — who is signed in, how the app looks, what the wallet is
 /// called, which currency it counts in, and the two locks that guard it.
@@ -118,20 +114,8 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _refresh(WidgetRef ref) async {
-    ref
-      ..invalidate(settingsProvider)
-      ..invalidate(twoFactorStatusProvider)
-      ..invalidate(accountsProvider)
-      ..invalidate(categoriesProvider)
-      ..invalidate(goalsProvider)
-      ..invalidate(loansProvider);
-    try {
-      await ref.read(settingsProvider.future);
-    } catch (_) {
-      // The error state is rendered from the provider; the spinner just stops.
-    }
-  }
+  Future<void> _refresh(WidgetRef ref) =>
+      refreshCurrentRoute(ref, '/settings');
 }
 
 /// The 20dp gutter every card on this screen sits in.

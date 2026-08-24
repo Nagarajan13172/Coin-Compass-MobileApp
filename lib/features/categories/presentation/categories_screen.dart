@@ -13,6 +13,7 @@ import '../data/categories_repository.dart';
 import '../domain/category.dart';
 import 'category_form_sheet.dart';
 import 'widgets/category_tile.dart';
+import '../../../core/router/route_refresh.dart';
 
 /// Height of the bottom nav bar in [AppScaffold]; a scrollable body has to
 /// clear it because the shell renders with `extendBody: true`.
@@ -42,14 +43,7 @@ class CategoriesScreen extends ConsumerStatefulWidget {
 class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
   CategoryType _tab = CategoryType.expense;
 
-  Future<void> _refresh() async {
-    ref.invalidate(categoriesProvider);
-    try {
-      await ref.read(categoriesProvider.future);
-    } catch (_) {
-      // The provider already carries the error into ErrorRetry.
-    }
-  }
+  Future<void> _refresh() => refreshCurrentRoute(ref, '/categories');
 
   Future<void> _openSheet({Category? category}) async {
     final result = await CategoryFormSheet.show(

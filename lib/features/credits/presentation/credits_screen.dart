@@ -21,6 +21,7 @@ import '../data/credits_repository.dart';
 import '../domain/credit.dart';
 import 'credit_form_sheet.dart';
 import 'widgets/credit_tile.dart';
+import '../../../core/router/route_refresh.dart';
 
 /// `/credits` — money lent to and borrowed from friends and family, with the
 /// address book and shared bills a tap away.
@@ -102,16 +103,7 @@ class _CreditsScreenState extends ConsumerState<CreditsScreen> {
     );
   }
 
-  Future<void> _refresh() async {
-    ref
-      ..invalidate(creditsProvider)
-      ..invalidate(splitsProvider);
-    try {
-      await ref.read(creditsProvider.future);
-    } catch (_) {
-      // The error state is rendered from the provider; the spinner just stops.
-    }
-  }
+  Future<void> _refresh() => refreshCurrentRoute(ref, '/credits');
 
   Future<void> _handleAction(Credit credit, CreditAction action) async {
     switch (action) {

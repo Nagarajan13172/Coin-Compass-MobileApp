@@ -5,23 +5,55 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../features/transactions/presentation/transaction_form_sheet.dart';
 import '../../features/transactions/presentation/transactions_providers.dart';
+import '../../features/wealth_lock/domain/wealth_lock.dart';
+import '../../features/wealth_lock/presentation/wealth_lock_providers.dart';
+import '../../features/wealth_lock/presentation/wealth_unlock_sheet.dart';
 import '../api/enums.dart';
 import '../router/destinations.dart';
 import '../theme/app_colors.dart';
 
 /// The remaining 14 destinations, opened from the "More" tab.
-class MoreSheet extends StatelessWidget {
+///
+/// While the Net Worth lock is on, "Net Worth" and "Stocks" are **removed**
+/// from this list — not disabled — exactly as the web removes them from its own
+/// nav, and one "Unlock Net Worth" row is appended in their place. That row is
+/// this app's answer to the web's account-menu item (bundle `VE` @745055) and
+/// the only reason someone whose deep link was redirected home is not stranded
+/// with no way back in.
+class MoreSheet extends ConsumerWidget {
   const MoreSheet({super.key});
 
-  static Future<void> show(BuildContext context) => showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    builder: (_) => const MoreSheet(),
-  );
+  /// Opens the sheet and carries out whatever it resolved to.
+  ///
+  /// The unlock row resolves the sheet rather than acting inside it — the same
+  /// rule [AddSheet.show] follows. Pushing a second sheet from a context that
+  /// is already on its way out is how a modal ends up with no Navigator.
+  static Future<void> show(BuildContext context) async {
+    final action = await showModalBottomSheet<_MoreAction>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => const MoreSheet(),
+    );
+    if (action == null || !context.mounted) return;
+    switch (action) {
+      case _MoreAction.unlockWealth:
+        await unlockWealthFlow(context);
+    }
+  }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
+    final visibility = ref.watch(wealthVisibilityProvider);
+    final wealthVisible = visibility != WealthVisibility.locked;
+    final destinations = visibleMoreDestinations(wealthVisible);
+    // One extra row while locked. `checking` keeps the rows it already had —
+    // a nav that reshuffles itself on every resume is worse than a nav that is
+    // one request out of date for 200ms, and nothing here shows a figure.
+    final rows = visibility == WealthVisibility.locked
+        ? destinations.length + 1
+        : destinations.length;
+
     return SafeArea(
       child: ConstrainedBox(
         constraints: BoxConstraints(
@@ -50,11 +82,17 @@ class MoreSheet extends StatelessWidget {
               child: ListView.separated(
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
                 shrinkWrap: true,
-                itemCount: moreDestinations.length,
+                itemCount: rows,
                 separatorBuilder: (_, _) =>
                     Divider(color: c.border, height: 1, indent: 56),
                 itemBuilder: (context, index) {
-                  final d = moreDestinations[index];
+                  if (index == destinations.length) {
+                    return _UnlockWealthRow(
+                      onTap: () =>
+                          Navigator.of(context).pop(_MoreAction.unlockWealth),
+                    );
+                  }
+                  final d = destinations[index];
                   return ListTile(
                     leading: Container(
                       width: 34,
@@ -88,6 +126,45 @@ class MoreSheet extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// What the "More" sheet can resolve to besides a plain jump.
+enum _MoreAction { unlockWealth }
+
+/// The way back in when the two wealth rows have been removed.
+///
+/// Primary-tinted rather than neutral because it is not a destination: it is
+/// the one action that changes what the rest of the list contains.
+class _UnlockWealthRow extends StatelessWidget {
+  const _UnlockWealthRow({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return ListTile(
+      leading: Container(
+        width: 34,
+        height: 34,
+        decoration: BoxDecoration(
+          color: c.primary.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(9),
+        ),
+        child: Icon(LucideIcons.lockKeyhole, size: 17, color: c.primary),
+      ),
+      title: Text(
+        'Unlock Net Worth',
+        style: TextStyle(
+          fontSize: 15.5,
+          fontWeight: FontWeight.w600,
+          color: c.primary,
+        ),
+      ),
+      trailing: Icon(LucideIcons.chevronRight, size: 17, color: c.primary),
+      onTap: onTap,
     );
   }
 }

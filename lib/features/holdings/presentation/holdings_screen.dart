@@ -17,6 +17,7 @@ import '../data/holdings_repository.dart';
 import '../domain/holding.dart';
 import 'holding_form_sheet.dart';
 import 'widgets/holding_tile.dart';
+import '../../../core/router/route_refresh.dart';
 
 /// Savings and investments — the asset half of net worth, grouped by the two
 /// classes the backend declares (`saving` / `investment`) with each row
@@ -83,14 +84,8 @@ class HoldingsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _refresh(WidgetRef ref) async {
-    ref.invalidate(holdingsProvider);
-    try {
-      await ref.read(holdingsProvider.future);
-    } catch (_) {
-      // The failure is rendered from the provider; the spinner just stops.
-    }
-  }
+  Future<void> _refresh(WidgetRef ref) =>
+      refreshCurrentRoute(ref, HoldingsScreen.routePath);
 }
 
 class _EmptyHoldings extends StatelessWidget {

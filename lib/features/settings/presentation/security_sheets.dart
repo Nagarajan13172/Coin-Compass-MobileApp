@@ -137,8 +137,9 @@ class _PinSheetState extends ConsumerState<PinSheet> {
 /// Unlike the PIN this one is free text, 4–32 characters, matching the web's
 /// own validation. Entered twice, no current-passcode field.
 ///
-/// ⚠️ Submitting fires `POST /settings/wealth-passcode`, which hides the Net
-/// Worth and Stocks screens behind a passcode on the owner's live account.
+/// ⚠️ Submitting fires `POST /settings/wealth-passcode`, which hides Net
+/// Worth, Savings & Investments and Stocks behind a passcode on the owner's
+/// live account — in this app and in a browser.
 class WealthPasscodeSheet extends ConsumerStatefulWidget {
   const WealthPasscodeSheet._({required this.change});
 
@@ -207,12 +208,24 @@ class _WealthPasscodeSheetState extends ConsumerState<WealthPasscodeSheet> {
       submitting: busy,
       onSubmit: _submit,
       formError: _error,
+      // Scope, and the consequence of forgetting. The passcode lives on the
+      // account, but unlocking is per sign-in — `/auth/unlock-wealth` elevates
+      // the current session rather than clearing the account flag. And a
+      // forgotten passcode is a real dead end in this app: while locked the
+      // Settings row offers only "Unlock", so there is no "clear it" to reach.
+      // Saying so before they choose one is the whole fix.
       footnote:
-          'Net Worth and Stocks stay hidden until this passcode is entered, '
-          'once per session.',
+          'Net Worth, Savings & Investments and Stocks stay hidden until this '
+          'passcode is entered. Each place you sign in asks for it separately. '
+          'Keep it somewhere safe — this app cannot clear a passcode you have '
+          'forgotten; you would have to remove it from CoinCompass in a '
+          'browser.',
       children: [
         Text(
-          'Between 4 and 32 characters. Letters, digits and symbols all count.',
+          'Between 4 and 32 characters. Letters, digits and symbols all '
+          'count. It hides the totals: your accounts, balances, loans and '
+          'transactions stay visible, and so do income, expenses and cash '
+          'flow.',
           style: TextStyle(fontSize: 13.5, color: c.mutedForeground),
         ),
         const SizedBox(height: 16),

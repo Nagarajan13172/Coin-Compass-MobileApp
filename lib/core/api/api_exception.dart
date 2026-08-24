@@ -35,6 +35,41 @@ class ApiException implements Exception {
     return (list == null || list.isEmpty) ? null : list.first;
   }
 
+  /// What a form says when a write could not leave the phone.
+  ///
+  /// The generic `NO_CONNECTION` sentence — "No connection. Check your internet
+  /// and try again." — leaves open whether the write landed. That ambiguity is
+  /// about money, so a write says plainly that nothing was sent.
+  static const String offlineWriteMessage =
+      "Not saved — you're offline. Nothing was sent.";
+
+  /// A send or receive timeout **may** have reached the server, so this one
+  /// deliberately claims nothing about whether the change was applied. Saying
+  /// "nothing was sent" here would be a guess about the owner's money.
+  static const String timedOutWriteMessage =
+      'The server took too long to reply, so we can\'t tell whether this was '
+      'saved. Check before trying again.';
+
+  /// Re-words a failed **write** so the message is honest about what happened
+  /// to the change. Applied in exactly one place — `ApiClient._sendWrite` — so
+  /// all 31 call sites that render `ApiException.message` get it for free and
+  /// none of them can drift.
+  static ApiException forFailedWrite(ApiException error) {
+    final message = switch (error.code) {
+      'NO_CONNECTION' => offlineWriteMessage,
+      'TIMEOUT' => timedOutWriteMessage,
+      _ => null,
+    };
+    if (message == null) return error;
+    return ApiException(
+      message: message,
+      statusCode: error.statusCode,
+      code: error.code,
+      fieldErrors: error.fieldErrors,
+      formErrors: error.formErrors,
+    );
+  }
+
   static ApiException from(Object error) {
     if (error is ApiException) return error;
 

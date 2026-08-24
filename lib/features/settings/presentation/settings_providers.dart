@@ -6,6 +6,7 @@ import '../../../core/api/api_exception.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../auth/presentation/auth_providers.dart';
 import '../../lock/presentation/lock_controller.dart';
+import '../../wealth_lock/presentation/wealth_lock_providers.dart';
 import '../data/settings_repository.dart';
 
 /// Which write the Settings screen currently has in flight.
@@ -95,14 +96,39 @@ class SettingsWriteController extends StateNotifier<SettingsWrite?> {
       _run(SettingsWrite.disablePin, _repo.disablePin);
 
   /// `POST /settings/wealth-passcode {passcode}` — 4–32 characters.
-  Future<String?> setWealthPasscode(String passcode) => _run(
-    SettingsWrite.wealthPasscode,
-    () => _repo.setWealthPasscode(passcode),
-  );
+  ///
+  /// Followed by [_afterWealthWrite]: this changes what the server will show,
+  /// so the settings document is not the only thing that has gone stale.
+  Future<String?> setWealthPasscode(String passcode) =>
+      _run(SettingsWrite.wealthPasscode, () async {
+        await _repo.setWealthPasscode(passcode);
+        await _afterWealthWrite();
+      });
 
   /// `DELETE /settings/wealth-passcode` — no body.
   Future<String?> disableWealthPasscode() =>
-      _run(SettingsWrite.disableWealthPasscode, _repo.disableWealthPasscode);
+      _run(SettingsWrite.disableWealthPasscode, () async {
+        await _repo.disableWealthPasscode();
+        await _afterWealthWrite();
+      });
+
+  /// Re-reads the user and drops the gated caches after either wealth-passcode
+  /// write.
+  ///
+  /// Both of them change the account's lock state, and the **gate** is derived
+  /// from `user.wealthLockEnabled` on `GET /auth/me` — not from the settings
+  /// document. Invalidating only `settingsProvider`, as these used to, would
+  /// leave the app rendering Net Worth from a stale `AppUser` after the owner
+  /// had just set a passcode.
+  ///
+  /// Clearing the passcode also clears this process's "we unlocked here" bit:
+  /// with no passcode on the account there is nothing left that a "Lock now"
+  /// button could be re-opened with.
+  Future<void> _afterWealthWrite() async {
+    await _ref.read(authControllerProvider.notifier).refreshUser();
+    _ref.read(wealthUnlockedHereProvider.notifier).state = false;
+    invalidateWealthReads(_ref);
+  }
 
   /// `POST /auth/logout` (no body) **and** a cookie-jar wipe.
   ///

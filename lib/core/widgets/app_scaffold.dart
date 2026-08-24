@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,10 +7,13 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../features/auth/presentation/auth_providers.dart';
 import '../../features/notifications/data/notifications_repository.dart';
+import '../api/stale_ledger.dart';
 import '../i18n/locale_controller.dart';
 import '../router/destinations.dart';
+import '../router/route_refresh.dart';
 import '../theme/app_colors.dart';
 import 'more_sheet.dart';
+import 'stale_banner.dart';
 
 /// Height of the shell's bottom nav bar, excluding the system inset below it.
 const double kShellNavBarHeight = 62;
@@ -31,25 +36,115 @@ double shellBottomInset(BuildContext context) =>
 
 /// The persistent chrome: CoinCompass app bar on top, five-slot bottom nav with
 /// a raised centre FAB below. Mirrors the web app's mobile layout.
-class AppScaffold extends ConsumerWidget {
+class AppScaffold extends ConsumerStatefulWidget {
   const AppScaffold({super.key, required this.child, required this.location});
 
   final Widget child;
   final String location;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AppScaffold> createState() => _AppScaffoldState();
+}
+
+class _AppScaffoldState extends ConsumerState<AppScaffold> {
+  /// When the last automatic recovery refresh ran. Phase 6.3's guard against a
+  /// flapping connection turning into a refresh loop: every live read that
+  /// lands while something stale is on screen bumps `onlineRevisionProvider`,
+  /// and without this a screenful of recovering cards would each trigger a
+  /// fresh round of invalidations.
+  DateTime? _lastRecoveryAt;
+
+  void _recover() {
+    final now = DateTime.now();
+    final last = _lastRecoveryAt;
+    if (last != null && now.difference(last) < kRecoveryCooldown) return;
+    _lastRecoveryAt = now;
+    unawaited(refreshCurrentRoute(ref, widget.location));
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final c = context.colors;
+    // Keeps the resume re-read of GET /auth/me alive for as long as the shell
+    // is on screen — and no longer. The shell exists only while signed in, so
+    // nothing polls the session from the login form. `.notifier` rather than
+    // the value: this needs the controller constructed, not a rebuild every
+    // time it counts a refresh.
+    ref.watch(sessionRefreshControllerProvider.notifier);
+
+    // The recovery path. A successful request to the API is the only reliable
+    // evidence the API is reachable, so the signal comes from `ResponseCache`
+    // rather than from a connectivity plugin — see `stale_ledger.dart`. Only
+    // the visible route is refreshed; hammering all seventeen on every
+    // reconnect is exactly what the brief warns against.
+    ref.listen<int>(onlineRevisionProvider, (previous, next) {
+      if (previous == null || next <= previous) return;
+      _recover();
+    });
+
     return Scaffold(
       backgroundColor: c.background,
       body: Column(
         children: [
           const _AppTopBar(),
-          Expanded(child: child),
+          const _UnverifiedSessionStrip(),
+          // One slot, seventeen screens, and none of them can invent its own
+          // staleness copy.
+          StaleBanner(
+            onRetry: () => refreshCurrentRoute(ref, widget.location),
+          ),
+          Expanded(child: widget.child),
         ],
       ),
-      bottomNavigationBar: _BottomNav(location: location),
+      bottomNavigationBar: _BottomNav(location: widget.location),
       extendBody: true,
+    );
+  }
+}
+
+/// Shown while `AuthState.unverifiedSession` — a cold start that could not
+/// reach `GET /auth/me` and is running on an unconfirmed cookie.
+///
+/// The app must never present an unconfirmed session as live; that is the
+/// actual harm the never-cache-`/auth/me` rule exists to prevent, and no
+/// `/auth/me` body touches disk either way.
+class _UnverifiedSessionStrip extends ConsumerWidget {
+  const _UnverifiedSessionStrip();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unverified = ref.watch(
+      authControllerProvider.select((s) => s.unverifiedSession),
+    );
+    if (!unverified) return const SizedBox.shrink();
+
+    final c = context.colors;
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: c.secondary,
+        border: Border(bottom: BorderSide(color: c.border)),
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      child: Row(
+        children: [
+          Icon(LucideIcons.triangleAlert, size: 16, color: c.warning),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              "Offline — we haven't been able to confirm your session.",
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12.5,
+                height: 1.25,
+                fontWeight: FontWeight.w500,
+                color: c.foreground,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

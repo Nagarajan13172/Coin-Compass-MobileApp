@@ -63,45 +63,75 @@ void main() {
   group('notificationRoute — web link to mobile route', () {
     test('the two links the live feed actually carries', () {
       // Verbatim from test/fixtures/notifications.json.
-      expect(notificationRoute('/recurring'), '/recurring');
+      expect(
+        notificationRoute('/recurring', wealthVisible: true),
+        '/recurring',
+      );
       // Mobile has no account detail screen; the list is where that account is.
       expect(
-        notificationRoute('/accounts/6a4669f861d974fd74ab42a0'),
+        notificationRoute(
+          '/accounts/6a4669f861d974fd74ab42a0',
+          wealthVisible: true,
+        ),
         '/accounts',
       );
     });
 
     test('a deep route wins over its parent', () {
-      expect(notificationRoute('/net-worth/holdings'), '/net-worth/holdings');
-      expect(notificationRoute('/net-worth'), '/net-worth');
+      expect(
+        notificationRoute('/net-worth/holdings', wealthVisible: true),
+        '/net-worth/holdings',
+      );
+      expect(
+        notificationRoute('/net-worth', wealthVisible: true),
+        '/net-worth',
+      );
     });
 
     test('web-only paths redirect to the screen that carries them here', () {
-      expect(notificationRoute('/people'), '/credits/people');
-      expect(notificationRoute('/splits'), '/credits/splits');
-      expect(notificationRoute('/holdings'), '/net-worth/holdings');
-      expect(notificationRoute('/dashboard'), '/');
+      expect(
+        notificationRoute('/people', wealthVisible: true),
+        '/credits/people',
+      );
+      expect(
+        notificationRoute('/splits', wealthVisible: true),
+        '/credits/splits',
+      );
+      expect(
+        notificationRoute('/holdings', wealthVisible: true),
+        '/net-worth/holdings',
+      );
+      expect(notificationRoute('/dashboard', wealthVisible: true), '/');
     });
 
     test('query strings are dropped, not forwarded as a guess', () {
       expect(
-        notificationRoute('/transactions?from=2026-08-01&type=expense'),
+        notificationRoute(
+          '/transactions?from=2026-08-01&type=expense',
+          wealthVisible: true,
+        ),
         '/transactions',
       );
     });
 
     test('anything unroutable is a no-op rather than a 404 screen', () {
-      expect(notificationRoute(null), isNull);
-      expect(notificationRoute(''), isNull);
-      expect(notificationRoute('   '), isNull);
-      expect(notificationRoute('/nowhere-at-all'), isNull);
+      expect(notificationRoute(null, wealthVisible: true), isNull);
+      expect(notificationRoute('', wealthVisible: true), isNull);
+      expect(notificationRoute('   ', wealthVisible: true), isNull);
+      expect(notificationRoute('/nowhere-at-all', wealthVisible: true), isNull);
       // Absolute URLs are not in-app links.
-      expect(notificationRoute('https://coincompass.app/recurring'), isNull);
-      expect(notificationRoute('recurring'), isNull);
+      expect(
+        notificationRoute(
+          'https://coincompass.app/recurring',
+          wealthVisible: true,
+        ),
+        isNull,
+      );
+      expect(notificationRoute('recurring', wealthVisible: true), isNull);
     });
 
     test('a bare slash is the dashboard', () {
-      expect(notificationRoute('/'), '/');
+      expect(notificationRoute('/', wealthVisible: true), '/');
     });
   });
 

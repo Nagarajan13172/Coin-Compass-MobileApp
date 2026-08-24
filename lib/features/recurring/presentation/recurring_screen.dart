@@ -19,6 +19,7 @@ import '../domain/recurring_rule.dart';
 import 'recurring_form_sheet.dart';
 import 'recurring_history_sheet.dart';
 import 'widgets/recurring_tile.dart';
+import '../../../core/router/route_refresh.dart';
 
 /// `/recurring` — the rules that post transactions on a schedule, what they
 /// come to per month, and the controls to run, skip or pause them.
@@ -101,14 +102,7 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
     );
   }
 
-  Future<void> _refresh() async {
-    ref.invalidate(recurringRulesProvider);
-    try {
-      await ref.read(recurringRulesProvider.future);
-    } catch (_) {
-      // The error state is rendered from the provider; the spinner just stops.
-    }
-  }
+  Future<void> _refresh() => refreshCurrentRoute(ref, '/recurring');
 
   static bool _isDue(RecurringRule rule) =>
       rule.active &&

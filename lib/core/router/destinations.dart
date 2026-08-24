@@ -53,3 +53,30 @@ const List<Destination> moreDestinations = [
   Destination('/notifications', 'Notifications', LucideIcons.bell),
   Destination('/settings', 'Settings', LucideIcons.settings),
 ];
+
+/// The "More" rows a user may actually see.
+///
+/// Web parity, and it is a **removal**, not a disable:
+///
+///     Wf.filter(d => !Gf.includes(d.to) && (o || !UM.includes(d.to)))
+///
+/// where `o` is the visibility predicate and `UM` is `["/net-worth","/stocks"]`.
+/// The web takes the gated entries out of the nav entirely, and the sidebar
+/// then drops any group left empty. A disabled-but-visible row would advertise
+/// the lock to exactly the person the everyday login is meant to be shareable
+/// with, which is the whole point of the feature.
+///
+/// Pure and total so it can be asserted directly; the shell's "More" highlight
+/// still reads the full [moreDestinations] list, so the tab stays lit when an
+/// unlocked user is sitting on `/net-worth`.
+List<Destination> visibleMoreDestinations(bool wealthVisible) {
+  if (wealthVisible) return moreDestinations;
+  return [
+    for (final d in moreDestinations)
+      if (!gatedNavPaths.contains(d.path)) d,
+  ];
+}
+
+/// The nav entries the Net Worth lock removes. Verbatim `UM` from the bundle.
+/// `/net-worth/holdings` is not here because it has no nav row of its own.
+const Set<String> gatedNavPaths = {'/net-worth', '/stocks'};

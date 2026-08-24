@@ -160,32 +160,68 @@ void main() {
       find.textContaining('when you open CoinCompass in a browser'),
       findsOneWidget,
     );
+    // Since 6.2 the footnote separates three scopes: the app lock is on the
+    // device, the PIN lock covers a browser, and the Net Worth PASSCODE is on
+    // the account while UNLOCKING is per sign-in. The comment here used to say
+    // the Net Worth lock covers phone and browser together — it does not.
     expect(
       find.textContaining(
-        'The app lock covers this phone. The PIN and Net Worth locks cover',
+        'The app lock covers this phone and is checked on the device',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'The Net Worth passcode is saved on your account, but each place you '
+        'sign in asks for it separately',
       ),
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets(
-    'the Net Worth lock copy is left honest, because 6.2 has not shipped',
-    (tester) async {
-      // The app lock does NOT gate Net Worth or Stocks behind their own
-      // passcode. Rewriting this row to imply otherwise would recreate exactly
-      // the honesty problem this phase was supposed to end.
-      await pumpCard(
-        tester,
-        settings: const AppSettings(wealthLockEnabled: true),
-      );
+  testWidgets('the Net Worth lock copy says what 6.2 actually does', (
+    tester,
+  ) async {
+    // 6.1 wrote "This app does not lock them yet" because it was true. 6.2 is
+    // the phase that retires it — and the replacement must not swing the other
+    // way and imply a private curtain for the phone. The lock is one flag on
+    // one account, so it covers a browser too.
+    await pumpCard(
+      tester,
+      settings: const AppSettings(wealthLockEnabled: true),
+    );
 
-      expect(
-        find.textContaining('This app does not lock them yet'),
-        findsOneWidget,
-      );
-    },
-  );
+    expect(
+      find.textContaining('This app does not lock them yet'),
+      findsNothing,
+    );
+    expect(
+      find.textContaining(
+        'Locking hides them here again; anywhere else you are signed in '
+        'keeps its own state',
+      ),
+      findsOneWidget,
+    );
+    // A passcode exists, so re-locking is offered — and only then.
+    expect(find.text('Lock now'), findsOneWidget);
+  });
+
+  testWidgets('with no wealth passcode there is no way to lock Net Worth', (
+    tester,
+  ) async {
+    // THE TRAP. `POST /auth/lock-wealth` takes no body, so it would succeed
+    // against this exact state — `wealthLockEnabled: false`, no passcode — and
+    // could hide Net Worth on both clients with nothing that reopens it. The
+    // control must not exist.
+    await pumpCard(tester, settings: const AppSettings());
+
+    expect(find.text('Set a passcode'), findsOneWidget);
+    expect(find.text('Lock now'), findsNothing);
+    expect(find.text('Unlock'), findsNothing);
+    // Nor may "Turn off" be reachable: there is nothing to turn off.
+    expect(find.text('Change passcode'), findsNothing);
+  });
 
   testWidgets('lays out at 360dp in dark mode', (tester) async {
     await pumpCard(
@@ -199,21 +235,20 @@ void main() {
 
   // ── the guard ─────────────────────────────────────────────────────────────
 
-  testWidgets(
-    'settings.pinEnabled arriving true NEVER arms the app lock',
-    (tester) async {
-      final container = await pumpCard(
-        tester,
-        settings: const AppSettings(pinEnabled: true, wealthLockEnabled: true),
-      );
+  testWidgets('settings.pinEnabled arriving true NEVER arms the app lock', (
+    tester,
+  ) async {
+    final container = await pumpCard(
+      tester,
+      settings: const AppSettings(pinEnabled: true, wealthLockEnabled: true),
+    );
 
-      // The server says the *web* PIN is on. The phone's lock stays off, and
-      // its row still offers to set one up.
-      expect(container.read(appLockControllerProvider).enabled, isFalse);
-      expect(find.text('Set up app lock'), findsOneWidget);
-      expect(find.text('Off'), findsWidgets);
-    },
-  );
+    // The server says the *web* PIN is on. The phone's lock stays off, and
+    // its row still offers to set one up.
+    expect(container.read(appLockControllerProvider).enabled, isFalse);
+    expect(find.text('Set up app lock'), findsOneWidget);
+    expect(find.text('Off'), findsWidgets);
+  });
 
   // ── arming ────────────────────────────────────────────────────────────────
 
@@ -364,7 +399,9 @@ class _NoNetwork implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
-    fail('the app lock made an HTTP request: ${options.method} ${options.path}');
+    fail(
+      'the app lock made an HTTP request: ${options.method} ${options.path}',
+    );
   }
 
   @override

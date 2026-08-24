@@ -17,8 +17,11 @@ import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/error_retry.dart';
 import '../../../core/widgets/loading_shimmer.dart';
 import '../../../core/widgets/screen_header.dart';
+import '../../wealth_lock/domain/wealth_lock.dart';
+import '../../wealth_lock/presentation/wealth_lock_providers.dart';
 import '../data/notifications_repository.dart';
 import '../domain/app_notification.dart';
+import '../../../core/router/route_refresh.dart';
 
 /// `/notifications` — the activity feed: what posted, what is coming up, and
 /// what went wrong while the app was closed. Body only; `AppScaffold` supplies
@@ -115,15 +118,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
   // ── reads ────────────────────────────────────────────────────────────────
 
-  Future<void> _refresh() async {
-    ref.invalidate(notificationFeedProvider);
-    try {
-      await ref.read(notificationFeedProvider.future);
-    } catch (_) {
-      // The failure is already rendered by the provider; the spinner just
-      // stops rather than throwing out of the RefreshIndicator.
-    }
-  }
+  Future<void> _refresh() => refreshCurrentRoute(ref, '/notifications');
 
   // ── writes ───────────────────────────────────────────────────────────────
   //
@@ -136,7 +131,11 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   void _open(AppNotification notification) {
     if (!notification.read) unawaited(_markRead(notification.id));
 
-    final route = notificationRoute(notification.link);
+    final route = notificationRoute(
+      notification.link,
+      wealthVisible:
+          ref.read(wealthVisibilityProvider) != WealthVisibility.locked,
+    );
     if (route != null) context.go(route);
   }
 
@@ -275,7 +274,17 @@ const Map<String, String> _routeAliases = <String, String>{
 /// Query strings are dropped on purpose. No notification link carries one, and
 /// the screens here do not all read route queries yet; sending a stray `?tab=`
 /// into `context.go` would be a guess.
-String? notificationRoute(String? link) {
+///
+/// [wealthVisible] is false while the Net Worth lock is on, and the three gated
+/// routes then resolve to null — the row keeps its title and its Dismiss
+/// button, loses the "Net Worth" label that promises a screen, and a tap marks
+/// it read without navigating. Without this a `/net-worth` notification would
+/// tap straight into the router's redirect and dump the user back on the
+/// dashboard with no explanation.
+///
+/// Required, not defaulted: a call site that forgets the gate should not
+/// compile.
+String? notificationRoute(String? link, {required bool wealthVisible}) {
   final raw = link?.trim();
   if (raw == null || raw.isEmpty || !raw.startsWith('/')) return null;
 
@@ -285,6 +294,13 @@ String? notificationRoute(String? link) {
   final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
   if (segments.isEmpty) return '/';
 
+  final resolved = _resolve(segments);
+  if (resolved == null) return null;
+  if (!wealthVisible && isWealthGatedPath(resolved)) return null;
+  return resolved;
+}
+
+String? _resolve(List<String> segments) {
   // Deepest match first, so `/net-worth/holdings` does not collapse to
   // `/net-worth`.
   final full = '/${segments.join('/')}';
@@ -552,7 +568,7 @@ class _DayCard extends StatelessWidget {
 
 /// One feed row. Public so the app-bar bell popover can reuse it verbatim the
 /// way the web's `YE` component does, if that ever lands.
-class NotificationRow extends StatelessWidget {
+class NotificationRow extends ConsumerWidget {
   const NotificationRow({
     super.key,
     required this.notification,
@@ -567,12 +583,16 @@ class NotificationRow extends StatelessWidget {
   final bool busy;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
     final copy = NotificationCopy.of(notification);
     final unread = !notification.read;
     final tone = _toneColor(context, notification.kind.tone);
-    final route = notificationRoute(notification.link);
+    final route = notificationRoute(
+      notification.link,
+      wealthVisible:
+          ref.watch(wealthVisibilityProvider) != WealthVisibility.locked,
+    );
     final destination = route == null ? null : _routeLabel(route);
 
     return Material(

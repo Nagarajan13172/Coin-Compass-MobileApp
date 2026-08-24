@@ -22,6 +22,7 @@ import '../domain/metal_price.dart';
 import 'gold_providers.dart';
 import 'widgets/metal_history_chart.dart';
 import 'widgets/metal_price_card.dart';
+import '../../../core/router/route_refresh.dart';
 
 /// `/metals/latest` + `/metals/history` — today's gold and silver board, the
 /// trend behind it, and a calculator for what a given weight is worth.
@@ -41,15 +42,7 @@ class _GoldScreenState extends ConsumerState<GoldScreen> {
 
   /// Pull-to-refresh re-reads what the server already has; it never triggers a
   /// scrape. Re-scraping is the explicit button beside the city picker.
-  Future<void> _reload() async {
-    ref.invalidate(metalsLatestProvider);
-    ref.invalidate(metalsHistoryProvider);
-    try {
-      await ref.read(metalsLatestProvider.future);
-    } catch (_) {
-      // The error surface is rendered from the provider; just stop the spinner.
-    }
-  }
+  Future<void> _reload() => refreshCurrentRoute(ref, '/gold');
 
   Future<void> _refreshRates() async {
     if (_refreshing) return;

@@ -20,6 +20,7 @@ import '../data/networth_repository.dart';
 import 'networth_providers.dart';
 import 'widgets/breakdown_card.dart';
 import 'widgets/net_worth_chart.dart';
+import '../../../core/router/route_refresh.dart';
 
 /// `/net-worth` — the hero figure, its trend, and where it comes from.
 ///
@@ -88,18 +89,8 @@ class NetWorthScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _refresh(WidgetRef ref) async {
-    ref
-      ..invalidate(netWorthHistoryProvider)
-      ..invalidate(netWorthHistoryRangeProvider)
-      ..invalidate(holdingsProvider)
-      ..invalidate(loansProvider);
-    try {
-      await ref.read(netWorthSeriesProvider.future);
-    } catch (_) {
-      // The failure is rendered from the provider; the spinner just stops.
-    }
-  }
+  Future<void> _refresh(WidgetRef ref) =>
+      refreshCurrentRoute(ref, '/net-worth');
 }
 
 class _Body extends ConsumerWidget {

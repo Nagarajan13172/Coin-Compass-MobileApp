@@ -10,18 +10,27 @@ import '../../auth/presentation/auth_providers.dart';
 import '../../lock/domain/lock_state.dart';
 import '../../lock/presentation/app_lock_setup_sheet.dart';
 import '../../lock/presentation/lock_controller.dart';
+import '../../wealth_lock/domain/wealth_lock.dart';
+import '../../wealth_lock/presentation/wealth_lock_providers.dart';
+import '../../wealth_lock/presentation/wealth_unlock_sheet.dart';
 import '../domain/app_settings.dart';
 import 'security_sheets.dart';
 import 'settings_providers.dart';
 
-/// App lock (this phone), PIN lock and Net Worth lock (both web-only), and
-/// two-factor status.
+/// App lock (this phone), PIN lock (browser) and Net Worth lock (the account),
+/// plus two-factor status.
+///
+/// **Three locks, three scopes, and the copy must not blur them.**
+///
+///   * the app lock is device-local: its PIN is chosen and checked on this
+///     phone, it works with no signal, and it changes nothing on the server;
+///   * the PIN lock is the web client's, stored server-side, and does nothing
+///     on this phone;
+///   * the Net Worth lock is one flag on the account, so it covers **both** —
+///     unlocking here also reveals Net Worth in a browser.
 ///
 /// The ordering is deliberate: the app lock goes first because it is the one
-/// that actually locks the device in the owner's hand. The two below it arm the
-/// **web** client and are unrelated — arming the phone must not change how
-/// coincompass.sathishkumar.cloud behaves in a browser, and turning the web PIN
-/// off must not silently unlock this phone.
+/// that actually locks the device in the owner's hand.
 ///
 /// Two-factor is read-only here: enrolling needs a QR scan and a 6-digit
 /// confirmation, and disabling one the owner relies on is worse than not
@@ -176,58 +185,20 @@ class SettingsSecurityCard extends ConsumerWidget {
           ),
           Divider(color: c.border, height: 24),
 
-          _SecurityRow(
-            icon: LucideIcons.shieldCheck,
-            enabled: settings.wealthLockEnabled,
-            title: 'Net Worth lock',
-            // This app does not gate Net Worth or Stocks yet — the passcode
-            // arms the web client. Say which surface it protects rather than
-            // implying this phone is locked when it is not.
-            description: settings.wealthLockEnabled
-                ? 'Net Worth and Stocks are hidden on the web until the '
-                      'passcode is entered. This app does not lock them yet.'
-                : 'Hide Net Worth and Stocks behind a passcode on the web.',
-            busy:
-                pending == SettingsWrite.wealthPasscode ||
-                pending == SettingsWrite.disableWealthPasscode,
-            actions: settings.wealthLockEnabled
-                ? [
-                    _SmallButton(
-                      label: 'Change',
-                      onPressed: blocked
-                          ? null
-                          : () =>
-                                WealthPasscodeSheet.show(context, change: true),
-                    ),
-                    _SmallButton(
-                      label: 'Turn off',
-                      destructive: true,
-                      onPressed: blocked
-                          ? null
-                          : () => _disableWealthLock(context, ref),
-                    ),
-                  ]
-                : [
-                    _SmallButton(
-                      label: 'Set a passcode',
-                      onPressed: blocked
-                          ? null
-                          : () => WealthPasscodeSheet.show(
-                              context,
-                              change: false,
-                            ),
-                    ),
-                  ],
-          ),
+          _WealthLockRow(settings: settings),
           Divider(color: c.border, height: 24),
 
           const _TwoFactorRow(),
 
           const SizedBox(height: 12),
           Text(
-            'The app lock covers this phone. The PIN and Net Worth locks cover '
-            'CoinCompass in a browser. None of them is your account password, '
-            'and none of them changes your data.',
+            // Four locks, four scopes, one sentence each. A reader must be
+            // able to tell which covers what without guessing.
+            'The app lock covers this phone and is checked on the device, so '
+            'it works with no signal. The PIN lock covers CoinCompass in a '
+            'browser. The Net Worth passcode is saved on your account, but '
+            'each place you sign in asks for it separately. None of them is '
+            'your account password, and none of them changes your data.',
             style: TextStyle(fontSize: 12, color: c.mutedForeground),
           ),
         ],
@@ -285,6 +256,186 @@ class SettingsSecurityCard extends ConsumerWidget {
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(failure ?? 'PIN lock turned off')));
   }
+}
+
+/// The Net Worth lock row: three states, and only one of them can reach
+/// `POST /auth/lock-wealth`.
+///
+/// | state | pill | actions |
+/// |---|---|---|
+/// | locked (`user.wealthLockEnabled`) | Locked | **Unlock**, and nothing else |
+/// | a passcode exists, currently showing | Unlocked | Change passcode · Lock now · Turn off |
+/// | no passcode | Off | Set a passcode |
+///
+/// Two things this fixes beyond the copy:
+///
+///  * **"Lock now" cannot exist without a passcode.** `POST /auth/lock-wealth`
+///    takes no body, so it would succeed against an account that has never had
+///    one — and if the server honours that, the owner is locked out of Net
+///    Worth on the phone *and* in the browser with nothing that can open it.
+///    The button renders only when [canRelock] holds, and
+///    [WealthLockController.lockNow] re-checks the same condition before it
+///    sends anything.
+///  * **"Turn off" is no longer offered while locked.** It used to be, and it
+///    fires `DELETE /settings/wealth-passcode` — so anyone holding the
+///    unlocked phone could discard a passcode they did not know. The web shows
+///    a non-superadmin "Unlock to manage" for exactly this reason.
+class _WealthLockRow extends ConsumerWidget {
+  const _WealthLockRow({required this.settings});
+
+  final AppSettings settings;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
+    final pending = ref.watch(settingsWriteControllerProvider);
+    final blocked = pending != null;
+    final visibility = ref.watch(wealthVisibilityProvider);
+    final wealthBusy = ref.watch(wealthLockControllerProvider).busy;
+
+    final locked = visibility == WealthVisibility.locked;
+    // The same provider `lockNow()` re-checks, so the button and the guard
+    // behind it can never disagree about whether a passcode exists.
+    final hasPasscode = ref.watch(wealthPasscodeExistsProvider);
+    final canLockAgain = ref.watch(canRelockProvider);
+    final superadmin = ref.watch(currentUserProvider)?.mode == 'superadmin';
+
+    // SCOPE, stated correctly: the PASSCODE is on the account, but unlocking is
+    // per sign-in. `POST /auth/unlock-wealth` elevates the CURRENT SESSION —
+    // the web's own menu proves it, offering "Hide" only when
+    // `wealthLockEnabled && mode == 'superadmin'`, a pair that could not occur
+    // if unlocking cleared the account flag. So unlocking here does NOT reveal
+    // anything in a browser, and locking here does NOT hide anything there.
+    // Earlier copy claimed both. Promising protection the app cannot deliver is
+    // worse than promising none.
+    final description = locked
+        ? 'Net Worth, Savings & Investments and Stocks are hidden until you '
+              'enter the passcode. Unlocking here unlocks them in this app '
+              'only — each place you sign in unlocks separately.'
+        : hasPasscode
+        ? 'Net Worth, Savings & Investments and Stocks are showing in this '
+              'app. Locking hides them here again; anywhere else you are '
+              'signed in keeps its own state.'
+        : 'Hide Net Worth, Savings & Investments and Stocks behind a '
+              'passcode. The passcode is saved on your account, and each place '
+              'you sign in asks for it separately.';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SecurityRow(
+          icon: LucideIcons.shieldCheck,
+          enabled: hasPasscode,
+          // A superadmin's figures stay visible even with the lock armed, so
+          // "Unlocked" would be a lie about the account. Say the lock is on
+          // and let the line below explain why they can still see it.
+          statusLabel: locked
+              ? 'Locked'
+              : superadmin && settings.wealthLockEnabled
+              ? 'On'
+              : hasPasscode
+              ? 'Unlocked'
+              : 'Off',
+          title: 'Net Worth lock',
+          description: description,
+          busy:
+              wealthBusy ||
+              pending == SettingsWrite.wealthPasscode ||
+              pending == SettingsWrite.disableWealthPasscode,
+          actions: locked
+              // Mirrors the web, which offers a non-superadmin nothing but
+              // "Unlock to manage" here.
+              ? [
+                  _SmallButton(
+                    label: 'Unlock',
+                    onPressed: wealthBusy
+                        ? null
+                        : () => unlockWealthFlow(context),
+                  ),
+                ]
+              : hasPasscode
+              ? [
+                  _SmallButton(
+                    label: 'Change passcode',
+                    onPressed: blocked
+                        ? null
+                        : () => WealthPasscodeSheet.show(context, change: true),
+                  ),
+                  if (canLockAgain)
+                    _SmallButton(
+                      label: 'Lock now',
+                      onPressed: blocked || wealthBusy
+                          ? null
+                          : () => _lockNow(context, ref),
+                    ),
+                  _SmallButton(
+                    label: 'Turn off',
+                    destructive: true,
+                    onPressed: blocked
+                        ? null
+                        : () => _disableWealthLock(context, ref),
+                  ),
+                ]
+              : [
+                  _SmallButton(
+                    label: 'Set a passcode',
+                    onPressed: blocked
+                        ? null
+                        : () =>
+                              WealthPasscodeSheet.show(context, change: false),
+                  ),
+                ],
+        ),
+        if (superadmin && settings.wealthLockEnabled)
+          Padding(
+            padding: const EdgeInsets.only(left: 50, top: 6),
+            child: Text(
+              // `mode == 'superadmin'` alongside `wealthLockEnabled` is the
+              // ORDINARY state after a successful unlock — it marks this
+              // session as elevated, not the account as an admin one. Calling
+              // it "superadmin mode" alarmed the owner about a role they do
+              // not have, in what is the normal post-unlock case.
+              'Unlocked for this sign-in. Net Worth stays visible here until '
+              'you lock it again or sign out.',
+              style: TextStyle(fontSize: 12, color: c.mutedForeground),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// The app's **only** call site for `POST /auth/lock-wealth`.
+  ///
+  /// Reachable only from the "Lock now" button, which only renders when a
+  /// passcode is known to exist. [WealthLockController.lockNow] checks the
+  /// same thing again and refuses if it does not hold.
+  Future<void> _lockNow(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await ConfirmSheet.show(
+      context,
+      title: 'Lock Net Worth again?',
+      message:
+          'Net Worth, Savings & Investments and Stocks will be hidden until '
+          'the passcode is entered again in this app. Your '
+          'data is not changed.',
+      confirmLabel: 'Lock',
+      destructive: false,
+    );
+    if (!confirmed) return;
+
+    final failure = await ref
+        .read(wealthLockControllerProvider.notifier)
+        .lockNow();
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            failure ?? 'Net Worth locked in this app.',
+          ),
+        ),
+      );
+  }
 
   Future<void> _disableWealthLock(BuildContext context, WidgetRef ref) async {
     final messenger = ScaffoldMessenger.of(context);
@@ -292,8 +443,9 @@ class SettingsSecurityCard extends ConsumerWidget {
       context,
       title: 'Turn off the Net Worth lock?',
       message:
-          'Net Worth and Stocks will be visible without a passcode. The old '
-          'passcode is discarded.',
+          'Net Worth, Savings & Investments and Stocks will be visible '
+          'without a passcode, in every place you sign in. The passcode is '
+          'discarded and cannot be recovered.',
       confirmLabel: 'Turn off',
     );
     if (!confirmed) return;
@@ -304,7 +456,7 @@ class SettingsSecurityCard extends ConsumerWidget {
     messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(content: Text(failure ?? 'Net Worth lock turned off')),
+        SnackBar(content: Text(failure ?? 'Net Worth lock turned off.')),
       );
   }
 }
@@ -508,7 +660,6 @@ class _TwoFactorRow extends ConsumerWidget {
     };
   }
 }
-
 
 /// Shown once when the lock disabled itself because its stored verifier was
 /// missing — a partial prefs wipe, a restore gone wrong.

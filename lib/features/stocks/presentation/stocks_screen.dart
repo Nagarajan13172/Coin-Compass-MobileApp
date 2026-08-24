@@ -24,6 +24,7 @@ import 'stock_sales_sheet.dart';
 import 'stock_splits_sheet.dart';
 import 'stocks_providers.dart';
 import 'widgets/position_tile.dart';
+import '../../../core/router/route_refresh.dart';
 
 /// `/stocks` — the equity book: what it is worth now, what it cost, what it
 /// has already made, and every lot behind those numbers.
@@ -120,17 +121,7 @@ class _StocksScreenState extends ConsumerState<StocksScreen> {
 
   /// Re-reads the book. Deliberately **not** a re-price: `/stocks/refresh` is a
   /// mutating action against a live quote feed and belongs on a button.
-  Future<void> _refresh() async {
-    ref
-      ..invalidate(stockPortfolioProvider)
-      ..invalidate(stockSalesProvider)
-      ..invalidate(stockSplitsProvider);
-    try {
-      await ref.read(stockPortfolioProvider.future);
-    } catch (_) {
-      // The error state is rendered from the provider; the spinner just stops.
-    }
-  }
+  Future<void> _refresh() => refreshCurrentRoute(ref, '/stocks');
 
   /// `POST /stocks/refresh` — re-quotes every position from the market feed.
   Future<void> _reprice() async {

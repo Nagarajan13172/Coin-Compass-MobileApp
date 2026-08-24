@@ -18,6 +18,7 @@ import '../domain/budget.dart';
 import 'budget_form_sheet.dart';
 import 'budgets_providers.dart';
 import 'widgets/budget_tile.dart';
+import '../../../core/router/route_refresh.dart';
 
 /// `/budgets` — one card per spending limit with its progress for the current
 /// window. Body only; [AppScaffold] supplies the chrome.
@@ -75,17 +76,8 @@ class BudgetsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _refresh(WidgetRef ref) async {
-    ref.invalidate(budgetsProvider);
-    for (final period in BudgetPeriod.values) {
-      ref.invalidate(budgetSpendProvider(period));
-    }
-    try {
-      await ref.read(budgetsProvider.future);
-    } catch (_) {
-      // The error state is rendered from the provider; the spinner just stops.
-    }
-  }
+  Future<void> _refresh(WidgetRef ref) =>
+      refreshCurrentRoute(ref, '/budgets');
 
   Future<void> _openForm(BuildContext context, {Budget? budget}) =>
       BudgetFormSheet.show(context, budget: budget);

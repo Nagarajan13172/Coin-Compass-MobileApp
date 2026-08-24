@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  API 31+ replacement for android:allowBackup / fullBackupContent.
+
+  Both destinations exclude the whole app: cloud backup and device-to-device
+  transfer would otherwise carry the session cookie in .cookies/ and the Phase
+  6.3 response cache in api-cache/ — the owner's balances, transactions and
+  loan figures — as plaintext JSON inside the backup set.
+
+  Nothing here is worth restoring: the cache regenerates from the API on the
+  first successful read, and the app lock's PIN verifier is deliberately
+  per-install.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>
