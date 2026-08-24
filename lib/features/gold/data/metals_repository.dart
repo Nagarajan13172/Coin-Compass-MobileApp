@@ -36,10 +36,10 @@ class MetalsRepository {
       Endpoints.metalsHistory,
       query: {'metal': metal, 'days': days},
     );
-    final rows = Envelope.rows(
-      json,
-      const ['history', 'prices'],
-    ).map(MetalPrice.fromJson).toList();
+    final rows = Envelope.rows(json, const [
+      'history',
+      'prices',
+    ]).map(MetalPrice.fromJson).toList();
     // `date` is a plain `yyyy-MM-dd`, so it sorts lexicographically.
     rows.sort((a, b) => (a.date ?? '').compareTo(b.date ?? ''));
     return rows;

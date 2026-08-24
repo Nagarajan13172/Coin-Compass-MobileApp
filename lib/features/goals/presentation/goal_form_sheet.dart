@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/api/api_exception.dart';
+import '../../../core/state/optimistic.dart';
 import '../../../core/api/write_body.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/date_x.dart';
@@ -65,14 +68,14 @@ class _GoalFormSheetState extends ConsumerState<GoalFormSheet> {
   late String _color = _existing?.color ?? '#6366F1';
 
   bool _saving = false;
-  bool _deleting = false;
   String? _formError;
   ApiException? _apiError;
   String? _nameError;
   String? _targetError;
 
   bool get _isEdit => _existing != null;
-  bool get _busy => _saving || _deleting;
+  // 6.4: a delete pops the sheet on the spot, so there is no deleting state.
+  bool get _busy => _saving;
 
   @override
   void dispose() {
@@ -91,7 +94,7 @@ class _GoalFormSheetState extends ConsumerState<GoalFormSheet> {
       title: _isEdit ? 'Edit goal' : 'New goal',
       submitLabel: _isEdit ? 'Save changes' : 'Create goal',
       submitting: _saving,
-      deleting: _deleting,
+      deleting: false,
       onSubmit: _submit,
       deleteLabel: _isEdit ? 'Delete goal' : null,
       onDelete: _isEdit ? _delete : null,
@@ -207,21 +210,41 @@ class _GoalFormSheetState extends ConsumerState<GoalFormSheet> {
       return;
     }
 
+    final body = _buildBody(name, target);
+    final existing = _existing;
+
+    // 6.4 — the form owns name, target, saved, monthly and colour, so an edit's
+    // outcome is known. `remaining`, `percent`, `complete` and `monthsLeft` are
+    // server-derived and all move here, so `Goal.predict` nulls them and the
+    // model's own arithmetic takes over. A create keeps the spinner.
+    //
+    // `POST /goals/:id/contribute` is a different matter and is deliberately
+    // NOT optimistic — see `GoalContributeSheet`.
+    final predicted = existing?.predict(
+      name: name,
+      targetAmount: target,
+      savedAmount: parseAmount(_saved.text) ?? 0,
+      monthlyContribution: parseAmount(_monthly.text) ?? 0,
+      color: _color,
+      icon: existing.icon,
+      targetDate: _targetDate,
+    );
+    if (existing != null && predicted != null) {
+      _runOptimistic(existing, predicted, body);
+      return;
+    }
+
     setState(() {
       _saving = true;
       _formError = null;
       _apiError = null;
     });
 
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       final repository = ref.read(goalsRepositoryProvider);
-      final body = _buildBody(name, target);
-      if (_isEdit) {
-        await repository.update(_existing!.id, body);
-      } else {
-        await repository.create(body);
-      }
-      ref.invalidate(goalsProvider);
+      await repository.create(body);
+      container.invalidate(goalsFetchProvider);
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {
@@ -246,26 +269,56 @@ class _GoalFormSheetState extends ConsumerState<GoalFormSheet> {
     );
     if (!confirmed || !mounted) return;
 
-    setState(() {
-      _deleting = true;
-      _formError = null;
-      _apiError = null;
-    });
+    // 6.4 — predictable, so the row goes now. No Undo: there is no restore
+    // endpoint for a goal. The ConfirmSheet above is the guard.
+    final messenger = ScaffoldMessenger.of(context);
+    final container = ProviderScope.containerOf(context, listen: false);
+    final repository = ref.read(goalsRepositoryProvider);
 
-    try {
-      await ref.read(goalsRepositoryProvider).delete(goal.id);
-      ref.invalidate(goalsProvider);
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
-    } catch (error) {
-      final api = ApiException.from(error);
-      if (!mounted) return;
-      setState(() {
-        _deleting = false;
-        _apiError = api;
-        _formError = api.message;
-      });
-    }
+    Navigator.of(context).pop(true);
+
+    unawaited(
+      container
+          .read(goalsWritesProvider.notifier)
+          .run<void>(
+            paint: PendingWrite.remove(goal.id),
+            send: () => repository.delete(goal.id),
+            settle: () => settleGoals(container),
+            messenger: messenger,
+            noun: goal.name,
+            successMessage: 'Deleted ${goal.name}',
+          ),
+    );
+  }
+
+  /// Closes the sheet on the predicted row and hands the write over.
+  void _runOptimistic(
+    Goal existing,
+    Goal predicted,
+    Map<String, dynamic> body,
+  ) {
+    final messenger = ScaffoldMessenger.of(context);
+    final container = ProviderScope.containerOf(context, listen: false);
+    final repository = ref.read(goalsRepositoryProvider);
+
+    Navigator.of(context).pop(true);
+
+    unawaited(
+      container
+          .read(goalsWritesProvider.notifier)
+          .run<Goal>(
+            paint: PendingWrite.upsert(predicted),
+            send: () => repository.update(existing.id, body),
+            confirm: (saved) => saved,
+            settle: () => settleGoals(container),
+            messenger: messenger,
+            noun: predicted.name,
+            onFix: () {
+              if (!messenger.mounted) return;
+              GoalFormSheet.show(messenger.context, goal: predicted);
+            },
+          ),
+    );
   }
 
   Map<String, dynamic> _buildBody(String name, num target) {

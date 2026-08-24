@@ -247,7 +247,7 @@ class _AccountPickerSheet extends ConsumerWidget {
                 child: ErrorRetry(
                   error: error,
                   compact: true,
-                  onRetry: () => ref.invalidate(accountsProvider),
+                  onRetry: () => ref.invalidate(accountsFetchProvider),
                 ),
               ),
               data: (items) => _list(context, ref, items),

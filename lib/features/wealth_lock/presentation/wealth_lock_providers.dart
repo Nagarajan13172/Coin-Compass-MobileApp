@@ -177,7 +177,7 @@ void invalidateWealthReads(Ref ref) {
     ..invalidate(netWorthLatestProvider)
     ..invalidate(netWorthSeriesProvider)
     // holdings
-    ..invalidate(holdingsProvider)
+    ..invalidate(holdingsFetchProvider)
     // stocks — ours, not the web's
     ..invalidate(stockPortfolioProvider)
     ..invalidate(stockSalesProvider)
@@ -186,7 +186,7 @@ void invalidateWealthReads(Ref ref) {
     ..invalidate(dashboardSummaryProvider)
     ..invalidate(dashboardTrendProvider)
     ..invalidate(dashboardCategoryProvider)
-    ..invalidate(accountsProvider)
+    ..invalidate(accountsFetchProvider)
     // reports + insights
     ..invalidate(reportsSummaryProvider)
     ..invalidate(reportsByCategoryProvider)

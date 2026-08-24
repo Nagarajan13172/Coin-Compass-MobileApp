@@ -1,3 +1,5 @@
+import 'dart:async';
+
 // Flutter's animation library exports a `Split` curve class, which would
 // collide with the domain model of the same name.
 import 'package:flutter/material.dart' hide Split;
@@ -5,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/api/api_exception.dart';
+import '../../../core/state/optimistic.dart';
 import '../../../core/api/enums.dart';
 import '../../../core/api/write_body.dart';
 import '../../../core/theme/app_colors.dart';
@@ -69,7 +72,6 @@ class _SplitFormSheetState extends ConsumerState<SplitFormSheet> {
   late List<String> _participantIds = [...?_existing?.participantIds];
 
   bool _saving = false;
-  bool _deleting = false;
   String? _formError;
   ApiException? _apiError;
   String? _descriptionError;
@@ -77,7 +79,8 @@ class _SplitFormSheetState extends ConsumerState<SplitFormSheet> {
   String? _shareError;
 
   bool get _isEdit => _existing != null;
-  bool get _busy => _saving || _deleting;
+  // 6.4: a delete pops the sheet on the spot, so there is no deleting state.
+  bool get _busy => _saving;
 
   @override
   void dispose() {
@@ -108,7 +111,7 @@ class _SplitFormSheetState extends ConsumerState<SplitFormSheet> {
       title: _isEdit ? 'Edit split' : 'Split a bill',
       submitLabel: _isEdit ? 'Save changes' : 'Create split',
       submitting: _saving,
-      deleting: _deleting,
+      deleting: false,
       onSubmit: _submit,
       deleteLabel: _isEdit ? 'Delete split' : null,
       onDelete: _isEdit ? _delete : null,
@@ -288,21 +291,38 @@ class _SplitFormSheetState extends ConsumerState<SplitFormSheet> {
       return;
     }
 
+    final body = _buildBody(description, total, share);
+    final existing = _existing;
+
+    // 6.4 — a split has no server-derived fields: `othersShare` is arithmetic
+    // on the two amounts the form sent. The edit's outcome is exact. A create
+    // keeps the spinner — the server assigns the id.
+    final predicted = existing?.predict(
+      description: description,
+      totalAmount: total,
+      yourShare: share,
+      participantIds: _participantIds,
+      date: _date,
+      note: _note.text.trim().isEmpty ? null : _note.text.trim(),
+      categoryId: _categoryId,
+      accountId: _accountId,
+    );
+    if (existing != null && predicted != null) {
+      _runOptimistic(existing, predicted, body);
+      return;
+    }
+
     setState(() {
       _saving = true;
       _formError = null;
       _apiError = null;
     });
 
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       final repository = ref.read(splitsRepositoryProvider);
-      final body = _buildBody(description, total, share);
-      if (_isEdit) {
-        await repository.update(_existing!.id, body);
-      } else {
-        await repository.create(body);
-      }
-      ref.invalidate(splitsProvider);
+      await repository.create(body);
+      container.invalidate(splitsFetchProvider);
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {
@@ -327,26 +347,56 @@ class _SplitFormSheetState extends ConsumerState<SplitFormSheet> {
     );
     if (!confirmed || !mounted) return;
 
-    setState(() {
-      _deleting = true;
-      _formError = null;
-      _apiError = null;
-    });
+    // 6.4 — predictable, so the row goes now. No Undo: there is no restore
+    // endpoint for a split. The ConfirmSheet above is the guard.
+    final messenger = ScaffoldMessenger.of(context);
+    final container = ProviderScope.containerOf(context, listen: false);
+    final repository = ref.read(splitsRepositoryProvider);
 
-    try {
-      await ref.read(splitsRepositoryProvider).delete(split.id);
-      ref.invalidate(splitsProvider);
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
-    } catch (error) {
-      final api = ApiException.from(error);
-      if (!mounted) return;
-      setState(() {
-        _deleting = false;
-        _apiError = api;
-        _formError = api.message;
-      });
-    }
+    Navigator.of(context).pop(true);
+
+    unawaited(
+      container
+          .read(splitsWritesProvider.notifier)
+          .run<void>(
+            paint: PendingWrite.remove(split.id),
+            send: () => repository.delete(split.id),
+            settle: () => settleSplits(container),
+            messenger: messenger,
+            noun: split.description,
+            successMessage: 'Deleted ${split.description}',
+          ),
+    );
+  }
+
+  /// Closes the sheet on the predicted row and hands the write over.
+  void _runOptimistic(
+    Split existing,
+    Split predicted,
+    Map<String, dynamic> body,
+  ) {
+    final messenger = ScaffoldMessenger.of(context);
+    final container = ProviderScope.containerOf(context, listen: false);
+    final repository = ref.read(splitsRepositoryProvider);
+
+    Navigator.of(context).pop(true);
+
+    unawaited(
+      container
+          .read(splitsWritesProvider.notifier)
+          .run<Split>(
+            paint: PendingWrite.upsert(predicted),
+            send: () => repository.update(existing.id, body),
+            confirm: (saved) => saved,
+            settle: () => settleSplits(container),
+            messenger: messenger,
+            noun: predicted.description,
+            onFix: () {
+              if (!messenger.mounted) return;
+              SplitFormSheet.show(messenger.context, split: predicted);
+            },
+          ),
+    );
   }
 
   Map<String, dynamic> _buildBody(String description, num total, num share) {

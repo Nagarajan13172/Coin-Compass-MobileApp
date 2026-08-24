@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/api/api_exception.dart';
+import '../../../core/state/optimistic.dart';
 import '../../../core/api/enums.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_card.dart';
@@ -81,7 +84,7 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: ErrorRetry(
                 error: error,
-                onRetry: () => ref.invalidate(recurringRulesProvider),
+                onRetry: () => ref.invalidate(recurringRulesFetchProvider),
               ),
             ),
             _ => const Padding(
@@ -133,7 +136,7 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
           posts: false,
         );
       case RecurringAction.toggleActive:
-        await _setActive(rule, active: !rule.active);
+        _setActive(rule, active: !rule.active);
       case RecurringAction.history:
         await RecurringHistorySheet.show(context, rule: rule);
       case RecurringAction.edit:
@@ -145,6 +148,15 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
 
   /// Runs one rule action, keeping the row spinning until it lands and telling
   /// the ledger to reload when the action posted something.
+  ///
+  /// **Deliberately synchronous (6.4).** `/recurring/:id/run`, `/skip` and
+  /// `/post-one` are the three mutations on this screen whose result the client
+  /// cannot predict: the server decides how many occurrences post, which
+  /// transactions they become, and where `nextRun` lands. Painting a guess here
+  /// would put a schedule the server owns on screen as if it were fact. The
+  /// rule's own `{active}` PATCH *is* optimistic — see [_setActive] — because
+  /// that one is a flag the client sent. Do not "fix" this by routing it
+  /// through `OptimisticCollection`.
   Future<void> _perform(
     RecurringRule rule,
     Future<RecurringRunResult> Function(RecurringRepository repository)
@@ -158,7 +170,7 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
     final messenger = ScaffoldMessenger.of(context);
     try {
       final result = await action(ref.read(recurringRepositoryProvider));
-      ref.invalidate(recurringRulesProvider);
+      ref.invalidate(recurringRulesFetchProvider);
       ref.invalidate(recurringHistoryProvider(rule.id));
       if (posts) _refreshLedger();
       messenger
@@ -175,34 +187,31 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
     }
   }
 
-  Future<void> _setActive(RecurringRule rule, {required bool active}) async {
-    if (_busyIds.contains(rule.id)) return;
-    setState(() => _busyIds.add(rule.id));
-
+  /// Pause / resume. 6.4 — this is the one action on this screen the client can
+  /// predict: it is a `PATCH` with `{active}` and nothing else, and
+  /// `RecurringRule.predictActive` nulls the schedule the server recomputes, so
+  /// the tile drops its "Next …" line rather than showing a stale date.
+  void _setActive(RecurringRule rule, {required bool active}) {
     final messenger = ScaffoldMessenger.of(context);
-    try {
-      await ref.read(recurringRepositoryProvider).update(rule.id, {
-        'active': active,
-      });
-      ref.invalidate(recurringRulesProvider);
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(
-              active ? 'Resumed ${rule.title}' : 'Paused ${rule.title}',
-            ),
+    final container = ProviderScope.containerOf(context, listen: false);
+    final repository = ref.read(recurringRepositoryProvider);
+    final predicted = rule.predictActive(active);
+
+    unawaited(
+      container
+          .read(recurringWritesProvider.notifier)
+          .run<RecurringRule>(
+            paint: predicted == null ? null : PendingWrite.upsert(predicted),
+            send: () => repository.update(rule.id, {'active': active}),
+            confirm: (saved) => saved,
+            settle: () => settleRecurring(container),
+            messenger: messenger,
+            noun: rule.title,
+            successMessage: active
+                ? 'Resumed ${rule.title}'
+                : 'Paused ${rule.title}',
           ),
-        );
-    } catch (error) {
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(content: Text(ApiException.from(error).message)),
-        );
-    } finally {
-      if (mounted) setState(() => _busyIds.remove(rule.id));
-    }
+    );
   }
 
   Future<void> _delete(RecurringRule rule) async {
@@ -214,27 +223,31 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
     );
     if (!confirmed || !mounted) return;
 
-    setState(() => _busyIds.add(rule.id));
+    // 6.4 — predictable, so the row goes now. No Undo: there is no restore
+    // endpoint for a rule. The ConfirmSheet above is the guard.
     final messenger = ScaffoldMessenger.of(context);
-    try {
-      await ref.read(recurringRepositoryProvider).delete(rule.id);
-      ref.invalidate(recurringRulesProvider);
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Deleted ${rule.title}')));
-    } catch (error) {
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(content: Text(ApiException.from(error).message)),
-        );
-    } finally {
-      if (mounted) setState(() => _busyIds.remove(rule.id));
-    }
+    final container = ProviderScope.containerOf(context, listen: false);
+    final repository = ref.read(recurringRepositoryProvider);
+
+    unawaited(
+      container
+          .read(recurringWritesProvider.notifier)
+          .run<void>(
+            paint: PendingWrite.remove(rule.id),
+            send: () => repository.delete(rule.id),
+            settle: () => settleRecurring(container),
+            messenger: messenger,
+            noun: rule.title,
+            successMessage: 'Deleted ${rule.title}',
+          ),
+    );
   }
 
   /// The backend has no bulk endpoint, so "Run due" is every due rule run in
   /// turn. One failure doesn't stop the rest; the snackbar reports the tally.
+  ///
+  /// **Deliberately synchronous (6.4)**, for the same reason as [_perform]: the
+  /// server decides what each run posts and where each rule's `nextRun` lands.
   Future<void> _runDue() async {
     final rules = ref.read(recurringRulesProvider).valueOrNull ?? const [];
     final due = rules.where(_isDue).toList();
@@ -258,7 +271,7 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
       }
     }
 
-    ref.invalidate(recurringRulesProvider);
+    ref.invalidate(recurringRulesFetchProvider);
     _refreshLedger();
     if (!mounted) return;
     setState(() => _runningDue = false);

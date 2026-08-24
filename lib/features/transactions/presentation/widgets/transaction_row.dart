@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../core/api/api_exception.dart';
 import '../../../../core/api/enums.dart';
+import '../../../../core/state/optimistic.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/date_x.dart';
@@ -180,6 +183,20 @@ class TransactionRow extends ConsumerWidget {
 
   /// Optimistic delete + undo. Everything the callbacks need is captured before
   /// the row leaves the tree, because `ref` and `context` die with it.
+  ///
+  /// ## 6.4 — the second storage adapter
+  ///
+  /// The transactions list is paginated and accumulating, so it does not fit
+  /// `OptimisticCollection`'s fold over a single fetch: it keeps
+  /// [TransactionsListController] and its `insertLocal` / `deleteLocal`. What it
+  /// does **not** keep is its own vocabulary — every rollback below renders
+  /// [rollbackMessage], the same sentence every other collection speaks. One
+  /// mechanism, two storage adapters; not two mechanisms.
+  ///
+  /// This is also the one collection with a real restore endpoint
+  /// (`POST /transactions/:id/restore`), which is why it is the one collection
+  /// that offers **Undo**. Elsewhere "Undo" could only re-POST a new row with a
+  /// new `_id` and nothing referencing it, which is not restoring.
   Future<void> _delete(BuildContext context, WidgetRef ref) async {
     final messenger = ScaffoldMessenger.of(context);
     final container = ProviderScope.containerOf(context, listen: false);
@@ -188,42 +205,74 @@ class TransactionRow extends ConsumerWidget {
 
     final removed = controller.deleteLocal(transaction.id) ?? transaction;
 
-    try {
-      await repository.delete(removed.id);
-    } catch (error) {
-      controller.insertLocal(removed);
-      messenger.showSnackBar(
-        SnackBar(content: Text(ApiException.from(error).message)),
-      );
-      return;
+    Future<void> send() async {
+      try {
+        await repository.delete(removed.id);
+      } catch (error) {
+        // Exact rollback: the row goes back through the same date placement it
+        // left by, so the list cannot end up sorted differently.
+        controller.insertLocal(removed);
+        final api = ApiException.from(error);
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(rollbackMessage(api, noun: removed.title)),
+              duration: kRollbackSnackDuration,
+              // A DELETE with a fixed path is idempotent, so a retry is safe —
+              // except after a timeout, where the write may already have landed.
+              action: api.code == 'TIMEOUT'
+                  ? null
+                  : SnackBarAction(
+                      label: 'Retry',
+                      onPressed: () {
+                        controller.deleteLocal(removed.id);
+                        unawaited(send());
+                      },
+                    ),
+            ),
+          );
+        return;
+      }
+
+      invalidateTransactionDerived(container, tags: removed.tags.isNotEmpty);
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('Deleted ${removed.title}'),
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Undo',
+              onPressed: () async {
+                try {
+                  await repository.restore(removed.id);
+                  controller.insertLocal(removed);
+                  invalidateTransactionDerived(
+                    container,
+                    tags: removed.tags.isNotEmpty,
+                  );
+                } catch (error) {
+                  messenger
+                    ..hideCurrentSnackBar()
+                    ..showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          rollbackMessage(
+                            ApiException.from(error),
+                            noun: removed.title,
+                          ),
+                        ),
+                      ),
+                    );
+                }
+              },
+            ),
+          ),
+        );
     }
 
-    invalidateTransactionDerived(container, tags: removed.tags.isNotEmpty);
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text('Deleted ${removed.title}'),
-          duration: const Duration(seconds: 5),
-          action: SnackBarAction(
-            label: 'Undo',
-            onPressed: () async {
-              try {
-                await repository.restore(removed.id);
-                controller.insertLocal(removed);
-                invalidateTransactionDerived(
-                  container,
-                  tags: removed.tags.isNotEmpty,
-                );
-              } catch (error) {
-                messenger.showSnackBar(
-                  SnackBar(content: Text(ApiException.from(error).message)),
-                );
-              }
-            },
-          ),
-        ),
-      );
+    await send();
   }
 }
 

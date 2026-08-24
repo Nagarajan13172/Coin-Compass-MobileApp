@@ -70,4 +70,33 @@ class Split {
     if (categoryId != null) 'category': categoryId,
     if (accountId != null) 'account': accountId,
   };
+
+  /// 6.4 — this row as the client claims the server will return it.
+  ///
+  /// A split has no server-derived fields: [othersShare] is arithmetic on the
+  /// two amounts the form sent. Straight copy, never null.
+  ///
+  /// See `lib/core/state/optimistic.dart`.
+  Split? predict({
+    required String description,
+    required num totalAmount,
+    required num yourShare,
+    required List<String> participantIds,
+    required DateTime date,
+    String? note,
+    String? categoryId,
+    String? accountId,
+  }) => Split(
+    id: id,
+    description: description,
+    totalAmount: totalAmount,
+    yourShare: yourShare,
+    participantIds: participantIds,
+    date: date,
+    note: note,
+    categoryId: categoryId,
+    accountId: accountId,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+  );
 }

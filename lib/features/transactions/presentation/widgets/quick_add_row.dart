@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../core/api/api_exception.dart';
+import '../../../../core/state/optimistic.dart';
 import '../../../../core/api/enums.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/lucide_map.dart';
@@ -140,18 +143,36 @@ class QuickAddRow extends ConsumerWidget {
                   );
                 } catch (error) {
                   controller.insertLocal(created);
-                  messenger.showSnackBar(
-                    SnackBar(content: Text(ApiException.from(error).message)),
-                  );
+                  // 6.4: one vocabulary for every rollback in the app.
+                  messenger
+                    ..hideCurrentSnackBar()
+                    ..showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          rollbackMessage(
+                            ApiException.from(error),
+                            noun: template.name,
+                          ),
+                        ),
+                      ),
+                    );
                 }
               },
             ),
           ),
         );
     } catch (error) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(ApiException.from(error).message)),
-      );
+      // 6.4: the quick-add create is not optimistic (the server assigns the
+      // id), but its failure speaks the same vocabulary as every rollback.
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              rollbackMessage(ApiException.from(error), noun: template.name),
+            ),
+          ),
+        );
     }
   }
 
@@ -168,16 +189,25 @@ class QuickAddRow extends ConsumerWidget {
     );
     if (!confirmed || !context.mounted) return;
 
+    // 6.4 — the chip's disappearance is exactly predictable, so it goes now.
+    // There is no `PATCH /templates/:id` in this app (a chip is created or
+    // removed, never edited) and no restore endpoint, so no Undo: the
+    // ConfirmSheet above is the guard.
     final messenger = ScaffoldMessenger.of(context);
     final container = ProviderScope.containerOf(context, listen: false);
-    try {
-      await ref.read(templatesRepositoryProvider).delete(template.id);
-      container.invalidate(templatesProvider);
-    } catch (error) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(ApiException.from(error).message)),
-      );
-    }
+    final repository = ref.read(templatesRepositoryProvider);
+
+    unawaited(
+      container
+          .read(templatesWritesProvider.notifier)
+          .run<void>(
+            paint: PendingWrite.remove(template.id),
+            send: () => repository.delete(template.id),
+            settle: () => settleTemplates(container),
+            messenger: messenger,
+            noun: template.name,
+          ),
+    );
   }
 
   /// True when [date] falls inside the window the list is currently showing.
@@ -404,7 +434,7 @@ class _NewQuickAddSheetState extends ConsumerState<_NewQuickAddSheet> {
         'currency': 'INR',
       });
       if (!mounted) return;
-      ref.invalidate(templatesProvider);
+      ref.invalidate(templatesFetchProvider);
       Navigator.of(context).pop();
     } catch (error) {
       if (!mounted) return;

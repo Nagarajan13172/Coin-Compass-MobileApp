@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/api/api_exception.dart';
+import '../../../core/state/optimistic.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_select.dart';
 import '../../../core/widgets/app_text_field.dart';
@@ -45,14 +48,15 @@ class _PersonFormSheetState extends ConsumerState<PersonFormSheet> {
   late PersonRelation _relation = _existing?.relation ?? PersonRelation.other;
 
   bool _saving = false;
-  bool _deleting = false;
   bool _merging = false;
   String? _formError;
   ApiException? _apiError;
   String? _nameError;
 
   bool get _isEdit => _existing != null;
-  bool get _busy => _saving || _deleting || _merging;
+  // 6.4: a delete pops the sheet on the spot and reports from the list, so
+  // there is no deleting state left to spin on.
+  bool get _busy => _saving || _merging;
 
   @override
   void dispose() {
@@ -68,7 +72,7 @@ class _PersonFormSheetState extends ConsumerState<PersonFormSheet> {
       title: _isEdit ? 'Edit person' : 'New person',
       submitLabel: _isEdit ? 'Save changes' : 'Add person',
       submitting: _saving,
-      deleting: _deleting,
+      deleting: false,
       onSubmit: _submit,
       deleteLabel: _isEdit ? 'Delete person' : null,
       onDelete: _isEdit ? _delete : null,
@@ -130,21 +134,31 @@ class _PersonFormSheetState extends ConsumerState<PersonFormSheet> {
       return;
     }
 
+    final body = _buildBody(name);
+    final existing = _existing;
+
+    // 6.4 — a rename or a relation change is the whole write surface, so the
+    // client knows the outcome exactly and the row repaints now. A **create**
+    // stays synchronous: the server assigns `_id`, a provisional row could not
+    // be tapped, and a failed create is the one failure that destroys typed
+    // input, which only an open form can carry.
+    final predicted = existing?.predict(name: name, relation: _relation);
+    if (existing != null && predicted != null) {
+      _runOptimistic(existing, predicted, body);
+      return;
+    }
+
     setState(() {
       _saving = true;
       _formError = null;
       _apiError = null;
     });
 
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       final repository = ref.read(peopleRepositoryProvider);
-      final body = _buildBody(name);
-      if (_isEdit) {
-        await repository.update(_existing!.id, body);
-      } else {
-        await repository.create(body);
-      }
-      ref.invalidate(peopleProvider);
+      await repository.create(body);
+      container.invalidate(peopleFetchProvider);
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {
@@ -169,30 +183,68 @@ class _PersonFormSheetState extends ConsumerState<PersonFormSheet> {
     );
     if (!confirmed || !mounted) return;
 
-    setState(() {
-      _deleting = true;
-      _formError = null;
-      _apiError = null;
-    });
+    // 6.4 — the row's disappearance is exactly predictable, so it goes now.
+    // No Undo: `/people/:id` has no restore counterpart, and re-POSTing would
+    // create a *different* person. The ConfirmSheet above is the guard.
+    final messenger = ScaffoldMessenger.of(context);
+    final container = ProviderScope.containerOf(context, listen: false);
+    final repository = ref.read(peopleRepositoryProvider);
 
-    try {
-      await ref.read(peopleRepositoryProvider).delete(person.id);
-      ref.invalidate(peopleProvider);
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
-    } catch (error) {
-      final api = ApiException.from(error);
-      if (!mounted) return;
-      setState(() {
-        _deleting = false;
-        _apiError = api;
-        _formError = api.message;
-      });
-    }
+    Navigator.of(context).pop(true);
+
+    unawaited(
+      container
+          .read(peopleWritesProvider.notifier)
+          .run<void>(
+            paint: PendingWrite.remove(person.id),
+            send: () => repository.delete(person.id),
+            settle: () => settlePeople(container),
+            messenger: messenger,
+            noun: person.name,
+            successMessage: 'Deleted ${person.name}',
+          ),
+    );
+  }
+
+  /// Closes the sheet on the predicted row and hands the write to the one
+  /// mechanism. Captured before the pop, because `ref` and `context` die here.
+  void _runOptimistic(
+    Person existing,
+    Person predicted,
+    Map<String, dynamic> body,
+  ) {
+    final messenger = ScaffoldMessenger.of(context);
+    final container = ProviderScope.containerOf(context, listen: false);
+    final repository = ref.read(peopleRepositoryProvider);
+
+    Navigator.of(context).pop(true);
+
+    unawaited(
+      container
+          .read(peopleWritesProvider.notifier)
+          .run<Person>(
+            paint: PendingWrite.upsert(predicted),
+            send: () => repository.update(existing.id, body),
+            confirm: (saved) => saved,
+            settle: () => settlePeople(container),
+            messenger: messenger,
+            noun: predicted.name,
+            onFix: () {
+              if (!messenger.mounted) return;
+              PersonFormSheet.show(messenger.context, person: predicted);
+            },
+          ),
+    );
   }
 
   /// Folds this person into another and closes the sheet — the duplicate is
   /// gone, so there is nothing left to edit here.
+  ///
+  /// **Deliberately synchronous (6.4).** `POST /people/:id/merge` moves credits
+  /// and splits across three collections and deletes the duplicate; the rows
+  /// that come back are unknowable client-side, so there is nothing honest to
+  /// paint. It keeps its spinner and its full refetch. Do not "fix" this by
+  /// routing it through `OptimisticCollection`.
   Future<void> _merge() async {
     final person = _existing;
     if (person == null) return;
@@ -229,9 +281,9 @@ class _PersonFormSheetState extends ConsumerState<PersonFormSheet> {
     try {
       await ref.read(peopleRepositoryProvider).merge(person.id, target.id!);
       ref
-        ..invalidate(peopleProvider)
-        ..invalidate(creditsProvider)
-        ..invalidate(splitsProvider);
+        ..invalidate(peopleFetchProvider)
+        ..invalidate(creditsFetchProvider)
+        ..invalidate(splitsFetchProvider);
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {

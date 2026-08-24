@@ -207,7 +207,10 @@ class _SplitCard extends StatelessWidget {
                     Text(
                       'What you paid does not change, so your net worth will '
                       'not move.',
-                      style: TextStyle(fontSize: 11.5, color: c.mutedForeground),
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: c.mutedForeground,
+                      ),
                     ),
                   ],
                 ),
@@ -270,10 +273,7 @@ class StockSplitsBanner extends ConsumerWidget {
               children: [
                 const Text(
                   'Corporate action to apply',
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
                 ),
                 Text(
                   subtitle,
@@ -284,11 +284,7 @@ class StockSplitsBanner extends ConsumerWidget {
               ],
             ),
           ),
-          Icon(
-            LucideIcons.chevronRight,
-            size: 18,
-            color: c.mutedForeground,
-          ),
+          Icon(LucideIcons.chevronRight, size: 18, color: c.mutedForeground),
         ],
       ),
     );

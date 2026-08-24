@@ -166,7 +166,27 @@ class SettingsWriteController extends StateNotifier<SettingsWrite?> {
     state = key;
     try {
       await action();
-      if (refreshSettings) _ref.invalidate(settingsProvider);
+      if (refreshSettings) {
+        // 6.4 settle discipline. This used to invalidate and return, leaving
+        // the refetch to Riverpod's scheduler — which flushes at the end of a
+        // frame, *after* `state = null` below has already rebuilt the rows that
+        // watch this controller. Those rows read providers derived from
+        // `settingsProvider`, so one of them would flush it mid-build and
+        // notify `SettingsScreen`, an ancestor that had already built:
+        // "setState() called during build".
+        //
+        // Waiting for the fresh document here removes the race and is the same
+        // rule `OptimisticCollection.run` follows — the pending flag is only
+        // dropped once the value that replaces the old one is in hand. Settings
+        // itself is deliberately NOT optimistic (a single document, not a list;
+        // see lib/core/state/optimistic.dart), so this is the settle half only.
+        _ref.invalidate(settingsProvider);
+        try {
+          await _ref.read(settingsProvider.future);
+        } on Object {
+          // The card renders the read's own error; the write already landed.
+        }
+      }
       return null;
     } catch (error) {
       return ApiException.from(error).message;

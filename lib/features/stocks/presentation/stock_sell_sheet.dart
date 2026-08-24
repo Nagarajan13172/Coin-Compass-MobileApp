@@ -245,6 +245,9 @@ class _StockSellSheetState extends ConsumerState<StockSellSheet> {
     setState(() => _sellDate = DateTime(picked.year, picked.month, picked.day));
   }
 
+  /// **Deliberately synchronous (6.4).** A sale is matched against lots on the
+  /// server; the realised short/long-term split it produces is not something
+  /// the client can compute. See lib/core/state/optimistic.dart.
   Future<void> _submit() async {
     final demats = ref.read(dematAccountsProvider);
     final dematId = _dematIdForSubmit(demats);
@@ -435,11 +438,7 @@ class _PreviewCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  LucideIcons.triangleAlert,
-                  size: 14,
-                  color: c.destructive,
-                ),
+                Icon(LucideIcons.triangleAlert, size: 14, color: c.destructive),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(

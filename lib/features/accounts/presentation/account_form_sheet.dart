@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/api/api_exception.dart';
 import '../../../core/api/enums.dart';
+import '../../../core/state/optimistic.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/lucide_map.dart';
@@ -88,7 +91,6 @@ class _AccountFormSheetState extends ConsumerState<AccountFormSheet> {
   bool _iconChosen = false;
 
   bool _saving = false;
-  bool _deleting = false;
   String? _formError;
   ApiException? _apiError;
   String? _nameError;
@@ -122,7 +124,9 @@ class _AccountFormSheetState extends ConsumerState<AccountFormSheet> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final busy = _saving || _deleting;
+    // 6.4: there is no separate `_deleting` flag any more — a delete pops the
+    // sheet on the spot and reports from the list, so nothing here spins for it.
+    final busy = _saving;
 
     return PopScope(
       // Belt and braces: a write already survives dismissal (the invalidation
@@ -283,16 +287,14 @@ class _AccountFormSheetState extends ConsumerState<AccountFormSheet> {
                       AppButton(
                         label: _isEdit ? 'Save changes' : 'Create account',
                         busy: _saving,
-                        onPressed: _deleting ? null : _submit,
+                        onPressed: _submit,
                       ),
                       if (_isEdit) ...[
                         const SizedBox(height: 6),
                         TextButton.icon(
                           onPressed: busy ? null : _delete,
                           icon: const Icon(LucideIcons.trash2, size: 17),
-                          label: Text(
-                            _deleting ? 'Deleting…' : 'Delete account',
-                          ),
+                          label: const Text('Delete account'),
                           style: TextButton.styleFrom(
                             foregroundColor: c.destructive,
                             minimumSize: const Size.fromHeight(44),
@@ -321,6 +323,31 @@ class _AccountFormSheetState extends ConsumerState<AccountFormSheet> {
       return;
     }
 
+    final body = _buildBody(name);
+    final existing = _existing;
+
+    // 6.4 — an edit whose result the client can predict repaints at once and
+    // settles in the background. `Account.predict` returns null when the
+    // opening balance moved, because the server's running balance then shifts
+    // by an amount only the whole ledger could re-derive; that submission falls
+    // through to the spinner below. A **create** always falls through too: the
+    // server assigns `_id` and `createdAt`, a provisional row would have no id
+    // to tap, and a failed create is the one failure that destroys typed input,
+    // which only an open form can carry honestly.
+    final predicted = existing?.predict(
+      name: name,
+      type: _type,
+      openingBalance: _parseAmount(_openingBalance.text) ?? 0,
+      currency: _currency,
+      excludeFromTotal: _excludeFromTotal,
+      color: _color,
+      icon: _icon,
+    );
+    if (existing != null && predicted != null) {
+      _runOptimistic(existing, predicted, body);
+      return;
+    }
+
     setState(() {
       _saving = true;
       _formError = null;
@@ -335,13 +362,12 @@ class _AccountFormSheetState extends ConsumerState<AccountFormSheet> {
 
     try {
       final repository = ref.read(accountsRepositoryProvider);
-      final body = _buildBody(name);
-      if (_isEdit) {
-        await repository.update(_existing!.id, body);
+      if (existing != null) {
+        await repository.update(existing.id, body);
       } else {
         await repository.create(body);
       }
-      container.invalidate(accountsProvider);
+      container.invalidate(accountsFetchProvider);
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {
@@ -353,6 +379,39 @@ class _AccountFormSheetState extends ConsumerState<AccountFormSheet> {
         _formError = api.message;
       });
     }
+  }
+
+  /// Closes the sheet on the predicted row and hands the write to the one
+  /// mechanism. Everything the rollback needs is captured before the pop,
+  /// because `ref` and `context` die with this element.
+  void _runOptimistic(
+    Account existing,
+    Account predicted,
+    Map<String, dynamic> body,
+  ) {
+    final messenger = ScaffoldMessenger.of(context);
+    final container = ProviderScope.containerOf(context, listen: false);
+    final repository = ref.read(accountsRepositoryProvider);
+
+    Navigator.of(context).pop(true);
+
+    unawaited(
+      container
+          .read(accountsWritesProvider.notifier)
+          .run<Account>(
+            paint: PendingWrite.upsert(predicted),
+            send: () => repository.update(existing.id, body),
+            confirm: (saved) => saved,
+            settle: () => settleAccounts(container),
+            messenger: messenger,
+            noun: predicted.name,
+            onFix: () {
+              if (!messenger.mounted) return;
+              // The attempted row, not the stale one — nothing typed is lost.
+              AccountFormSheet.show(messenger.context, account: predicted);
+            },
+          ),
+    );
   }
 
   Future<void> _delete() async {
@@ -370,26 +429,27 @@ class _AccountFormSheetState extends ConsumerState<AccountFormSheet> {
     );
     if (!confirmed || !mounted) return;
 
-    setState(() {
-      _deleting = true;
-      _formError = null;
-      _apiError = null;
-    });
+    // 6.4 — the client knows exactly what a delete does to the list, so the
+    // row leaves now. There is no `/accounts/:id/restore`, so no Undo is
+    // offered: re-POSTing would make a *new* account with a new id and nothing
+    // referencing it. The ConfirmSheet above is the pre-flight guard instead.
+    final messenger = ScaffoldMessenger.of(context);
+    final repository = ref.read(accountsRepositoryProvider);
 
-    try {
-      await ref.read(accountsRepositoryProvider).delete(account.id);
-      container.invalidate(accountsProvider);
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
-    } catch (error) {
-      final api = ApiException.from(error);
-      if (!mounted) return;
-      setState(() {
-        _deleting = false;
-        _apiError = api;
-        _formError = api.message;
-      });
-    }
+    Navigator.of(context).pop(true);
+
+    unawaited(
+      container
+          .read(accountsWritesProvider.notifier)
+          .run<void>(
+            paint: PendingWrite.remove(account.id),
+            send: () => repository.delete(account.id),
+            settle: () => settleAccounts(container),
+            messenger: messenger,
+            noun: account.name,
+            successMessage: 'Deleted ${account.name}',
+          ),
+    );
   }
 
   /// Wire body — exactly the keys the accounts schema accepts.

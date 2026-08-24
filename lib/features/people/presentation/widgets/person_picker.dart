@@ -166,7 +166,7 @@ class _PersonPickerSheetState extends ConsumerState<_PersonPickerSheet> {
                     child: ErrorRetry(
                       error: error,
                       compact: true,
-                      onRetry: () => ref.invalidate(peopleProvider),
+                      onRetry: () => ref.invalidate(peopleFetchProvider),
                     ),
                   ),
                   _ => const Padding(

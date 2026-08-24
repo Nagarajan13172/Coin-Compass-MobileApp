@@ -125,4 +125,88 @@ class RecurringRule {
     if (endDate != null) 'endDate': endDate!.toUtc().toIso8601String(),
     'active': active,
   };
+
+  /// 6.4 — this row as the client claims the server will return it.
+  ///
+  /// [nextRun] and [upcoming] are the server's schedule projection, and every
+  /// field on this form — frequency, interval, start date, and pausing the rule
+  /// — moves them, so both are nulled. `RecurringTile` already omits its
+  /// "Next …" line when `nextRun` is null, so no schedule the server owns is
+  /// ever painted from a guess. [lastRun] is history and is carried across.
+  ///
+  /// This covers the form edit **and** the pause/resume toggle, which is the
+  /// same `PATCH` with `{active}`. `/recurring/:id/run`, `/skip` and
+  /// `/post-one` are deliberately not optimistic — see the exclusion note on
+  /// `RecurringScreen._perform`.
+  ///
+  /// See `lib/core/state/optimistic.dart`.
+  RecurringRule? predict({
+    required TransactionType type,
+    required num amount,
+    required Frequency frequency,
+    required int interval,
+    required bool active,
+    required String note,
+    required String payee,
+    String? accountId,
+    Account? account,
+    String? toAccountId,
+    String? categoryId,
+    Category? category,
+    List<String>? tags,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) => RecurringRule(
+    id: id,
+    type: type,
+    amount: amount,
+    accountId: accountId,
+    account:
+        account ??
+        (accountId != null && accountId == this.accountId
+            ? this.account
+            : null),
+    toAccountId: toAccountId,
+    categoryId: categoryId,
+    category:
+        category ??
+        (categoryId != null && categoryId == this.categoryId
+            ? this.category
+            : null),
+    note: note,
+    payee: payee,
+    tags: tags ?? this.tags,
+    currency: currency,
+    loanId: loanId,
+    frequency: frequency,
+    interval: interval,
+    startDate: startDate,
+    nextRun: null,
+    endDate: endDate,
+    lastRun: lastRun,
+    active: active,
+    upcoming: const [],
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+  );
+
+  /// The pause/resume toggle: the same `PATCH` with `{active}` and nothing
+  /// else, so everything but the flag and the server's schedule is carried.
+  RecurringRule? predictActive(bool active) => predict(
+    type: type,
+    amount: amount,
+    frequency: frequency,
+    interval: interval,
+    active: active,
+    note: note,
+    payee: payee,
+    accountId: accountId,
+    account: account,
+    toAccountId: toAccountId,
+    categoryId: categoryId,
+    category: category,
+    tags: tags,
+    startDate: startDate,
+    endDate: endDate,
+  );
 }

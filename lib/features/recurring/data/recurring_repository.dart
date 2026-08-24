@@ -4,6 +4,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/api/endpoints.dart';
 import '../../../core/api/envelope.dart';
 import '../../../core/api/json.dart';
+import '../../../core/state/optimistic.dart';
 import '../../transactions/domain/transaction.dart';
 import '../domain/recurring_rule.dart';
 
@@ -96,9 +97,39 @@ final recurringRepositoryProvider = Provider<RecurringRepository>(
   (ref) => RecurringRepository(ref.watch(apiClientProvider)),
 );
 
-final recurringRulesProvider = FutureProvider<List<RecurringRule>>(
+// ─── 6.4: the optimistic overlay ───────────────────────────────────────────
+//
+// The server's list moves to `<x>FetchProvider`; the public name stays on the
+// composed view, so every existing `ref.watch` site gains optimism unedited.
+// See lib/core/state/optimistic.dart.
+
+/// The server's own list. Read this only to **refetch** it.
+final recurringRulesFetchProvider = FutureProvider<List<RecurringRule>>(
   (ref) => ref.watch(recurringRepositoryProvider).list(),
 );
+
+/// In-flight optimistic edits, pause/resume toggles and deletes on
+/// `/recurring`.
+///
+/// [RecurringRepository.run], [RecurringRepository.skip] and
+/// [RecurringRepository.postOne] are deliberately **not** routed through here:
+/// the server decides how many occurrences post and where `nextRun` lands. See
+/// `RecurringScreen._perform`.
+final recurringWritesProvider =
+    StateNotifierProvider<
+      OptimisticCollection<RecurringRule>,
+      PendingWrites<RecurringRule>
+    >((ref) => OptimisticCollection<RecurringRule>(idOf: (rule) => rule.id));
+
+final recurringRulesProvider = Provider<AsyncValue<List<RecurringRule>>>(
+  (ref) => ref
+      .watch(recurringWritesProvider)
+      .applyTo(ref.watch(recurringRulesFetchProvider)),
+);
+
+/// The settle step for a recurring write.
+Future<void> settleRecurring(ProviderContainer container) =>
+    settleFetch(container, recurringRulesFetchProvider);
 
 /// One rule's posted transactions, loaded when its history sheet opens.
 final recurringHistoryProvider = FutureProvider.autoDispose

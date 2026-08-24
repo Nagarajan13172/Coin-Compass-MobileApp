@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/api/api_exception.dart';
+import '../../../core/state/optimistic.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/money.dart';
 import '../../../core/widgets/app_card.dart';
@@ -84,7 +87,7 @@ class _CreditsScreenState extends ConsumerState<CreditsScreen> {
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: ErrorRetry(
                 error: error,
-                onRetry: () => ref.invalidate(creditsProvider),
+                onRetry: () => ref.invalidate(creditsFetchProvider),
               ),
             ),
             _ => const Padding(
@@ -123,23 +126,25 @@ class _CreditsScreenState extends ConsumerState<CreditsScreen> {
     );
     if (!confirmed || !mounted) return;
 
-    setState(() => _busyIds.add(credit.id));
+    // 6.4 — the row's disappearance is exactly predictable, so it goes now and
+    // the spinner goes with it. A failure puts it back and says so; there is no
+    // Undo because `/credits/:id` has no restore counterpart.
     final messenger = ScaffoldMessenger.of(context);
-    try {
-      await ref.read(creditsRepositoryProvider).delete(credit.id);
-      ref.invalidate(creditsProvider);
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Credit deleted')));
-    } catch (error) {
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(content: Text(ApiException.from(error).message)),
-        );
-    } finally {
-      if (mounted) setState(() => _busyIds.remove(credit.id));
-    }
+    final container = ProviderScope.containerOf(context, listen: false);
+    final repository = ref.read(creditsRepositoryProvider);
+
+    unawaited(
+      container
+          .read(creditsWritesProvider.notifier)
+          .run<void>(
+            paint: PendingWrite.remove(credit.id),
+            send: () => repository.delete(credit.id),
+            settle: () => settleCredits(container),
+            messenger: messenger,
+            noun: credit.displayName,
+            successMessage: 'Credit deleted',
+          ),
+    );
   }
 }
 

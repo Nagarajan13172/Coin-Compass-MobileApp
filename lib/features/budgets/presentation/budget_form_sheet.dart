@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/api/api_exception.dart';
+import '../../../core/state/optimistic.dart';
 import '../../../core/api/enums.dart';
 import '../../../core/api/write_body.dart';
 import '../../../core/theme/app_colors.dart';
@@ -63,7 +66,6 @@ class _BudgetFormSheetState extends ConsumerState<BudgetFormSheet> {
   bool _categoryTouched = false;
 
   bool _saving = false;
-  bool _deleting = false;
   String? _formError;
   ApiException? _apiError;
   String? _amountError;
@@ -85,7 +87,7 @@ class _BudgetFormSheetState extends ConsumerState<BudgetFormSheet> {
       title: _isEdit ? 'Edit budget' : 'New budget',
       submitLabel: _isEdit ? 'Save changes' : 'Create budget',
       submitting: _saving,
-      deleting: _deleting,
+      deleting: false,
       onSubmit: _submit,
       deleteLabel: _isEdit ? 'Delete budget' : null,
       onDelete: _isEdit ? _delete : null,
@@ -175,7 +177,8 @@ class _BudgetFormSheetState extends ConsumerState<BudgetFormSheet> {
     );
   }
 
-  bool get _busy => _saving || _deleting;
+  // 6.4: a delete pops the sheet on the spot, so there is no deleting state.
+  bool get _busy => _saving;
 
   /// The server anchors each window to `startDate`, so this is what makes the
   /// period concrete: a salary month that runs from the 5th, a week that runs
@@ -222,6 +225,27 @@ class _BudgetFormSheetState extends ConsumerState<BudgetFormSheet> {
       return;
     }
 
+    final body = _buildBody(amount);
+    final existing = _existing;
+    final category = _categoryFor(ref.read(categoriesProvider).valueOrNull);
+
+    // 6.4 — the client knows the new limit, category, period and start date
+    // exactly. What it does *not* know is `spent`/`remaining`/`percent`/`over`,
+    // which the server recomputes — so `Budget.predict` nulls all four and the
+    // tile re-derives the bar from the spend the app already holds. A create
+    // keeps the spinner (server-assigned id).
+    final predicted = existing?.predict(
+      amount: amount,
+      period: _period,
+      categoryId: category?.id,
+      category: category,
+      startDate: _startDate,
+    );
+    if (existing != null && predicted != null) {
+      _runOptimistic(existing, predicted, body);
+      return;
+    }
+
     setState(() {
       _saving = true;
       _formError = null;
@@ -231,12 +255,7 @@ class _BudgetFormSheetState extends ConsumerState<BudgetFormSheet> {
 
     try {
       final repository = ref.read(budgetsRepositoryProvider);
-      final body = _buildBody(amount);
-      if (_isEdit) {
-        await repository.update(_existing!.id, body);
-      } else {
-        await repository.create(body);
-      }
+      await repository.create(body);
       _invalidate();
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -262,32 +281,81 @@ class _BudgetFormSheetState extends ConsumerState<BudgetFormSheet> {
     );
     if (!confirmed || !mounted) return;
 
-    setState(() {
-      _deleting = true;
-      _formError = null;
-      _apiError = null;
-    });
+    // 6.4 — predictable, so the row goes now. No Undo: `/budgets/:id` has no
+    // restore counterpart. The ConfirmSheet above is the guard.
+    final messenger = ScaffoldMessenger.of(context);
+    final container = ProviderScope.containerOf(context, listen: false);
+    final repository = ref.read(budgetsRepositoryProvider);
+    final settle = _settleFor(container);
 
-    try {
-      await ref.read(budgetsRepositoryProvider).delete(budget.id);
-      _invalidate();
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
-    } catch (error) {
-      final api = ApiException.from(error);
-      if (!mounted) return;
-      setState(() {
-        _deleting = false;
-        _apiError = api;
-        _formError = api.message;
-      });
-    }
+    Navigator.of(context).pop(true);
+
+    unawaited(
+      container
+          .read(budgetsWritesProvider.notifier)
+          .run<void>(
+            paint: PendingWrite.remove(budget.id),
+            send: () => repository.delete(budget.id),
+            settle: settle,
+            messenger: messenger,
+            noun: 'budget',
+            successMessage: 'Deleted budget',
+          ),
+    );
+  }
+
+  /// Closes the sheet on the predicted row and hands the write over.
+  void _runOptimistic(
+    Budget existing,
+    Budget predicted,
+    Map<String, dynamic> body,
+  ) {
+    final messenger = ScaffoldMessenger.of(context);
+    final container = ProviderScope.containerOf(context, listen: false);
+    final repository = ref.read(budgetsRepositoryProvider);
+    final settle = _settleFor(container);
+
+    Navigator.of(context).pop(true);
+
+    unawaited(
+      container
+          .read(budgetsWritesProvider.notifier)
+          .run<Budget>(
+            paint: PendingWrite.upsert(predicted),
+            send: () => repository.update(existing.id, body),
+            confirm: (saved) => saved,
+            settle: settle,
+            messenger: messenger,
+            noun: predicted.category?.name ?? 'budget',
+            onFix: () {
+              if (!messenger.mounted) return;
+              BudgetFormSheet.show(messenger.context, budget: predicted);
+            },
+          ),
+    );
+  }
+
+  /// The settle step: the list, plus the spend windows the limit's own tile
+  /// reads — a changed limit or period moves the totals card as well as the
+  /// row. Built before the pop, so it does not read `_period` off a dead State.
+  Future<void> Function() _settleFor(ProviderContainer container) {
+    final period = _period;
+    final previous = _existing?.period;
+    return () => settleFetch(
+      container,
+      budgetsFetchProvider,
+      also: [
+        budgetSpendProvider(period),
+        if (previous != null && previous != period)
+          budgetSpendProvider(previous),
+      ],
+    );
   }
 
   /// Drops the list and the spend windows — a new limit changes the totals card
   /// as well as the row.
   void _invalidate() {
-    ref.invalidate(budgetsProvider);
+    ref.invalidate(budgetsFetchProvider);
     ref.invalidate(budgetSpendProvider(_period));
     final previous = _existing?.period;
     if (previous != null && previous != _period) {

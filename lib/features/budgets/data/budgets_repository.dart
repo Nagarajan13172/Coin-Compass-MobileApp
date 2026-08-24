@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/endpoints.dart';
 import '../../../core/api/envelope.dart';
+import '../../../core/state/optimistic.dart';
 import '../domain/budget.dart';
 
 class BudgetsRepository {
@@ -34,8 +35,31 @@ final budgetsRepositoryProvider = Provider<BudgetsRepository>(
   (ref) => BudgetsRepository(ref.watch(apiClientProvider)),
 );
 
-/// Session-cached: the budgets screen and the add sheet both read it.
-/// Invalidate after a write with `ref.invalidate(budgetsProvider)`.
-final budgetsProvider = FutureProvider<List<Budget>>(
+// ─── 6.4: the optimistic overlay ───────────────────────────────────────────
+//
+// The server's list moves to `<x>FetchProvider`; the public name stays on the
+// composed view, so every existing `ref.watch` site gains optimism unedited.
+// See lib/core/state/optimistic.dart.
+
+/// The server's own list. Read this only to **refetch** it.
+final budgetsFetchProvider = FutureProvider<List<Budget>>(
   (ref) => ref.watch(budgetsRepositoryProvider).list(),
 );
+
+/// In-flight optimistic edits and deletes on `/budgets`.
+final budgetsWritesProvider =
+    StateNotifierProvider<OptimisticCollection<Budget>, PendingWrites<Budget>>(
+      (ref) => OptimisticCollection<Budget>(idOf: (budget) => budget.id),
+    );
+
+/// Session-cached: the budgets screen and the add sheet both read it.
+final budgetsProvider = Provider<AsyncValue<List<Budget>>>(
+  (ref) =>
+      ref.watch(budgetsWritesProvider).applyTo(ref.watch(budgetsFetchProvider)),
+);
+
+/// The settle step for a budgets write. The spend windows live in
+/// `presentation/budgets_providers.dart` and are added by the call site — the
+/// data layer does not reach up into presentation.
+Future<void> settleBudgets(ProviderContainer container) =>
+    settleFetch(container, budgetsFetchProvider);

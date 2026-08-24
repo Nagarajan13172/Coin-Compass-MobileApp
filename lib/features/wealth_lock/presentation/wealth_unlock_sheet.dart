@@ -191,6 +191,16 @@ class _WealthUnlockSheetState extends ConsumerState<WealthUnlockSheet> {
             enabled: !state.busy,
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => state.busy ? null : _submit(),
+            // Found on the device: after a rejected attempt, "That passcode
+            // didn't match." stayed on screen the whole time the owner was
+            // typing the next one — a red error about a passcode they had
+            // already replaced. The controller has always had `clearError()`;
+            // nothing called it. Guarded so an untouched field does not
+            // rebuild the sheet on every keystroke.
+            onChanged: (_) {
+              if (state.error == null) return;
+              ref.read(wealthLockControllerProvider.notifier).clearError();
+            },
             inputFormatters: [LengthLimitingTextInputFormatter(32)],
             labelAction: TextButton(
               onPressed: state.busy

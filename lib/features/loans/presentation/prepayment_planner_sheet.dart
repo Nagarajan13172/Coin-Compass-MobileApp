@@ -208,7 +208,10 @@ class _Outcome extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: TextStyle(fontSize: 11.5, color: c.mutedForeground)),
+          Text(
+            title,
+            style: TextStyle(fontSize: 11.5, color: c.mutedForeground),
+          ),
           const SizedBox(height: 4),
           Text(
             schedule.feasible ? formatMonths(schedule.months) : 'Never',
@@ -218,10 +221,7 @@ class _Outcome extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               eta,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
             ),
           ],
           const SizedBox(height: 4),
@@ -286,15 +286,14 @@ class _Verdict extends StatelessWidget {
               const Expanded(
                 child: Text(
                   'Net benefit',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
               ),
               MoneyText(
                 plan.netBenefit,
-                tone: plan.netBenefit < 0 ? MoneyTone.expense : MoneyTone.income,
+                tone: plan.netBenefit < 0
+                    ? MoneyTone.expense
+                    : MoneyTone.income,
                 style: const TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w700,
@@ -388,10 +387,7 @@ class _Warning extends StatelessWidget {
           Icon(icon, size: 16, color: tone),
           const SizedBox(width: 9),
           Expanded(
-            child: Text(
-              text,
-              style: TextStyle(fontSize: 12.5, color: tone),
-            ),
+            child: Text(text, style: TextStyle(fontSize: 12.5, color: tone)),
           ),
         ],
       ),

@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/api/api_exception.dart';
 import '../../../core/api/enums.dart';
+import '../../../core/state/optimistic.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/lucide_map.dart';
@@ -136,12 +139,6 @@ class _CategoryFormSheetState extends ConsumerState<CategoryFormSheet> {
       setState(() => _nameError = 'Name is required');
       return;
     }
-    setState(() {
-      _busy = true;
-      _nameError = null;
-      _formError = null;
-    });
-
     final body = <String, dynamic>{
       'name': name,
       'type': _type.api,
@@ -154,16 +151,35 @@ class _CategoryFormSheetState extends ConsumerState<CategoryFormSheet> {
     // list even if the sheet is dismissed mid-request, and `ref` throws once
     // disposed. `ProviderContainer.invalidate` has no such assertion.
     final container = ProviderScope.containerOf(context, listen: false);
+    final existing = widget.category;
+
+    // 6.4 — a rename, a recolour, a regroup: the client knows the result
+    // exactly, and nothing on a category is server-computed by this write
+    // (`order`, `isDefault` and `usageCount` belong to the row's history). A
+    // create keeps the spinner — the server assigns the id.
+    final predicted = existing?.predict(
+      name: name,
+      type: _type,
+      icon: _icon,
+      color: _color,
+      group: _group,
+      parentId: existing.parentId,
+    );
+    if (existing != null && predicted != null) {
+      _runOptimistic(existing, predicted, body, container);
+      return;
+    }
+
+    setState(() {
+      _busy = true;
+      _nameError = null;
+      _formError = null;
+    });
 
     try {
       final repo = ref.read(categoriesRepositoryProvider);
-      final existing = widget.category;
-      if (existing == null) {
-        await repo.create(body);
-      } else {
-        await repo.update(existing.id, body);
-      }
-      container.invalidate(categoriesProvider);
+      await repo.create(body);
+      container.invalidate(categoriesFetchProvider);
       if (!mounted) return;
       Navigator.of(context).pop(CategorySheetResult.saved);
     } on ApiException catch (error) {
@@ -192,22 +208,54 @@ class _CategoryFormSheetState extends ConsumerState<CategoryFormSheet> {
     );
     if (!confirmed || !mounted) return;
 
-    setState(() {
-      _busy = true;
-      _formError = null;
-    });
-    try {
-      await ref.read(categoriesRepositoryProvider).delete(category.id);
-      container.invalidate(categoriesProvider);
-      if (!mounted) return;
-      Navigator.of(context).pop(CategorySheetResult.deleted);
-    } on ApiException catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _busy = false;
-        _formError = error.message;
-      });
-    }
+    // 6.4 — predictable, so the row goes now. No Undo: there is no restore
+    // endpoint for a category. The ConfirmSheet above is the guard.
+    final messenger = ScaffoldMessenger.of(context);
+    final repository = ref.read(categoriesRepositoryProvider);
+
+    Navigator.of(context).pop(CategorySheetResult.deleted);
+
+    unawaited(
+      container
+          .read(categoriesWritesProvider.notifier)
+          .run<void>(
+            paint: PendingWrite.remove(category.id),
+            send: () => repository.delete(category.id),
+            settle: () => settleCategories(container),
+            messenger: messenger,
+            noun: category.name,
+          ),
+    );
+  }
+
+  /// Closes the sheet on the predicted row and hands the write over.
+  void _runOptimistic(
+    Category existing,
+    Category predicted,
+    Map<String, dynamic> body,
+    ProviderContainer container,
+  ) {
+    final messenger = ScaffoldMessenger.of(context);
+    final repository = ref.read(categoriesRepositoryProvider);
+
+    Navigator.of(context).pop(CategorySheetResult.saved);
+
+    unawaited(
+      container
+          .read(categoriesWritesProvider.notifier)
+          .run<Category>(
+            paint: PendingWrite.upsert(predicted),
+            send: () => repository.update(existing.id, body),
+            confirm: (saved) => saved,
+            settle: () => settleCategories(container),
+            messenger: messenger,
+            noun: predicted.name,
+            onFix: () {
+              if (!messenger.mounted) return;
+              CategoryFormSheet.show(messenger.context, category: predicted);
+            },
+          ),
+    );
   }
 
   @override

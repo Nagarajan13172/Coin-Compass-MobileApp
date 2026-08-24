@@ -74,6 +74,24 @@ class Person {
     'name': name,
     'relation': relation.api,
   };
+
+  /// 6.4 — this row as the client claims the server will return it.
+  ///
+  /// A rename and a relation change are the whole write surface, so the
+  /// prediction is exact. [key] is the server's slug of [name]; a rename moves
+  /// it, so it is nulled rather than guessed. Never null: there is no
+  /// unpredictable edit a person can take.
+  ///
+  /// See `lib/core/state/optimistic.dart` for the rule this follows.
+  Person? predict({required String name, required PersonRelation relation}) =>
+      Person(
+        id: id,
+        name: name,
+        key: null,
+        relation: relation,
+        createdAt: createdAt,
+        updatedAt: updatedAt,
+      );
 }
 
 /// A household, a trip, a team. `POST /people/groups` accepts `name` and
@@ -114,4 +132,18 @@ class PersonGroup {
     'name': name,
     if (memberIds.isNotEmpty) 'members': memberIds,
   };
+
+  /// 6.4 — see [Person.predict]. `memberCount` is not server-computed in any
+  /// interesting sense: it is the length of the list the client just sent.
+  PersonGroup? predict({
+    required String name,
+    required List<String> memberIds,
+  }) => PersonGroup(
+    id: id,
+    name: name,
+    memberIds: memberIds,
+    memberCount: memberIds.length,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+  );
 }

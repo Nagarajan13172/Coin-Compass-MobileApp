@@ -60,7 +60,7 @@ class PeopleScreen extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: ErrorRetry(
                 error: error,
-                onRetry: () => ref.invalidate(peopleProvider),
+                onRetry: () => ref.invalidate(peopleFetchProvider),
               ),
             ),
             _ => const Padding(
@@ -83,7 +83,7 @@ class PeopleScreen extends ConsumerWidget {
               child: ErrorRetry(
                 error: error,
                 compact: true,
-                onRetry: () => ref.invalidate(personGroupsProvider),
+                onRetry: () => ref.invalidate(personGroupsFetchProvider),
               ),
             ),
             _ => const SizedBox.shrink(),

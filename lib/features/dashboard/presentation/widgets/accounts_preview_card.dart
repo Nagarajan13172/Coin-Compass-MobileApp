@@ -34,7 +34,7 @@ class AccountsPreviewCard extends ConsumerWidget {
       error: (error, _) => ErrorRetry(
         error: error,
         compact: true,
-        onRetry: () => ref.invalidate(accountsProvider),
+        onRetry: () => ref.invalidate(accountsFetchProvider),
       ),
       data: (items) => _Card(accounts: items, balances: balances),
     );

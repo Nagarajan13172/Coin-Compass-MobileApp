@@ -79,7 +79,7 @@ class AccountsScreen extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(vertical: 24),
                 child: ErrorRetry(
                   error: error,
-                  onRetry: () => ref.invalidate(accountsProvider),
+                  onRetry: () => ref.invalidate(accountsFetchProvider),
                 ),
               ),
             ),

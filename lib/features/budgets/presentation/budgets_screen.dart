@@ -55,7 +55,7 @@ class BudgetsScreen extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: ErrorRetry(
                 error: error,
-                onRetry: () => ref.invalidate(budgetsProvider),
+                onRetry: () => ref.invalidate(budgetsFetchProvider),
               ),
             ),
             _ => const Padding(

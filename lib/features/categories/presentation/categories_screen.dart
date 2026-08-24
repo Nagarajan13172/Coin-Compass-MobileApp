@@ -84,7 +84,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
                 padding: const EdgeInsets.only(top: 8),
                 child: ErrorRetry(
                   error: error,
-                  onRetry: () => ref.invalidate(categoriesProvider),
+                  onRetry: () => ref.invalidate(categoriesFetchProvider),
                 ),
               ),
             ],

@@ -55,6 +55,36 @@ class Category {
     if (group != null) 'group': group,
     if (parentId != null) 'parent': parentId,
   };
+
+  /// 6.4 — this row as the client claims the server will return it.
+  ///
+  /// A category has nothing the server derives from what this form sends:
+  /// [order], [isDefault] and [usageCount] are properties of the row's history,
+  /// not of a rename or a recolour, so they are carried across unchanged.
+  /// Never null.
+  ///
+  /// See `lib/core/state/optimistic.dart`.
+  Category? predict({
+    required String name,
+    required CategoryType type,
+    String? icon,
+    String? color,
+    String? group,
+    String? parentId,
+  }) => Category(
+    id: id,
+    name: name,
+    type: type,
+    icon: icon,
+    color: color,
+    group: group,
+    parentId: parentId,
+    order: order,
+    isDefault: isDefault,
+    usageCount: usageCount,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+  );
 }
 
 /// Human labels for the 14 `group` values the API seeds.

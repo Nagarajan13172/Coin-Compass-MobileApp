@@ -97,4 +97,48 @@ class Account {
     if (icon != null) 'icon': icon,
     'includeInTotal': !excludeFromTotal,
   };
+
+  /// 6.4 — this row as the client claims the server will return it, or **null**
+  /// when it cannot claim anything.
+  ///
+  /// Name, type, colour, icon, currency and the include-in-total flag move
+  /// nothing the server computes, so [balance] is carried across untouched —
+  /// nulling it would blank the figure the row is mostly there to show.
+  ///
+  /// [openingBalance] is the escape hatch, and the reason this method is
+  /// nullable: the wire's `initialBalance` is a term of the server's running
+  /// balance, so changing it shifts a number the client would have to re-derive
+  /// from the whole ledger. That submission returns null and takes the spinner.
+  /// One rule, decided per submission rather than per endpoint.
+  ///
+  /// See `lib/core/state/optimistic.dart`.
+  Account? predict({
+    required String name,
+    required AccountType type,
+    required num openingBalance,
+    required String currency,
+    required bool excludeFromTotal,
+    String? color,
+    String? icon,
+  }) {
+    if (openingBalance != this.openingBalance) return null;
+    return Account(
+      id: id,
+      name: name,
+      type: type,
+      openingBalance: openingBalance,
+      balance: balance,
+      currency: currency,
+      institution: institution,
+      last4: last4,
+      color: color,
+      icon: icon,
+      note: note,
+      excludeFromTotal: excludeFromTotal,
+      archived: archived,
+      creditLimit: creditLimit,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+    );
+  }
 }

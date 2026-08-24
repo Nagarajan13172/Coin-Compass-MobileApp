@@ -184,6 +184,12 @@ class _LoanPaySheetState extends ConsumerState<LoanPaySheet> {
     if (_loan.outstanding > 0) _loan.outstanding,
   }.toList();
 
+  /// **Deliberately synchronous (6.4).** A part payment is the archetype of an
+  /// unpredictable mutation: the server recomputes `outstanding`, `interestPaid`
+  /// and `chargesPaid` with its own amortisation (docs/LOAN_MATH.md). Splitting
+  /// a payment into principal and interest to the rupee is server math, and a
+  /// guess paints a wrong outstanding on a two-crore loan. The loan **form**
+  /// edit is optimistic; this is not. See lib/core/state/optimistic.dart.
   Future<void> _submit() async {
     // Submit `_applied`, not the raw text. The whole sheet previews the
     // clamped amount — balance after, months shaved, interest saved — so
@@ -203,7 +209,7 @@ class _LoanPaySheetState extends ConsumerState<LoanPaySheet> {
       await ref
           .read(loansRepositoryProvider)
           .pay(id: _loan.id, amount: amount, chargePct: _chargePct);
-      ref.invalidate(loansProvider);
+      ref.invalidate(loansFetchProvider);
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {
@@ -263,10 +269,7 @@ class _Effect extends StatelessWidget {
                     style: TextStyle(fontSize: 13, color: c.mutedForeground),
                   ),
                 ),
-                MoneyText(
-                  row.amount,
-                  style: const TextStyle(fontSize: 13.5),
-                ),
+                MoneyText(row.amount, style: const TextStyle(fontSize: 13.5)),
               ],
             ),
             const SizedBox(height: 6),

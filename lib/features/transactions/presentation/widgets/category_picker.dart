@@ -190,7 +190,7 @@ class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
                   child: ErrorRetry(
                     error: error,
                     compact: true,
-                    onRetry: () => ref.invalidate(categoriesProvider),
+                    onRetry: () => ref.invalidate(categoriesFetchProvider),
                   ),
                 ),
                 data: _list,

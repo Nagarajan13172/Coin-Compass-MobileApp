@@ -34,14 +34,10 @@ class StocksRepository {
   Future<List<StockQuote>> search(String query) async {
     final q = query.trim();
     if (q.isEmpty) return const [];
-    final json = await _api.getJson(
-      Endpoints.stocksSearch,
-      query: {'q': q},
-    );
-    return Envelope.rows(
-      json,
-      const ['results'],
-    ).map(StockQuote.fromJson).toList();
+    final json = await _api.getJson(Endpoints.stocksSearch, query: {'q': q});
+    return Envelope.rows(json, const [
+      'results',
+    ]).map(StockQuote.fromJson).toList();
   }
 
   /// Records a purchase lot. Body: `{symbol, demat, qty, buyPrice, buyDate?,
@@ -93,10 +89,9 @@ class StocksRepository {
   /// Closed positions, newest first — the realized-gains history.
   Future<List<StockSale>> sales() async {
     final json = await _api.getJson(Endpoints.stocksSales);
-    final rows = Envelope.rows(
-      json,
-      const ['sales'],
-    ).map(StockSale.fromJson).toList();
+    final rows = Envelope.rows(json, const [
+      'sales',
+    ]).map(StockSale.fromJson).toList();
     rows.sort((a, b) {
       final left = b.sellDate, right = a.sellDate;
       if (left == null && right == null) return 0;
@@ -118,10 +113,9 @@ class StocksRepository {
   /// Corporate actions the server has detected but not yet applied.
   Future<List<StockSplit>> splits() async {
     final json = await _api.getJson(Endpoints.stocksSplits);
-    return Envelope.rows(
-      json,
-      const ['splits'],
-    ).map(StockSplit.fromJson).toList();
+    return Envelope.rows(json, const [
+      'splits',
+    ]).map(StockSplit.fromJson).toList();
   }
 
   /// Applies one detected split, restating the affected lots' quantities and

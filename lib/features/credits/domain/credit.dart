@@ -77,6 +77,44 @@ class Credit {
     if (accountId != null) 'account': accountId,
     if (categoryId != null) 'category': categoryId,
   };
+
+  /// 6.4 — this row as the client claims the server will return it.
+  ///
+  /// [outstanding] is the one server-computed field a credit carries, and both
+  /// the amount and the direction move it, so it is nulled; [outstandingOrAmount]
+  /// then falls back to the amount the owner just typed, which is what the row
+  /// shows. [person] is carried when the id is unchanged and dropped when the
+  /// form named someone else, so no row ever shows the previous person's name
+  /// beside the new one's id. Never null.
+  ///
+  /// See `lib/core/state/optimistic.dart`.
+  Credit? predict({
+    required num amount,
+    required CreditDirection direction,
+    required DateTime date,
+    String? personId,
+    String? personName,
+    Person? person,
+    String? note,
+    String? accountId,
+    String? categoryId,
+  }) => Credit(
+    id: id,
+    amount: amount,
+    direction: direction,
+    personId: personId,
+    person: person ?? (personId != null && personId == this.personId
+        ? this.person
+        : null),
+    personName: personName,
+    note: note,
+    date: date,
+    accountId: accountId,
+    categoryId: categoryId,
+    outstanding: null,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+  );
 }
 
 /// `GET /credits/summary`

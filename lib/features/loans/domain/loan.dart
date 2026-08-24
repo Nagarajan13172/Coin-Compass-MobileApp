@@ -109,6 +109,52 @@ class Loan {
     'currency': currency,
   };
 
+  /// 6.4 — this row as the client claims the server will return it.
+  ///
+  /// The form's own fields only, including the [outstanding] the owner typed.
+  /// [interestPaid] and [chargesPaid] are carried across unchanged because a
+  /// form edit cannot move them: the server accumulates them from part-payments
+  /// and preclosure, and strips them on write.
+  ///
+  /// This is the **form** edit. `POST /loans/:id/pay` and
+  /// `POST /loans/:id/preclose` recompute outstanding, interest and charges
+  /// with their own amortisation and are deliberately not optimistic — see the
+  /// exclusion notes on `LoanPaySheet` and `LoanPrecloseSheet`.
+  ///
+  /// See `lib/core/state/optimistic.dart`.
+  Loan? predict({
+    required String name,
+    required num outstanding,
+    required LoanType type,
+    required LoanStatus status,
+    required num principal,
+    required num roi,
+    required num emi,
+    required num foreclosureChargePct,
+    required String note,
+    String? lender,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) => Loan(
+    id: id,
+    name: name,
+    outstanding: outstanding,
+    lender: lender,
+    type: type,
+    principal: principal,
+    roi: roi,
+    emi: emi,
+    foreclosureChargePct: foreclosureChargePct,
+    interestPaid: interestPaid,
+    chargesPaid: chargesPaid,
+    startDate: startDate,
+    endDate: endDate,
+    status: status,
+    note: note,
+    currency: currency,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+  );
 }
 
 /// A calendar day as the API stores it: UTC midnight of that day.

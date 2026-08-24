@@ -76,8 +76,8 @@ void main() {
       await Future.wait(<Future<Object?>>[
         for (final f in <Future<Object?>>[
           container.read(settingsProvider.future),
-          container.read(holdingsProvider.future),
-          container.read(loansProvider.future),
+          container.read(holdingsFetchProvider.future),
+          container.read(loansFetchProvider.future),
           container.read(netWorthHistoryProvider.future),
           container.read(netWorthSeriesProvider.future),
         ])

@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/api/api_exception.dart';
+import '../../../core/state/optimistic.dart';
 import '../../../core/api/enums.dart';
 import '../../../core/api/write_body.dart';
 import '../../../core/theme/app_colors.dart';
@@ -80,7 +83,6 @@ class _RecurringFormSheetState extends ConsumerState<RecurringFormSheet> {
   bool _categoryTouched = false;
 
   bool _saving = false;
-  bool _deleting = false;
   String? _formError;
   ApiException? _apiError;
   String? _amountError;
@@ -88,7 +90,8 @@ class _RecurringFormSheetState extends ConsumerState<RecurringFormSheet> {
   String? _toAccountError;
 
   bool get _isEdit => _existing != null;
-  bool get _busy => _saving || _deleting;
+  // 6.4: a delete pops the sheet on the spot, so there is no deleting state.
+  bool get _busy => _saving;
   bool get _isTransfer => _type == TransactionType.transfer;
 
   CategoryType get _categoryType => _type == TransactionType.income
@@ -138,7 +141,7 @@ class _RecurringFormSheetState extends ConsumerState<RecurringFormSheet> {
       title: _isEdit ? 'Edit rule' : 'New recurring rule',
       submitLabel: _isEdit ? 'Save changes' : 'Create rule',
       submitting: _saving,
-      deleting: _deleting,
+      deleting: false,
       onSubmit: _submit,
       deleteLabel: _isEdit ? 'Delete rule' : null,
       onDelete: _isEdit ? _delete : null,
@@ -365,21 +368,50 @@ class _RecurringFormSheetState extends ConsumerState<RecurringFormSheet> {
       return;
     }
 
+    final body = _buildBody(amount, account);
+    final existing = _existing;
+
+    // 6.4 — every field on this form is one the client sent. `nextRun` and
+    // `upcoming` are the server's schedule projection and *every* field here
+    // moves them, so `RecurringRule.predict` nulls both; the tile already omits
+    // its "Next …" line when `nextRun` is null, so no schedule the server owns
+    // is ever painted from a guess. A create keeps the spinner.
+    //
+    // `/recurring/:id/run`, `/skip` and `/post-one` are deliberately NOT
+    // optimistic — see `RecurringScreen._perform`.
+    final interval = int.tryParse(_interval.text.trim()) ?? 1;
+    final predicted = existing?.predict(
+      type: _type,
+      amount: amount,
+      frequency: _frequency,
+      interval: interval < 1 ? 1 : interval,
+      active: _active,
+      note: _note.text.trim(),
+      payee: _payee.text.trim(),
+      accountId: account.id,
+      account: account,
+      toAccountId: _isTransfer ? _toAccount?.id : null,
+      categoryId: _isTransfer ? null : _category?.id,
+      category: _isTransfer ? null : _category,
+      startDate: _startDate,
+      endDate: _endDate,
+    );
+    if (existing != null && predicted != null) {
+      _runOptimistic(existing, predicted, body);
+      return;
+    }
+
     setState(() {
       _saving = true;
       _formError = null;
       _apiError = null;
     });
 
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       final repository = ref.read(recurringRepositoryProvider);
-      final body = _buildBody(amount, account);
-      if (_isEdit) {
-        await repository.update(_existing!.id, body);
-      } else {
-        await repository.create(body);
-      }
-      ref.invalidate(recurringRulesProvider);
+      await repository.create(body);
+      container.invalidate(recurringRulesFetchProvider);
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {
@@ -405,26 +437,56 @@ class _RecurringFormSheetState extends ConsumerState<RecurringFormSheet> {
     );
     if (!confirmed || !mounted) return;
 
-    setState(() {
-      _deleting = true;
-      _formError = null;
-      _apiError = null;
-    });
+    // 6.4 — predictable, so the row goes now. No Undo: there is no restore
+    // endpoint for a rule. The ConfirmSheet above is the guard.
+    final messenger = ScaffoldMessenger.of(context);
+    final container = ProviderScope.containerOf(context, listen: false);
+    final repository = ref.read(recurringRepositoryProvider);
 
-    try {
-      await ref.read(recurringRepositoryProvider).delete(rule.id);
-      ref.invalidate(recurringRulesProvider);
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
-    } catch (error) {
-      final api = ApiException.from(error);
-      if (!mounted) return;
-      setState(() {
-        _deleting = false;
-        _apiError = api;
-        _formError = api.message;
-      });
-    }
+    Navigator.of(context).pop(true);
+
+    unawaited(
+      container
+          .read(recurringWritesProvider.notifier)
+          .run<void>(
+            paint: PendingWrite.remove(rule.id),
+            send: () => repository.delete(rule.id),
+            settle: () => settleRecurring(container),
+            messenger: messenger,
+            noun: rule.title,
+            successMessage: 'Deleted ${rule.title}',
+          ),
+    );
+  }
+
+  /// Closes the sheet on the predicted row and hands the write over.
+  void _runOptimistic(
+    RecurringRule existing,
+    RecurringRule predicted,
+    Map<String, dynamic> body,
+  ) {
+    final messenger = ScaffoldMessenger.of(context);
+    final container = ProviderScope.containerOf(context, listen: false);
+    final repository = ref.read(recurringRepositoryProvider);
+
+    Navigator.of(context).pop(true);
+
+    unawaited(
+      container
+          .read(recurringWritesProvider.notifier)
+          .run<RecurringRule>(
+            paint: PendingWrite.upsert(predicted),
+            send: () => repository.update(existing.id, body),
+            confirm: (saved) => saved,
+            settle: () => settleRecurring(container),
+            messenger: messenger,
+            noun: predicted.title,
+            onFix: () {
+              if (!messenger.mounted) return;
+              RecurringFormSheet.show(messenger.context, rule: predicted);
+            },
+          ),
+    );
   }
 
   Map<String, dynamic> _buildBody(num amount, Account account) {

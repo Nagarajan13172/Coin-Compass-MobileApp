@@ -348,10 +348,7 @@ class _PositionDetailSheetState extends ConsumerState<PositionDetailSheet> {
                   if (lots.isEmpty)
                     Text(
                       'This position has no open lots on record.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: c.mutedForeground,
-                      ),
+                      style: TextStyle(fontSize: 13, color: c.mutedForeground),
                     )
                   else
                     for (final lot in lots)
@@ -463,14 +460,20 @@ class _StatGrid extends StatelessWidget {
       children: [
         Row(
           children: [
-            Expanded(child: _Stat(label: 'Quantity', valueText: qty)),
-            Expanded(child: _Stat(label: 'Avg cost', amount: position.avgCost)),
+            Expanded(
+              child: _Stat(label: 'Quantity', valueText: qty),
+            ),
+            Expanded(
+              child: _Stat(label: 'Avg cost', amount: position.avgCost),
+            ),
           ],
         ),
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: _Stat(label: 'Last price', amount: position.price)),
+            Expanded(
+              child: _Stat(label: 'Last price', amount: position.price),
+            ),
             Expanded(
               child: _Stat(label: 'Invested', amount: position.investedCost),
             ),
@@ -567,7 +570,11 @@ class _Stat extends StatelessWidget {
 }
 
 class _LotRow extends StatelessWidget {
-  const _LotRow({required this.lot, required this.busy, required this.onDelete});
+  const _LotRow({
+    required this.lot,
+    required this.busy,
+    required this.onDelete,
+  });
 
   final StockLot lot;
   final bool busy;
@@ -717,9 +724,6 @@ class _Fit extends StatelessWidget {
   final AlignmentGeometry alignment;
 
   @override
-  Widget build(BuildContext context) => FittedBox(
-    fit: BoxFit.scaleDown,
-    alignment: alignment,
-    child: child,
-  );
+  Widget build(BuildContext context) =>
+      FittedBox(fit: BoxFit.scaleDown, alignment: alignment, child: child);
 }

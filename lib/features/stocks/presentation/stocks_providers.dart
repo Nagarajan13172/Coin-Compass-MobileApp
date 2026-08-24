@@ -10,9 +10,7 @@ import '../domain/stock.dart';
 /// Which half of the book the screen is showing.
 enum StocksTab { holdings, sold }
 
-final stocksTabProvider = StateProvider<StocksTab>(
-  (ref) => StocksTab.holdings,
-);
+final stocksTabProvider = StateProvider<StocksTab>((ref) => StocksTab.holdings);
 
 /// Buying and selling both require `demat` — **an account id of type `demat`**,
 /// not a broker's name. Until one of these exists the buy sheet has nothing to
@@ -37,7 +35,7 @@ void invalidateStocks(WidgetRef ref) {
     ..invalidate(stockPortfolioProvider)
     ..invalidate(stockSalesProvider)
     ..invalidate(stockSplitsProvider)
-    ..invalidate(accountsProvider);
+    ..invalidate(accountsFetchProvider);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -175,7 +173,9 @@ SellPreview computeSellPreview({
   }
 
   final soldQty = allocations.fold<num>(0, (sum, a) => sum + a.qty);
-  final costBasis = _round(allocations.fold<num>(0, (sum, a) => sum + a.costBasis));
+  final costBasis = _round(
+    allocations.fold<num>(0, (sum, a) => sum + a.costBasis),
+  );
 
   var shortTerm = 0.0;
   var longTerm = 0.0;
@@ -190,14 +190,14 @@ SellPreview computeSellPreview({
 
   final nearly =
       (allocations
-            .where(
-              (a) =>
-                  !a.longTerm &&
-                  a.daysToLongTerm > 0 &&
-                  a.daysToLongTerm <= _nearlyLongTermDays,
-            )
-            .map((a) => a.daysToLongTerm)
-            .toList()
+          .where(
+            (a) =>
+                !a.longTerm &&
+                a.daysToLongTerm > 0 &&
+                a.daysToLongTerm <= _nearlyLongTermDays,
+          )
+          .map((a) => a.daysToLongTerm)
+          .toList()
         ..sort());
 
   final realizedShort = _round(shortTerm);

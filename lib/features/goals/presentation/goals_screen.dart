@@ -54,7 +54,7 @@ class GoalsScreen extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: ErrorRetry(
                 error: error,
-                onRetry: () => ref.invalidate(goalsProvider),
+                onRetry: () => ref.invalidate(goalsFetchProvider),
               ),
             ),
             _ => const Padding(
@@ -75,8 +75,7 @@ class GoalsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _refresh(WidgetRef ref) =>
-      refreshCurrentRoute(ref, '/goals');
+  Future<void> _refresh(WidgetRef ref) => refreshCurrentRoute(ref, '/goals');
 }
 
 class _EmptyGoals extends StatelessWidget {

@@ -129,10 +129,7 @@ class _LoanPrecloseSheetState extends ConsumerState<LoanPrecloseSheet> {
                   'Closing now avoids about ${Money.format(interestAvoided)} '
                   'of future interest'
                   '${schedule.months > 0 ? ' over ${formatMonths(schedule.months)}' : ''}.',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    color: c.mutedForeground,
-                  ),
+                  style: TextStyle(fontSize: 12.5, color: c.mutedForeground),
                 ),
               ),
             ],
@@ -143,6 +140,11 @@ class _LoanPrecloseSheetState extends ConsumerState<LoanPrecloseSheet> {
   }
 
   /// The second gate. Nothing reaches the API until this returns true.
+  /// **Deliberately synchronous (6.4), and permanently so.** The foreclosure
+  /// charge is computed server-side from the charge percentage against the
+  /// server's own outstanding, and this is the endpoint that once closed the
+  /// owner's real loan. It keeps its confirmation, its spinner and its full
+  /// refetch, and predicts nothing. See lib/core/state/optimistic.dart.
   Future<void> _confirmThenPreclose() async {
     final outstanding = _loan.outstanding;
     final charge = prepaymentCharge(outstanding, _chargePct);
@@ -169,7 +171,7 @@ class _LoanPrecloseSheetState extends ConsumerState<LoanPrecloseSheet> {
       await ref
           .read(loansRepositoryProvider)
           .preclose(id: _loan.id, chargePct: _chargePct);
-      ref.invalidate(loansProvider);
+      ref.invalidate(loansFetchProvider);
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {
@@ -227,10 +229,7 @@ class _Settlement extends StatelessWidget {
               const Expanded(
                 child: Text(
                   'Total payable',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
               ),
               MoneyText(

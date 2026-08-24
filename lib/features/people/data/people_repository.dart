@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/endpoints.dart';
 import '../../../core/api/envelope.dart';
+import '../../../core/state/optimistic.dart';
 import '../domain/person.dart';
 
 class PeopleRepository {
@@ -66,12 +67,62 @@ final peopleRepositoryProvider = Provider<PeopleRepository>(
   (ref) => PeopleRepository(ref.watch(apiClientProvider)),
 );
 
+// ─── 6.4: the optimistic overlay ───────────────────────────────────────────
+//
+// The server's list moves to `<x>FetchProvider`; the public name stays on the
+// composed view, so every existing `ref.watch` site gains optimism unedited.
+// See lib/core/state/optimistic.dart.
+
+/// The server's own list. Read this only to **refetch** it.
+///
 /// Session-cached: the credit sheet's person picker, the splits sheet and the
 /// People screen all read it.
-final peopleProvider = FutureProvider<List<Person>>(
+final peopleFetchProvider = FutureProvider<List<Person>>(
   (ref) => ref.watch(peopleRepositoryProvider).list(),
 );
 
-final personGroupsProvider = FutureProvider<List<PersonGroup>>(
+/// In-flight optimistic edits and deletes on `/people`.
+///
+/// `POST /people/:id/merge` is deliberately **not** routed through here — it
+/// moves credits and splits across three collections and deletes the duplicate,
+/// and the resulting rows are unknowable client-side. See
+/// `PersonFormSheet._merge`.
+final peopleWritesProvider =
+    StateNotifierProvider<OptimisticCollection<Person>, PendingWrites<Person>>(
+      (ref) => OptimisticCollection<Person>(idOf: (person) => person.id),
+    );
+
+final peopleProvider = Provider<AsyncValue<List<Person>>>(
+  (ref) =>
+      ref.watch(peopleWritesProvider).applyTo(ref.watch(peopleFetchProvider)),
+);
+
+/// The settle step for a people write.
+Future<void> settlePeople(ProviderContainer container) =>
+    settleFetch(container, peopleFetchProvider);
+
+/// The server's own group list. Read this only to **refetch** it.
+final personGroupsFetchProvider = FutureProvider<List<PersonGroup>>(
   (ref) => ref.watch(peopleRepositoryProvider).groups(),
+);
+
+/// In-flight optimistic edits and deletes on `/people/groups`.
+final personGroupsWritesProvider =
+    StateNotifierProvider<
+      OptimisticCollection<PersonGroup>,
+      PendingWrites<PersonGroup>
+    >((ref) => OptimisticCollection<PersonGroup>(idOf: (group) => group.id));
+
+final personGroupsProvider = Provider<AsyncValue<List<PersonGroup>>>(
+  (ref) => ref
+      .watch(personGroupsWritesProvider)
+      .applyTo(ref.watch(personGroupsFetchProvider)),
+);
+
+/// The settle step for a groups write. Membership lives on both sides, so the
+/// people list is dropped alongside.
+Future<void> settlePersonGroups(ProviderContainer container) => settleFetch(
+  container,
+  personGroupsFetchProvider,
+  also: [peopleFetchProvider],
 );

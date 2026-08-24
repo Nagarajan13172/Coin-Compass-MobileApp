@@ -151,14 +151,14 @@ the rule, and confirm both land in the web app.
 
 | # | Task | Status |
 |---|---|---|
-| 6.1 | Biometric + PIN app lock on resume (`local_auth`) | [ ] unblocked — 5.9 landed; `local_auth` is a dependency but unused |
-| 6.2 | Wealth-lock blur/mask on sensitive amounts | [ ] unblocked — `wealthLockEnabled` is read, nothing masks yet |
-| 6.3 | Offline read cache + request retry; graceful no-connection banner | [ ] partial — `NO_CONNECTION` already becomes "No connection" + Retry; no cache, no retry |
+| 6.1 | Biometric + PIN app lock on resume (`local_auth`) | [x] walked on the device. See `PHASE6_1_REPORT.md` |
+| 6.2 | Wealth-lock blur/mask on sensitive amounts | [x] walked end-to-end on the device against the live backend; account restored to `Off`. See `PHASE6_2_REPORT.md` |
+| 6.3 | Offline read cache + request retry; graceful no-connection banner | [x] `response_cache.dart` + `retry_policy.dart` + stale banner; wealth-scope barriers verified on the device in 6.2 |
 | 6.4 | Optimistic updates for create/edit/delete | [~] transactions only (delete/undo, insert, edit); every other feature awaits then invalidates |
 | 6.5 | Audit every screen for loading / empty / error+retry states | [x] |
 | 6.6 | Dark mode audit across all 17 screens | [x] |
-| 6.7 | App icon, adaptive icon, splash screen, app label | [x] built · not yet seen on a device |
-| 6.8 | Widget tests for Money/DateX, model round-trips, auth flow | [~] Money/DateX and model round-trips done; auth flow only via restore/401/sign-out |
+| 6.7 | App icon, adaptive icon, splash screen, app label | [x] built · seen on the device during the 6.2 pass |
+| 6.8 | Widget tests for Money/DateX, model round-trips, auth flow | [x] `auth_flow_test.dart` — 23 tests through the real stack; 4 guards mutation-proven. See `PHASE6_8_REPORT.md` |
 | 6.9 | Release signing keystore, `--release` APK + AAB, size check | [x] signed with a real upload key — see `RELEASE.md` |
 | 6.10 | On-device pass over all 17 screens with real data | [ ] |
 

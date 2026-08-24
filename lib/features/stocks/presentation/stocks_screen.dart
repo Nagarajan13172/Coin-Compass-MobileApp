@@ -128,6 +128,8 @@ class _StocksScreenState extends ConsumerState<StocksScreen> {
     setState(() => _repricing = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
+      // Deliberately synchronous (6.4): the new prices ARE the result. There
+      // is nothing to predict. See lib/core/state/optimistic.dart.
       await ref.read(stocksRepositoryProvider).refresh();
       ref.invalidate(stockPortfolioProvider);
       messenger
@@ -178,7 +180,10 @@ class _Book extends StatelessWidget {
         if (hasBook && portfolio.anyStale)
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-            child: _StaleNote(pricedAt: portfolio.pricedAt, onReprice: onReprice),
+            child: _StaleNote(
+              pricedAt: portfolio.pricedAt,
+              onReprice: onReprice,
+            ),
           ),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
@@ -216,8 +221,7 @@ class _TabBar extends ConsumerWidget {
         SegmentOption(StocksTab.holdings, 'Holdings'),
         SegmentOption(StocksTab.sold, 'Sold'),
       ],
-      onChanged: (value) =>
-          ref.read(stocksTabProvider.notifier).state = value,
+      onChanged: (value) => ref.read(stocksTabProvider.notifier).state = value,
     );
   }
 }
@@ -465,9 +469,7 @@ class _StaleNote extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final when = pricedAt == null
-        ? 'some time ago'
-        : DateX.relative(pricedAt!);
+    final when = pricedAt == null ? 'some time ago' : DateX.relative(pricedAt!);
 
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),

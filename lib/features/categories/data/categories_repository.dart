@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/endpoints.dart';
 import '../../../core/api/json.dart';
+import '../../../core/state/optimistic.dart';
 import '../domain/category.dart';
 
 class CategoriesRepository {
@@ -64,9 +65,34 @@ final categoriesRepositoryProvider = Provider<CategoriesRepository>(
   (ref) => CategoriesRepository(ref.watch(apiClientProvider)),
 );
 
+// ─── 6.4: the optimistic overlay ───────────────────────────────────────────
+//
+// The server's list moves to `<x>FetchProvider`; the public name stays on the
+// composed view, so every existing `ref.watch` site gains optimism unedited.
+// See lib/core/state/optimistic.dart.
+
+/// The server's own list. Read this only to **refetch** it.
+///
 /// Cached for the whole session (not autoDispose): 33 seeded categories feed
 /// every picker, the donut rows and the categories screen.
-/// Invalidate it after a write with `ref.invalidate(categoriesProvider)`.
-final categoriesProvider = FutureProvider<List<Category>>(
+final categoriesFetchProvider = FutureProvider<List<Category>>(
   (ref) => ref.watch(categoriesRepositoryProvider).list(),
 );
+
+/// In-flight optimistic edits and deletes on `/categories`.
+final categoriesWritesProvider =
+    StateNotifierProvider<
+      OptimisticCollection<Category>,
+      PendingWrites<Category>
+    >((ref) => OptimisticCollection<Category>(idOf: (category) => category.id));
+
+/// What every picker and screen watches.
+final categoriesProvider = Provider<AsyncValue<List<Category>>>(
+  (ref) => ref
+      .watch(categoriesWritesProvider)
+      .applyTo(ref.watch(categoriesFetchProvider)),
+);
+
+/// The settle step for a categories write.
+Future<void> settleCategories(ProviderContainer container) =>
+    settleFetch(container, categoriesFetchProvider);

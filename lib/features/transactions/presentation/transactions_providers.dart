@@ -107,7 +107,7 @@ void invalidateTransactionDerived(
     ..invalidate(transactionBalanceProvider)
     ..invalidate(transactionBalanceAsOfProvider)
     ..invalidate(transactionsSummaryProvider)
-    ..invalidate(accountsProvider)
+    ..invalidate(accountsFetchProvider)
     ..invalidate(netWorthHistoryProvider)
     ..invalidate(transactionsPageProvider);
   if (tags) container.invalidate(transactionTagsProvider);

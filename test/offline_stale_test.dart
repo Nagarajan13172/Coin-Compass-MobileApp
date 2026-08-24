@@ -278,7 +278,7 @@ void main() {
 
         // Now the train goes into the tunnel.
         adapter.offline = true;
-        container.invalidate(loansProvider);
+        container.invalidate(loansFetchProvider);
         await settle(tester);
 
         expect(
@@ -301,7 +301,7 @@ void main() {
 
         // Back above ground: the banner goes away by itself.
         adapter.offline = false;
-        container.invalidate(loansProvider);
+        container.invalidate(loansFetchProvider);
         await settle(tester);
 
         expect(find.text('Deena'), findsOneWidget);

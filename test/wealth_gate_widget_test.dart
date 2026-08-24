@@ -389,6 +389,35 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('the rejection clears as soon as the owner types again', (
+      tester,
+    ) async {
+      // Found on the owner's phone during the 6.2 device pass: the red
+      // "didn't match" line stayed up the entire time they were typing the
+      // replacement, so the sheet was showing an error about a passcode that
+      // no longer existed in the field. `clearError()` had been on the
+      // controller since 6.2 was written, with no caller.
+      final repo = FakeAuthRepository(
+        user: fakeUser(wealthLockEnabled: true),
+        unlockError: wrongPasscodeFailure,
+      );
+      await openSheet(tester, repo);
+
+      await tester.enterText(find.byType(TextField).first, 'wrong');
+      await tester.tap(find.text('Unlock'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text("That passcode didn't match."), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField).first, 'w');
+      await tester.pump();
+
+      expect(find.text("That passcode didn't match."), findsNothing);
+      // Clearing the message must not have sent anything.
+      expect(repo.unlockAttempts, ['wrong']);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('the sheet says unlocking also unlocks the browser', (
       tester,
     ) async {

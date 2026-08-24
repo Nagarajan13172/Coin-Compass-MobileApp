@@ -1,3 +1,5 @@
+import 'dart:async';
+
 // Flutter's animation library exports a `Split` curve class, which would
 // collide with the domain model of the same name.
 import 'package:flutter/material.dart' hide Split;
@@ -6,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/api/api_exception.dart';
+import '../../../core/state/optimistic.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/date_x.dart';
 import '../../../core/utils/money.dart';
@@ -71,7 +74,7 @@ class _SplitsScreenState extends ConsumerState<SplitsScreen> {
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: ErrorRetry(
                 error: error,
-                onRetry: () => ref.invalidate(splitsProvider),
+                onRetry: () => ref.invalidate(splitsFetchProvider),
               ),
             ),
             _ => const Padding(
@@ -100,23 +103,25 @@ class _SplitsScreenState extends ConsumerState<SplitsScreen> {
     );
     if (!confirmed || !mounted) return;
 
-    setState(() => _busyIds.add(split.id));
+    // 6.4 — predictable, so the row goes now and the per-row spinner with it.
+    // A failure puts it back and says so; no Undo, because there is no restore
+    // endpoint for a split.
     final messenger = ScaffoldMessenger.of(context);
-    try {
-      await ref.read(splitsRepositoryProvider).delete(split.id);
-      ref.invalidate(splitsProvider);
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Deleted ${split.description}')));
-    } catch (error) {
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(content: Text(ApiException.from(error).message)),
-        );
-    } finally {
-      if (mounted) setState(() => _busyIds.remove(split.id));
-    }
+    final container = ProviderScope.containerOf(context, listen: false);
+    final repository = ref.read(splitsRepositoryProvider);
+
+    unawaited(
+      container
+          .read(splitsWritesProvider.notifier)
+          .run<void>(
+            paint: PendingWrite.remove(split.id),
+            send: () => repository.delete(split.id),
+            settle: () => settleSplits(container),
+            messenger: messenger,
+            noun: split.description,
+            successMessage: 'Deleted ${split.description}',
+          ),
+    );
   }
 }
 

@@ -58,7 +58,7 @@ class LoansScreen extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: ErrorRetry(
                 error: error,
-                onRetry: () => ref.invalidate(loansProvider),
+                onRetry: () => ref.invalidate(loansFetchProvider),
               ),
             ),
             _ => const Padding(
@@ -79,8 +79,7 @@ class LoansScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _refresh(WidgetRef ref) =>
-      refreshCurrentRoute(ref, '/loans');
+  Future<void> _refresh(WidgetRef ref) => refreshCurrentRoute(ref, '/loans');
 }
 
 class _EmptyLoans extends StatelessWidget {
@@ -129,7 +128,10 @@ class _LoansBody extends ConsumerWidget {
           if (active.length > 1)
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-              child: _OutstandingByLoan(loans: active, total: summary.totalOutstanding),
+              child: _OutstandingByLoan(
+                loans: active,
+                total: summary.totalOutstanding,
+              ),
             ),
         ],
         Padding(

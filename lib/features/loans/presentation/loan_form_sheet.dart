@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/api/api_exception.dart';
+import '../../../core/state/optimistic.dart';
 import '../../../core/api/enums.dart';
 import '../../../core/api/write_body.dart';
 import '../../../core/theme/app_colors.dart';
@@ -61,6 +64,7 @@ class _LoanFormSheetState extends ConsumerState<LoanFormSheet> {
   late final TextEditingController _lender = TextEditingController(
     text: _existing?.lender ?? '',
   );
+
   /// Unlike the optional figures, a zero outstanding is meaningful — a closed
   /// loan owes nothing — so it is shown rather than blanked.
   late final TextEditingController _outstanding = TextEditingController(
@@ -90,14 +94,14 @@ class _LoanFormSheetState extends ConsumerState<LoanFormSheet> {
   bool _chargeTouched = false;
 
   bool _saving = false;
-  bool _deleting = false;
   String? _formError;
   ApiException? _apiError;
   String? _nameError;
   String? _outstandingError;
 
   bool get _isEdit => _existing != null;
-  bool get _busy => _saving || _deleting;
+  // 6.4: a delete pops the sheet on the spot, so there is no deleting state.
+  bool get _busy => _saving;
 
   @override
   void dispose() {
@@ -124,7 +128,7 @@ class _LoanFormSheetState extends ConsumerState<LoanFormSheet> {
       title: _isEdit ? 'Edit loan' : 'Add loan',
       submitLabel: _isEdit ? 'Save changes' : 'Add loan',
       submitting: _saving,
-      deleting: _deleting,
+      deleting: false,
       onSubmit: _submit,
       deleteLabel: _isEdit ? 'Delete loan' : null,
       onDelete: _isEdit ? _delete : null,
@@ -377,6 +381,36 @@ class _LoanFormSheetState extends ConsumerState<LoanFormSheet> {
       return;
     }
 
+    final body = _buildBody(name, outstanding);
+    final existing = _existing;
+
+    // 6.4 — this is the **form** edit: every field here is one the owner typed,
+    // including the outstanding. `interestPaid` and `chargesPaid` are carried
+    // across untouched because a form edit cannot move them (the server
+    // accumulates them from part-payments and strips them on write).
+    //
+    // `POST /loans/:id/pay` and `POST /loans/:id/preclose` are a different
+    // matter and are deliberately NOT optimistic — see `LoanPaySheet` and
+    // `LoanPrecloseSheet`. A create keeps the spinner.
+    final predicted = existing?.predict(
+      name: name,
+      outstanding: outstanding,
+      type: _type,
+      status: _status,
+      principal: parseAmount(_principal.text) ?? 0,
+      roi: parseAmount(_roi.text) ?? 0,
+      emi: parseAmount(_emi.text) ?? 0,
+      foreclosureChargePct: parseAmount(_charge.text) ?? 0,
+      note: _note.text.trim(),
+      lender: _lender.text.trim().isEmpty ? null : _lender.text.trim(),
+      startDate: _startDate,
+      endDate: _endDate,
+    );
+    if (existing != null && predicted != null) {
+      _runOptimistic(existing, predicted, body);
+      return;
+    }
+
     setState(() {
       _saving = true;
       _formError = null;
@@ -385,15 +419,11 @@ class _LoanFormSheetState extends ConsumerState<LoanFormSheet> {
       _outstandingError = null;
     });
 
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       final repository = ref.read(loansRepositoryProvider);
-      final body = _buildBody(name, outstanding);
-      if (_isEdit) {
-        await repository.update(_existing!.id, body);
-      } else {
-        await repository.create(body);
-      }
-      ref.invalidate(loansProvider);
+      await repository.create(body);
+      container.invalidate(loansFetchProvider);
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {
@@ -419,26 +449,57 @@ class _LoanFormSheetState extends ConsumerState<LoanFormSheet> {
     );
     if (!confirmed || !mounted) return;
 
-    setState(() {
-      _deleting = true;
-      _formError = null;
-      _apiError = null;
-    });
+    // 6.4 — predictable, so the row goes now. No Undo: there is no restore
+    // endpoint for a loan, and the ConfirmSheet above already says the payment
+    // history goes with it.
+    final messenger = ScaffoldMessenger.of(context);
+    final container = ProviderScope.containerOf(context, listen: false);
+    final repository = ref.read(loansRepositoryProvider);
 
-    try {
-      await ref.read(loansRepositoryProvider).delete(loan.id);
-      ref.invalidate(loansProvider);
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
-    } catch (error) {
-      final api = ApiException.from(error);
-      if (!mounted) return;
-      setState(() {
-        _deleting = false;
-        _apiError = api;
-        _formError = api.message;
-      });
-    }
+    Navigator.of(context).pop(true);
+
+    unawaited(
+      container
+          .read(loansWritesProvider.notifier)
+          .run<void>(
+            paint: PendingWrite.remove(loan.id),
+            send: () => repository.delete(loan.id),
+            settle: () => settleLoans(container),
+            messenger: messenger,
+            noun: loan.name,
+            successMessage: 'Deleted ${loan.name}',
+          ),
+    );
+  }
+
+  /// Closes the sheet on the predicted row and hands the write over.
+  void _runOptimistic(
+    Loan existing,
+    Loan predicted,
+    Map<String, dynamic> body,
+  ) {
+    final messenger = ScaffoldMessenger.of(context);
+    final container = ProviderScope.containerOf(context, listen: false);
+    final repository = ref.read(loansRepositoryProvider);
+
+    Navigator.of(context).pop(true);
+
+    unawaited(
+      container
+          .read(loansWritesProvider.notifier)
+          .run<Loan>(
+            paint: PendingWrite.upsert(predicted),
+            send: () => repository.update(existing.id, body),
+            confirm: (saved) => saved,
+            settle: () => settleLoans(container),
+            messenger: messenger,
+            noun: predicted.name,
+            onFix: () {
+              if (!messenger.mounted) return;
+              LoanFormSheet.show(messenger.context, loan: predicted);
+            },
+          ),
+    );
   }
 
   /// Only keys `POST /loans` declares. Guarded by test/write_schema_test.dart,

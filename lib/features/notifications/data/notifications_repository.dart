@@ -22,6 +22,13 @@ import '../domain/app_notification.dart';
 ///
 /// None of the four takes a body, so there is no write schema to get wrong
 /// here — only a verb and a path.
+/// **Deliberately not optimistic (6.4).** Marking one notification read IS
+/// predictable, but this feed's state is a record of `{items, unread}` with a
+/// server-owned count rather than a plain list, so folding it through
+/// `OptimisticCollection` would fork the mechanism into a second shape — and
+/// three of the four mutations here are irreversible bulk operations already on
+/// this project's never-call list. Revisit when the feed is modelled as a list
+/// plus a derived count. See lib/core/state/optimistic.dart.
 class NotificationsRepository {
   const NotificationsRepository(this._api);
 
@@ -45,8 +52,7 @@ class NotificationsRepository {
   Future<void> markAllRead() => _api.postJson(Endpoints.notificationsReadAll);
 
   /// Dismisses one notification. Irreversible.
-  Future<void> delete(String id) =>
-      _api.deleteJson(Endpoints.notification(id));
+  Future<void> delete(String id) => _api.deleteJson(Endpoints.notification(id));
 
   /// Deletes every notification. Irreversible, and undocumented in SPEC.md —
   /// it was found in the web bundle's "Clear all" button.

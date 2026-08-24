@@ -89,7 +89,7 @@ class _ParticipantsSheetState extends ConsumerState<_ParticipantsSheet> {
                   child: ErrorRetry(
                     error: error,
                     compact: true,
-                    onRetry: () => ref.invalidate(peopleProvider),
+                    onRetry: () => ref.invalidate(peopleFetchProvider),
                   ),
                 ),
                 _ => const Padding(

@@ -11,6 +11,15 @@
 /// Re-invalidating all seventeen screens' providers on every reconnect is the
 /// hammering the brief warns about.
 ///
+/// ## 6.4 — it refreshes the *server* read, never the composed view
+///
+/// Every list a screen watches is now `<x>Provider`, a `Provider<AsyncValue<…>>`
+/// that folds in-flight optimistic writes over `<x>FetchProvider`. Invalidating
+/// the composed one would compile and quietly recompute the fold instead of
+/// issuing a request, so pull-to-refresh would stop working with no error. Every
+/// pair here therefore names the **Fetch** provider, and
+/// `test/optimistic_guard_test.dart` pins that nothing invalidates a view.
+///
 /// ## It cannot fire a gated read
 ///
 /// The three wealth-gated routes consult [wealthReadAllowed] first, exactly as
@@ -64,30 +73,30 @@ Future<void> refreshCurrentRoute(WidgetRef ref, String location) {
     '/calendar' => _refreshCalendar(ref),
     '/budgets' => _refreshBudgets(ref),
     '/goals' => _reload(
-      () => ref.invalidate(goalsProvider),
-      () => ref.read(goalsProvider.future),
+      () => ref.invalidate(goalsFetchProvider),
+      () => ref.read(goalsFetchProvider.future),
     ),
     '/accounts' => _refreshAccounts(ref),
     '/credits' => _refreshCredits(ref),
     '/credits/people' => _refreshPeople(ref),
     '/credits/splits' => _reload(
-      () => ref.invalidate(splitsProvider),
-      () => ref.read(splitsProvider.future),
+      () => ref.invalidate(splitsFetchProvider),
+      () => ref.read(splitsFetchProvider.future),
     ),
     '/recurring' => _reload(
-      () => ref.invalidate(recurringRulesProvider),
-      () => ref.read(recurringRulesProvider.future),
+      () => ref.invalidate(recurringRulesFetchProvider),
+      () => ref.read(recurringRulesFetchProvider.future),
     ),
     '/categories' => _reload(
-      () => ref.invalidate(categoriesProvider),
-      () => ref.read(categoriesProvider.future),
+      () => ref.invalidate(categoriesFetchProvider),
+      () => ref.read(categoriesFetchProvider.future),
     ),
     '/net-worth' => _refreshNetWorth(ref),
     '/net-worth/holdings' => _refreshHoldings(ref),
     '/stocks' => _refreshStocks(ref),
     '/loans' => _reload(
-      () => ref.invalidate(loansProvider),
-      () => ref.read(loansProvider.future),
+      () => ref.invalidate(loansFetchProvider),
+      () => ref.read(loansFetchProvider.future),
     ),
     '/gold' => _refreshGold(ref),
     '/notifications' => _reload(
@@ -131,7 +140,7 @@ Future<void> refreshDashboard(WidgetRef ref) async {
     ..invalidate(dashboardSummaryProvider)
     ..invalidate(dashboardTrendProvider)
     ..invalidate(dashboardCategoryProvider)
-    ..invalidate(accountsProvider)
+    ..invalidate(accountsFetchProvider)
     ..invalidate(metalsLatestProvider)
     ..invalidate(netWorthHistoryProvider)
     ..invalidate(transactionBalanceProvider)
@@ -141,7 +150,7 @@ Future<void> refreshDashboard(WidgetRef ref) async {
     settle(ref.read(dashboardSummaryProvider.future)),
     settle(ref.read(dashboardTrendProvider.future)),
     settle(ref.read(dashboardCategoryProvider.future)),
-    settle(ref.read(accountsProvider.future)),
+    settle(ref.read(accountsFetchProvider.future)),
     settle(ref.read(metalsLatestProvider.future)),
     if (netWorthAllowed) settle(ref.read(netWorthHistoryProvider.future)),
     settle(ref.read(transactionsPageProvider(recentTransactionsQuery).future)),
@@ -172,32 +181,32 @@ Future<void> _refreshCalendar(WidgetRef ref) {
 }
 
 Future<void> _refreshBudgets(WidgetRef ref) {
-  ref.invalidate(budgetsProvider);
+  ref.invalidate(budgetsFetchProvider);
   for (final period in BudgetPeriod.values) {
     ref.invalidate(budgetSpendProvider(period));
   }
-  return settle(ref.read(budgetsProvider.future));
+  return settle(ref.read(budgetsFetchProvider.future));
 }
 
 Future<void> _refreshAccounts(WidgetRef ref) {
   ref
-    ..invalidate(accountsProvider)
+    ..invalidate(accountsFetchProvider)
     ..invalidate(transactionBalanceProvider);
-  return settle(ref.read(accountsProvider.future));
+  return settle(ref.read(accountsFetchProvider.future));
 }
 
 Future<void> _refreshCredits(WidgetRef ref) {
   ref
-    ..invalidate(creditsProvider)
-    ..invalidate(splitsProvider);
-  return settle(ref.read(creditsProvider.future));
+    ..invalidate(creditsFetchProvider)
+    ..invalidate(splitsFetchProvider);
+  return settle(ref.read(creditsFetchProvider.future));
 }
 
 Future<void> _refreshPeople(WidgetRef ref) {
   ref
-    ..invalidate(peopleProvider)
-    ..invalidate(personGroupsProvider);
-  return settle(ref.read(peopleProvider.future));
+    ..invalidate(peopleFetchProvider)
+    ..invalidate(personGroupsFetchProvider);
+  return settle(ref.read(peopleFetchProvider.future));
 }
 
 Future<void> _refreshGold(WidgetRef ref) {
@@ -211,10 +220,10 @@ Future<void> _refreshSettings(WidgetRef ref) {
   ref
     ..invalidate(settingsProvider)
     ..invalidate(twoFactorStatusProvider)
-    ..invalidate(accountsProvider)
-    ..invalidate(categoriesProvider)
-    ..invalidate(goalsProvider)
-    ..invalidate(loansProvider);
+    ..invalidate(accountsFetchProvider)
+    ..invalidate(categoriesFetchProvider)
+    ..invalidate(goalsFetchProvider)
+    ..invalidate(loansFetchProvider);
   return settle(ref.read(settingsProvider.future));
 }
 
@@ -225,15 +234,15 @@ Future<void> _refreshNetWorth(WidgetRef ref) {
   ref
     ..invalidate(netWorthHistoryProvider)
     ..invalidate(netWorthHistoryRangeProvider)
-    ..invalidate(holdingsProvider)
-    ..invalidate(loansProvider);
+    ..invalidate(holdingsFetchProvider)
+    ..invalidate(loansFetchProvider);
   return settle(ref.read(netWorthSeriesProvider.future));
 }
 
 Future<void> _refreshHoldings(WidgetRef ref) {
   if (!_wealthAllowed(ref)) return Future<void>.value();
-  ref.invalidate(holdingsProvider);
-  return settle(ref.read(holdingsProvider.future));
+  ref.invalidate(holdingsFetchProvider);
+  return settle(ref.read(holdingsFetchProvider.future));
 }
 
 Future<void> _refreshStocks(WidgetRef ref) {

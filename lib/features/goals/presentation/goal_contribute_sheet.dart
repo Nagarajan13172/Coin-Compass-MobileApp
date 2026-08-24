@@ -106,6 +106,12 @@ class _GoalContributeSheetState extends ConsumerState<GoalContributeSheet> {
     );
   }
 
+  /// **Deliberately synchronous (6.4).** `POST /goals/:id/contribute` is not
+  /// optimistic and must not become so: the server re-derives `savedAmount`,
+  /// `remaining`, `percent`, `complete` and `monthsLeft`, and the last of those
+  /// depends on the server's own date arithmetic against `monthlyContribution`.
+  /// A guess here paints a wrong figure about the owner's savings. Spinner and
+  /// full refetch, unchanged. See lib/core/state/optimistic.dart.
   Future<void> _submit() async {
     final amount = parseAmount(_amount.text);
     if (amount == null || amount <= 0) {
@@ -122,7 +128,7 @@ class _GoalContributeSheetState extends ConsumerState<GoalContributeSheet> {
       await ref
           .read(goalsRepositoryProvider)
           .contribute(widget.goal.id, amount);
-      ref.invalidate(goalsProvider);
+      ref.invalidate(goalsFetchProvider);
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {

@@ -241,6 +241,10 @@ class _StockBuySheetState extends ConsumerState<StockBuySheet> {
     router.go('/accounts');
   }
 
+  /// **Deliberately synchronous (6.4).** Positions, average cost and realised
+  /// P&L are all derived server-side by FIFO lot matching, so an optimistic
+  /// average cost would be a fabricated number about the owner's portfolio.
+  /// See lib/core/state/optimistic.dart.
   Future<void> _submit() async {
     final stock = _stock;
     final demat = _resolveDemat(ref.read(dematAccountsProvider));
@@ -369,9 +373,10 @@ class _StockField extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      [quote.ticker ?? quote.symbol, ?quote.exchange].join(
-                        ' · ',
-                      ),
+                      [
+                        quote.ticker ?? quote.symbol,
+                        ?quote.exchange,
+                      ].join(' · '),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(

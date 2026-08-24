@@ -86,4 +86,45 @@ class Goal {
     'icon': icon,
     'currency': currency,
   };
+
+  /// 6.4 — this row as the client claims the server will return it.
+  ///
+  /// `remaining`, `percent`, `complete` and `monthsLeft` are all re-derived
+  /// server-side and all four move when the target or the saved amount does, so
+  /// each is nulled. The first three fall straight back to this model's own
+  /// arithmetic ([remainingOrComputed], [percent], [isComplete]); `monthsLeft`
+  /// has no client-side counterpart, so the tile simply omits its phrase until
+  /// the refetch lands rather than showing a figure the edit invalidated.
+  ///
+  /// Note this is the **form** edit only. `POST /goals/:id/contribute` is
+  /// deliberately not optimistic — see the exclusion note on
+  /// `GoalContributeSheet`.
+  ///
+  /// See `lib/core/state/optimistic.dart`.
+  Goal? predict({
+    required String name,
+    required num targetAmount,
+    required num savedAmount,
+    required num monthlyContribution,
+    required String color,
+    required String icon,
+    DateTime? targetDate,
+  }) => Goal(
+    id: id,
+    name: name,
+    targetAmount: targetAmount,
+    savedAmount: savedAmount,
+    targetDate: targetDate,
+    monthlyContribution: monthlyContribution,
+    color: color,
+    icon: icon,
+    currency: currency,
+    achievedAt: achievedAt,
+    remaining: null,
+    percentFromServer: null,
+    completeFromServer: null,
+    monthsLeft: null,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+  );
 }

@@ -99,8 +99,8 @@ void main() {
       await Future.wait(<Future<Object?>>[
         for (final f in <Future<Object?>>[
           container.read(settingsProvider.future),
-          container.read(accountsProvider.future),
-          container.read(loansProvider.future),
+          container.read(accountsFetchProvider.future),
+          container.read(loansFetchProvider.future),
           container.read(stockPortfolioProvider.future),
           container.read(stockSalesProvider.future),
           container.read(stockSplitsProvider.future),

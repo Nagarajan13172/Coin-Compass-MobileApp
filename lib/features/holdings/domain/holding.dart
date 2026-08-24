@@ -70,6 +70,39 @@ class Holding {
     if (note != null) 'note': note,
     'currency': currency,
   };
+
+  /// 6.4 — this row as the client claims the server will return it.
+  ///
+  /// A holding is a single current [value] with no derived fields at all — no
+  /// cost basis, no gain, no server arithmetic — so the prediction is a
+  /// straight copy of what the form sent. Never null.
+  ///
+  /// The net-worth chart the value feeds is a separate server aggregate and is
+  /// refetched, never guessed.
+  ///
+  /// See `lib/core/state/optimistic.dart`.
+  Holding? predict({
+    required String name,
+    required HoldingClass holdingClass,
+    required HoldingSubtype subtype,
+    required num value,
+    required String currency,
+    DateTime? maturityDate,
+    DateTime? startDate,
+    String? note,
+  }) => Holding(
+    id: id,
+    name: name,
+    holdingClass: holdingClass,
+    subtype: subtype,
+    value: value,
+    maturityDate: maturityDate,
+    startDate: startDate,
+    note: note,
+    currency: currency,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+  );
 }
 
 /// A calendar day as the API stores it: UTC midnight of that day. `toUtc()` on

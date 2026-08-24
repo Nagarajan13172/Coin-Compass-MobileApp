@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/api/api_exception.dart';
+import '../../../core/state/optimistic.dart';
 import '../../../core/api/enums.dart';
 import '../../../core/api/write_body.dart';
 import '../../../core/theme/app_colors.dart';
@@ -65,14 +68,14 @@ class _CreditFormSheetState extends ConsumerState<CreditFormSheet> {
       : PersonRef(id: _existing.personId, name: _existing.displayName);
 
   bool _saving = false;
-  bool _deleting = false;
   String? _formError;
   ApiException? _apiError;
   String? _amountError;
   String? _personError;
 
   bool get _isEdit => _existing != null;
-  bool get _busy => _saving || _deleting;
+  // 6.4: a delete pops the sheet on the spot, so there is no deleting state.
+  bool get _busy => _saving;
 
   @override
   void dispose() {
@@ -99,7 +102,7 @@ class _CreditFormSheetState extends ConsumerState<CreditFormSheet> {
       title: _isEdit ? 'Edit credit' : 'Add credit',
       submitLabel: _isEdit ? 'Save changes' : 'Add credit',
       submitting: _saving,
-      deleting: _deleting,
+      deleting: false,
       onSubmit: _submit,
       deleteLabel: _isEdit ? 'Delete credit' : null,
       onDelete: _isEdit ? _delete : null,
@@ -255,6 +258,29 @@ class _CreditFormSheetState extends ConsumerState<CreditFormSheet> {
       return;
     }
 
+    final body = _buildBody(amount, person);
+    final existing = _existing;
+
+    // 6.4 — amount, direction, person, date, note, account and category are the
+    // whole write surface. `outstanding` is the only server-computed field and
+    // `Credit.predict` nulls it, so the row falls back to the amount the owner
+    // just typed. A create keeps the spinner: the server assigns the id and may
+    // also add a brand-new person to the address book.
+    final predicted = existing?.predict(
+      amount: amount,
+      direction: _direction,
+      date: _date,
+      personId: person.id,
+      personName: person.id == null ? person.name : null,
+      note: _note.text.trim().isEmpty ? null : _note.text.trim(),
+      accountId: _accountId,
+      categoryId: _categoryId,
+    );
+    if (existing != null && predicted != null) {
+      _runOptimistic(existing, predicted, body);
+      return;
+    }
+
     setState(() {
       _saving = true;
       _formError = null;
@@ -263,12 +289,7 @@ class _CreditFormSheetState extends ConsumerState<CreditFormSheet> {
 
     try {
       final repository = ref.read(creditsRepositoryProvider);
-      final body = _buildBody(amount, person);
-      if (_isEdit) {
-        await repository.update(_existing!.id, body);
-      } else {
-        await repository.create(body);
-      }
+      await repository.create(body);
       _invalidate();
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -295,34 +316,70 @@ class _CreditFormSheetState extends ConsumerState<CreditFormSheet> {
     );
     if (!confirmed || !mounted) return;
 
-    setState(() {
-      _deleting = true;
-      _formError = null;
-      _apiError = null;
-    });
+    // 6.4 — predictable, so the row goes now. No Undo: `/credits/:id` has no
+    // restore counterpart. The ConfirmSheet above is the guard.
+    final messenger = ScaffoldMessenger.of(context);
+    final container = ProviderScope.containerOf(context, listen: false);
+    final repository = ref.read(creditsRepositoryProvider);
 
-    try {
-      await ref.read(creditsRepositoryProvider).delete(credit.id);
-      _invalidate();
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
-    } catch (error) {
-      final api = ApiException.from(error);
-      if (!mounted) return;
-      setState(() {
-        _deleting = false;
-        _apiError = api;
-        _formError = api.message;
-      });
-    }
+    Navigator.of(context).pop(true);
+
+    unawaited(
+      container
+          .read(creditsWritesProvider.notifier)
+          .run<void>(
+            paint: PendingWrite.remove(credit.id),
+            send: () => repository.delete(credit.id),
+            settle: () => settleCredits(container),
+            messenger: messenger,
+            noun: credit.displayName,
+            successMessage: 'Credit deleted',
+          ),
+    );
+  }
+
+  /// Closes the sheet on the predicted row and hands the write over.
+  void _runOptimistic(
+    Credit existing,
+    Credit predicted,
+    Map<String, dynamic> body,
+  ) {
+    final messenger = ScaffoldMessenger.of(context);
+    final container = ProviderScope.containerOf(context, listen: false);
+    final repository = ref.read(creditsRepositoryProvider);
+
+    Navigator.of(context).pop(true);
+
+    unawaited(
+      container
+          .read(creditsWritesProvider.notifier)
+          .run<Credit>(
+            paint: PendingWrite.upsert(predicted),
+            send: () => repository.update(existing.id, body),
+            confirm: (saved) => saved,
+            // A credit can name someone new, which the backend adds to the address
+            // book — so the people list is dropped along with the credits.
+            settle: () => settleFetch(
+              container,
+              creditsFetchProvider,
+              also: [peopleFetchProvider],
+            ),
+            messenger: messenger,
+            noun: predicted.displayName,
+            onFix: () {
+              if (!messenger.mounted) return;
+              CreditFormSheet.show(messenger.context, credit: predicted);
+            },
+          ),
+    );
   }
 
   /// A credit can name someone new, which the backend adds to the address book
   /// — so the people list is dropped along with the credits.
   void _invalidate() {
     ref
-      ..invalidate(creditsProvider)
-      ..invalidate(peopleProvider);
+      ..invalidate(creditsFetchProvider)
+      ..invalidate(peopleFetchProvider);
   }
 
   Map<String, dynamic> _buildBody(num amount, PersonRef person) {

@@ -63,7 +63,7 @@ class HoldingsScreen extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: ErrorRetry(
                 error: error,
-                onRetry: () => ref.invalidate(holdingsProvider),
+                onRetry: () => ref.invalidate(holdingsFetchProvider),
               ),
             ),
             _ => const Padding(

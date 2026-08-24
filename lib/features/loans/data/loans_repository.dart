@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/endpoints.dart';
 import '../../../core/api/envelope.dart';
+import '../../../core/state/optimistic.dart';
 import '../domain/loan.dart';
 
 /// `/loans` — borrowings, their EMI schedule, and the two actions that move
@@ -72,9 +73,36 @@ final loansRepositoryProvider = Provider<LoansRepository>(
   (ref) => LoansRepository(ref.watch(apiClientProvider)),
 );
 
+// ─── 6.4: the optimistic overlay ───────────────────────────────────────────
+//
+// The server's list moves to `<x>FetchProvider`; the public name stays on the
+// composed view, so every existing `ref.watch` site gains optimism unedited.
+// See lib/core/state/optimistic.dart.
+
+/// The server's own list. Read this only to **refetch** it.
+///
 /// Cached for the session: the loans list feeds the loans screen, the net-worth
-/// liabilities total and the dashboard. Invalidate after any write with
-/// `ref.invalidate(loansProvider)`.
-final loansProvider = FutureProvider<List<Loan>>(
+/// liabilities total and the dashboard.
+final loansFetchProvider = FutureProvider<List<Loan>>(
   (ref) => ref.watch(loansRepositoryProvider).list(),
 );
+
+/// In-flight optimistic edits and deletes on `/loans`.
+///
+/// [LoansRepository.pay] and [LoansRepository.preclose] are deliberately **not**
+/// routed through here: the server recomputes outstanding, interestPaid and
+/// chargesPaid with its own amortisation. See `LoanPaySheet` /
+/// `LoanPrecloseSheet`.
+final loansWritesProvider =
+    StateNotifierProvider<OptimisticCollection<Loan>, PendingWrites<Loan>>(
+      (ref) => OptimisticCollection<Loan>(idOf: (loan) => loan.id),
+    );
+
+final loansProvider = Provider<AsyncValue<List<Loan>>>(
+  (ref) =>
+      ref.watch(loansWritesProvider).applyTo(ref.watch(loansFetchProvider)),
+);
+
+/// The settle step for a loans write.
+Future<void> settleLoans(ProviderContainer container) =>
+    settleFetch(container, loansFetchProvider);

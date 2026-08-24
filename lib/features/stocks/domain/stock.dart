@@ -336,8 +336,10 @@ class StockQuote {
   String get name => shortName ?? longName ?? symbol;
 
   /// `NSE · Energy`, skipping whichever half is missing.
-  String get subtitle =>
-      [exchange, sector].whereType<String>().where((e) => e.isNotEmpty).join(' · ');
+  String get subtitle => [
+    exchange,
+    sector,
+  ].whereType<String>().where((e) => e.isNotEmpty).join(' · ');
 
   factory StockQuote.fromJson(Map<String, dynamic> json) => StockQuote(
     symbol: J.str(json['symbol']),

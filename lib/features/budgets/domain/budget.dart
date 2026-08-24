@@ -124,4 +124,39 @@ class Budget {
     'currency': currency,
     if (startDate != null) 'startDate': startDate!.toUtc().toIso8601String(),
   };
+
+  /// 6.4 — this row as the client claims the server will return it.
+  ///
+  /// This is the prediction that carries the phase's argument. `spent`,
+  /// `remaining`, `percent`, `over` and `periodRange` are all recomputed
+  /// server-side, and a changed limit or period moves every one of them — so
+  /// each is set to **null** rather than carried across. That is not a loss:
+  /// [percentUsed], [isOver] and [barValue] already fall back to a client-side
+  /// derivation over the spend the app holds from `/reports`, so a nulled field
+  /// re-derives an exactly correct bar instead of painting a stale server
+  /// figure next to a new limit.
+  ///
+  /// See `lib/core/state/optimistic.dart`.
+  Budget? predict({
+    required num amount,
+    required BudgetPeriod period,
+    String? categoryId,
+    Category? category,
+    DateTime? startDate,
+  }) => Budget(
+    id: id,
+    amount: amount,
+    categoryId: categoryId,
+    category: category,
+    period: period,
+    spent: null,
+    remaining: null,
+    percent: null,
+    over: null,
+    periodRange: null,
+    currency: currency,
+    startDate: startDate,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+  );
 }

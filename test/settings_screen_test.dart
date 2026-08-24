@@ -126,13 +126,27 @@ void main() {
         for (final f in <Future<Object?>>[
           container.read(settingsProvider.future),
           container.read(twoFactorStatusProvider.future),
-          container.read(accountsProvider.future),
-          container.read(categoriesProvider.future),
-          container.read(goalsProvider.future),
-          container.read(loansProvider.future),
+          container.read(accountsFetchProvider.future),
+          container.read(categoriesFetchProvider.future),
+          container.read(goalsFetchProvider.future),
+          container.read(loansFetchProvider.future),
         ])
           settled(f),
       ]);
+
+      // 6.4: the lists a screen watches are now composed `Provider`s over their
+      // `<x>FetchProvider`. A composed provider whose dependency resolved is
+      // *dirty*, not recomputed — Riverpod flushes it on the scheduler, which
+      // does not run inside `runAsync`. Reading each one here flushes it before
+      // the widget mounts, so the first build is not also the first flush.
+      for (final p in <ProviderListenable<Object?>>[
+        accountsProvider,
+        categoriesProvider,
+        goalsProvider,
+        loansProvider,
+      ]) {
+        container.read<Object?>(p);
+      }
     });
     addTearDown(container.dispose);
 

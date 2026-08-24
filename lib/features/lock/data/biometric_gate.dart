@@ -140,7 +140,7 @@ class LocalAuthGate extends BiometricGate {
       LocalAuthExceptionCode.noCredentialsSet => const BiometricResult(
         BiometricOutcome.unavailable,
         'This phone has no screen lock, so there is no fingerprint to check — '
-            'use your PIN.',
+        'use your PIN.',
       ),
       LocalAuthExceptionCode.noBiometricsEnrolled => const BiometricResult(
         BiometricOutcome.unavailable,
@@ -162,7 +162,7 @@ class LocalAuthGate extends BiometricGate {
       LocalAuthExceptionCode.biometricLockout => const BiometricResult(
         BiometricOutcome.lockedOut,
         'Fingerprint is locked until the phone is unlocked normally — use your '
-            'PIN.',
+        'PIN.',
       ),
       _ => BiometricResult(
         BiometricOutcome.error,

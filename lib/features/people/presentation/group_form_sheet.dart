@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/api/api_exception.dart';
+import '../../../core/state/optimistic.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../../../core/widgets/confirm_sheet.dart';
@@ -44,13 +47,13 @@ class _GroupFormSheetState extends ConsumerState<GroupFormSheet> {
   late List<String> _memberIds = [...?_existing?.memberIds];
 
   bool _saving = false;
-  bool _deleting = false;
   String? _formError;
   ApiException? _apiError;
   String? _nameError;
 
   bool get _isEdit => _existing != null;
-  bool get _busy => _saving || _deleting;
+  // 6.4: a delete pops the sheet on the spot, so there is no deleting state.
+  bool get _busy => _saving;
 
   @override
   void dispose() {
@@ -68,7 +71,7 @@ class _GroupFormSheetState extends ConsumerState<GroupFormSheet> {
       title: _isEdit ? 'Edit group' : 'New group',
       submitLabel: _isEdit ? 'Save changes' : 'Create group',
       submitting: _saving,
-      deleting: _deleting,
+      deleting: false,
       onSubmit: _submit,
       deleteLabel: _isEdit ? 'Delete group' : null,
       onDelete: _isEdit ? _delete : null,
@@ -117,23 +120,33 @@ class _GroupFormSheetState extends ConsumerState<GroupFormSheet> {
       return;
     }
 
+    // `name` and `members` are the whole accepted schema — a colour or a note
+    // would be stripped by the server. See docs/WRITE_SCHEMAS.md.
+    final body = <String, dynamic>{'name': name, 'members': _memberIds};
+    final existing = _existing;
+
+    // 6.4 — name and membership are the entire write surface, so an edit's
+    // outcome is exactly known and the row repaints now. A create keeps the
+    // spinner: the server assigns the id.
+    final predicted = existing?.predict(name: name, memberIds: _memberIds);
+    if (existing != null && predicted != null) {
+      _runOptimistic(existing, predicted, body);
+      return;
+    }
+
     setState(() {
       _saving = true;
       _formError = null;
       _apiError = null;
     });
 
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       final repository = ref.read(peopleRepositoryProvider);
-      // `name` and `members` are the whole accepted schema — a colour or a note
-      // would be stripped by the server. See docs/WRITE_SCHEMAS.md.
-      final body = <String, dynamic>{'name': name, 'members': _memberIds};
-      if (_isEdit) {
-        await repository.updateGroup(_existing!.id, body);
-      } else {
-        await repository.createGroup(body);
-      }
-      _invalidate();
+      await repository.createGroup(body);
+      container
+        ..invalidate(personGroupsFetchProvider)
+        ..invalidate(peopleFetchProvider);
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {
@@ -158,32 +171,56 @@ class _GroupFormSheetState extends ConsumerState<GroupFormSheet> {
     );
     if (!confirmed || !mounted) return;
 
-    setState(() {
-      _deleting = true;
-      _formError = null;
-      _apiError = null;
-    });
+    // 6.4 — predictable, so the row goes now. No Undo: there is no restore
+    // endpoint for a group, and re-POSTing would make a different one.
+    final messenger = ScaffoldMessenger.of(context);
+    final container = ProviderScope.containerOf(context, listen: false);
+    final repository = ref.read(peopleRepositoryProvider);
 
-    try {
-      await ref.read(peopleRepositoryProvider).deleteGroup(group.id);
-      _invalidate();
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
-    } catch (error) {
-      final api = ApiException.from(error);
-      if (!mounted) return;
-      setState(() {
-        _deleting = false;
-        _apiError = api;
-        _formError = api.message;
-      });
-    }
+    Navigator.of(context).pop(true);
+
+    unawaited(
+      container
+          .read(personGroupsWritesProvider.notifier)
+          .run<void>(
+            paint: PendingWrite.remove(group.id),
+            send: () => repository.deleteGroup(group.id),
+            settle: () => settlePersonGroups(container),
+            messenger: messenger,
+            noun: group.name,
+            successMessage: 'Deleted ${group.name}',
+          ),
+    );
   }
 
-  /// Membership lives on both sides, so the people list is dropped too.
-  void _invalidate() {
-    ref
-      ..invalidate(personGroupsProvider)
-      ..invalidate(peopleProvider);
+  /// Closes the sheet on the predicted row and hands the write over.
+  void _runOptimistic(
+    PersonGroup existing,
+    PersonGroup predicted,
+    Map<String, dynamic> body,
+  ) {
+    final messenger = ScaffoldMessenger.of(context);
+    final container = ProviderScope.containerOf(context, listen: false);
+    final repository = ref.read(peopleRepositoryProvider);
+
+    Navigator.of(context).pop(true);
+
+    unawaited(
+      container
+          .read(personGroupsWritesProvider.notifier)
+          .run<PersonGroup>(
+            paint: PendingWrite.upsert(predicted),
+            send: () => repository.updateGroup(existing.id, body),
+            confirm: (saved) => saved,
+            // Membership lives on both sides, so the people list is dropped too.
+            settle: () => settlePersonGroups(container),
+            messenger: messenger,
+            noun: predicted.name,
+            onFix: () {
+              if (!messenger.mounted) return;
+              GroupFormSheet.show(messenger.context, group: predicted);
+            },
+          ),
+    );
   }
 }

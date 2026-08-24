@@ -49,6 +49,8 @@ class _GoldScreenState extends ConsumerState<GoldScreen> {
     setState(() => _refreshing = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
+      // Deliberately synchronous (6.4): the new prices ARE the result. There
+      // is nothing to predict. See lib/core/state/optimistic.dart.
       await ref.read(metalsRepositoryProvider).refresh();
       ref.invalidate(metalsLatestProvider);
       ref.invalidate(metalsHistoryProvider);

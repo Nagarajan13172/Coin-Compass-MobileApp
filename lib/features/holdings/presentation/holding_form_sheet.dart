@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/api/api_exception.dart';
+import '../../../core/state/optimistic.dart';
 import '../../../core/api/enums.dart';
 import '../../../core/api/write_body.dart';
 import '../../../core/theme/app_colors.dart';
@@ -70,14 +73,14 @@ class _HoldingFormSheetState extends ConsumerState<HoldingFormSheet> {
   String? _currency;
 
   bool _saving = false;
-  bool _deleting = false;
   String? _formError;
   ApiException? _apiError;
   String? _nameError;
   String? _valueError;
 
   bool get _isEdit => _existing != null;
-  bool get _busy => _saving || _deleting;
+  // 6.4: a delete pops the sheet on the spot, so there is no deleting state.
+  bool get _busy => _saving;
 
   @override
   void dispose() {
@@ -91,8 +94,8 @@ class _HoldingFormSheetState extends ConsumerState<HoldingFormSheet> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final symbol = ref.watch(currencySymbolProvider);
-    final options = ref.watch(settingsProvider).valueOrNull?.currencies ??
-        const [];
+    final options =
+        ref.watch(settingsProvider).valueOrNull?.currencies ?? const [];
     // A currency control only earns its place when there is a choice to make.
     // The wallet this app ships against has one currency, and a select with a
     // single option is a control that cannot be used.
@@ -102,12 +105,13 @@ class _HoldingFormSheetState extends ConsumerState<HoldingFormSheet> {
       title: _isEdit ? 'Edit holding' : 'New holding',
       submitLabel: _isEdit ? 'Save changes' : 'Add holding',
       submitting: _saving,
-      deleting: _deleting,
+      deleting: false,
       onSubmit: _submit,
       deleteLabel: _isEdit ? 'Delete holding' : null,
       onDelete: _isEdit ? _delete : null,
       formError: _formError,
-      footnote: 'A holding records what it is worth today — there is no cost '
+      footnote:
+          'A holding records what it is worth today — there is no cost '
           'basis or interest rate to track.',
       children: [
         AppTextField(
@@ -207,9 +211,7 @@ class _HoldingFormSheetState extends ConsumerState<HoldingFormSheet> {
         PickerField(
           label: 'Maturity date',
           hint: 'Optional — deposits and bonds',
-          value: _maturityDate == null
-              ? null
-              : DateX.shortDay(_maturityDate!),
+          value: _maturityDate == null ? null : DateX.shortDay(_maturityDate!),
           errorText: _apiError?.fieldError('maturityDate'),
           onTap: _busy ? null : () => _pickDate(isMaturity: true),
           leading: Icon(
@@ -259,7 +261,8 @@ class _HoldingFormSheetState extends ConsumerState<HoldingFormSheet> {
     final picked = await showDatePicker(
       context: context,
       initialDate:
-          current ?? (isMaturity ? DateTime(now.year + 1, now.month, now.day) : now),
+          current ??
+          (isMaturity ? DateTime(now.year + 1, now.month, now.day) : now),
       firstDate: DateTime(1980),
       lastDate: DateTime(now.year + 50, 12, 31),
     );
@@ -286,6 +289,28 @@ class _HoldingFormSheetState extends ConsumerState<HoldingFormSheet> {
       return;
     }
 
+    final body = _buildBody(name, value);
+    final existing = _existing;
+
+    // 6.4 — a holding is a single current value with no derived fields at all,
+    // so an edit's outcome is a straight copy of what the form sent. The
+    // net-worth series it feeds is a separate server aggregate and is refetched
+    // in the settle, never guessed. A create keeps the spinner.
+    final predicted = existing?.predict(
+      name: name,
+      holdingClass: _class,
+      subtype: _subtype,
+      value: value,
+      currency: _currency ?? existing.currency,
+      maturityDate: _maturityDate,
+      startDate: _startDate,
+      note: _note.text.trim().isEmpty ? null : _note.text.trim(),
+    );
+    if (existing != null && predicted != null) {
+      _runOptimistic(existing, predicted, body);
+      return;
+    }
+
     setState(() {
       _saving = true;
       _formError = null;
@@ -294,12 +319,7 @@ class _HoldingFormSheetState extends ConsumerState<HoldingFormSheet> {
 
     try {
       final repository = ref.read(holdingsRepositoryProvider);
-      final body = _buildBody(name, value);
-      if (_isEdit) {
-        await repository.update(_existing!.id, body);
-      } else {
-        await repository.create(body);
-      }
+      await repository.create(body);
       _invalidate();
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -325,33 +345,71 @@ class _HoldingFormSheetState extends ConsumerState<HoldingFormSheet> {
     );
     if (!confirmed || !mounted) return;
 
-    setState(() {
-      _deleting = true;
-      _formError = null;
-      _apiError = null;
-    });
+    // 6.4 — predictable, so the row goes now. No Undo: there is no restore
+    // endpoint for a holding. The ConfirmSheet above is the guard.
+    final messenger = ScaffoldMessenger.of(context);
+    final container = ProviderScope.containerOf(context, listen: false);
+    final repository = ref.read(holdingsRepositoryProvider);
 
-    try {
-      await ref.read(holdingsRepositoryProvider).delete(holding.id);
-      _invalidate();
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
-    } catch (error) {
-      final api = ApiException.from(error);
-      if (!mounted) return;
-      setState(() {
-        _deleting = false;
-        _apiError = api;
-        _formError = api.message;
-      });
-    }
+    Navigator.of(context).pop(true);
+
+    unawaited(
+      container
+          .read(holdingsWritesProvider.notifier)
+          .run<void>(
+            paint: PendingWrite.remove(holding.id),
+            send: () => repository.delete(holding.id),
+            settle: () => _settle(container),
+            messenger: messenger,
+            noun: holding.name,
+            successMessage: 'Deleted ${holding.name}',
+          ),
+    );
   }
+
+  /// Closes the sheet on the predicted row and hands the write over.
+  void _runOptimistic(
+    Holding existing,
+    Holding predicted,
+    Map<String, dynamic> body,
+  ) {
+    final messenger = ScaffoldMessenger.of(context);
+    final container = ProviderScope.containerOf(context, listen: false);
+    final repository = ref.read(holdingsRepositoryProvider);
+
+    Navigator.of(context).pop(true);
+
+    unawaited(
+      container
+          .read(holdingsWritesProvider.notifier)
+          .run<Holding>(
+            paint: PendingWrite.upsert(predicted),
+            send: () => repository.update(existing.id, body),
+            confirm: (saved) => saved,
+            settle: () => _settle(container),
+            messenger: messenger,
+            noun: predicted.name,
+            onFix: () {
+              if (!messenger.mounted) return;
+              HoldingFormSheet.show(messenger.context, holding: predicted);
+            },
+          ),
+    );
+  }
+
+  /// Holdings feed the asset half of net worth, so the snapshot series is
+  /// refetched alongside the list — never predicted.
+  static Future<void> _settle(ProviderContainer container) => settleFetch(
+    container,
+    holdingsFetchProvider,
+    also: [netWorthHistoryProvider, netWorthHistoryRangeProvider],
+  );
 
   /// Holdings feed the asset half of net worth, so the snapshot series has to
   /// be refetched alongside the list.
   void _invalidate() {
     ref
-      ..invalidate(holdingsProvider)
+      ..invalidate(holdingsFetchProvider)
       ..invalidate(netWorthHistoryProvider)
       ..invalidate(netWorthHistoryRangeProvider);
   }
