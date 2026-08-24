@@ -128,7 +128,15 @@ class Endpoints {
   // ── notifications ────────────────────────────────────────────────────────
   static const String notifications = '/notifications';
   static const String notificationsReadAll = '/notifications/read-all';
+
+  /// `DELETE /notifications` — "Clear all". Same path as the list, which is
+  /// why it needs its own name: an irreversible bulk delete that reads like a
+  /// GET at the call site otherwise. Absent from SPEC.md; found in the web
+  /// bundle.
+  static const String notificationsClearAll = '/notifications';
   static String notification(String id) => '/notifications/$id';
+
+  /// POST, not PATCH — SPEC.md has the verb wrong.
   static String notificationRead(String id) => '/notifications/$id/read';
 
   // ── settings ─────────────────────────────────────────────────────────────

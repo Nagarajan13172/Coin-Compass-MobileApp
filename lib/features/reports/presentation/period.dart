@@ -16,7 +16,28 @@ extension PeriodKindX on PeriodKind {
 
   /// The value `/reports/insights?period=` expects.
   String get apiValue => name;
+
+  /// The noun the copy interpolates: "vs last month", "Projected this month".
+  String get noun => name;
+
+  /// The Reports caption suffix — "August 2026 · Month view".
+  String get viewName => switch (this) {
+    PeriodKind.week => 'Week view',
+    PeriodKind.month => 'Month view',
+    PeriodKind.year => 'Year view',
+  };
 }
+
+/// Moves a raw anchor instant by [steps] periods, the way the web's pager does
+/// (`cd()`: subWeeks/addMonths/addYears). Reports pages a [PeriodRange] with
+/// [PeriodRange.shifted]; Insights pages the `ref` instant it sends to the API,
+/// which is what this is for.
+DateTime shiftAnchor(PeriodKind kind, DateTime anchor, int steps) =>
+    switch (kind) {
+      PeriodKind.week => anchor.add(Duration(days: 7 * steps)),
+      PeriodKind.month => anchor.addMonths(steps),
+      PeriodKind.year => anchor.addMonths(12 * steps),
+    };
 
 /// A half-open window `[start, end)` — the same convention the backend uses
 /// (`/reports/summary` echoes `range: {start: 1 Aug, end: 1 Sep}` for August),
@@ -52,6 +73,28 @@ class PeriodRange {
   /// '1 Aug – 1 Sep 2026' — the dashboard subtitle, exactly as the web app
   /// renders it (the exclusive end date is shown, matching the server range).
   String get rangeLabel => DateX.rangeLabel(start, end);
+
+  /// The label the **web's period pager** shows on Reports and Insights:
+  /// '04 Aug – 10 Aug', 'August 2026', '2026'.
+  ///
+  /// Deliberately not [label]. That one says 'This month' for the current
+  /// window, which the web never does — it renders the current month exactly
+  /// like any other. [label] stays as it is because the dashboard's greeting
+  /// reads better with it; these two screens use this one.
+  ///
+  /// The week form names the last day *inside* the window, so the exclusive
+  /// [end] is stepped back a day. The separator is an EN DASH (U+2013).
+  String get periodLabel {
+    switch (kind) {
+      case PeriodKind.week:
+        final last = end.subtract(const Duration(days: 1));
+        return '${DateX.shortDay(start)} \u2013 ${DateX.shortDay(last)}';
+      case PeriodKind.month:
+        return DateX.monthLabel(start);
+      case PeriodKind.year:
+        return '${start.year}';
+    }
+  }
 
   bool get isCurrent => contains(DateTime.now());
 

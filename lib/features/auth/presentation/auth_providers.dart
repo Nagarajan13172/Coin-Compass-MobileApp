@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_exception.dart';
+import '../../settings/domain/app_settings.dart';
 import '../data/auth_repository.dart';
 import '../domain/app_user.dart';
 
@@ -213,4 +214,11 @@ mixin AuthErrorReset<T extends ConsumerStatefulWidget> on ConsumerState<T> {
 /// Convenience for widgets that only need the user.
 final currentUserProvider = Provider<AppUser?>(
   (ref) => ref.watch(authControllerProvider).user,
+);
+
+/// `GET /auth/2fa/status` — what the Settings screen's two-factor card reads.
+/// Note it does NOT read `AppUser.twoFactorEnabled`, which is on the user
+/// object but is not what the web renders. Invalidate after any 2FA write.
+final twoFactorStatusProvider = FutureProvider.autoDispose<TwoFactorStatus>(
+  (ref) => ref.watch(authRepositoryProvider).twoFactorStatus(),
 );

@@ -154,13 +154,40 @@ class AuthRepository {
   Future<void> resendVerification() =>
       _api.postJson(Endpoints.resendVerification);
 
+  /// [currentPassword] is **omitted** — not sent as null — when the account has
+  /// no password yet (a Google sign-in setting one for the first time). That is
+  /// what the web does: `{currentPassword: me.hasPassword ? value : undefined,
+  /// newPassword}`. [newPassword] must be at least 8 characters, which the web
+  /// checks client-side before calling.
   Future<void> changePassword({
-    required String currentPassword,
+    String? currentPassword,
     required String newPassword,
   }) => _api.postJson(
     Endpoints.changePassword,
-    body: {'currentPassword': currentPassword, 'newPassword': newPassword},
+    body: {'currentPassword': ?currentPassword, 'newPassword': newPassword},
   );
+
+  // ── Net Worth lock ────────────────────────────────────────────────────────
+  //
+  // ⚠️ NEVER CALL DURING DEVELOPMENT. Both flip a real session-level flag on
+  // the owner's account; locking hides the Net Worth and Stocks screens until
+  // the passcode they set is entered again.
+
+  /// Hides the Net Worth section for this session. No body at all. Returns the
+  /// updated user, which is what re-gates the wealth routes.
+  Future<AppUser> lockWealth() async {
+    final json = await _api.postJson(Endpoints.lockWealth);
+    return AppUser.fromJson(J.map(json));
+  }
+
+  /// Reveals it again for this session.
+  Future<AppUser> unlockWealth(String passcode) async {
+    final json = await _api.postJson(
+      Endpoints.unlockWealth,
+      body: {'passcode': passcode},
+    );
+    return AppUser.fromJson(J.map(json));
+  }
 
   Future<TwoFactorStatus> twoFactorStatus() async {
     final json = await _api.getJson(Endpoints.twoFactorStatus);
@@ -189,6 +216,53 @@ class AuthRepository {
   }
 
   Future<void> sendTwoFactorEmail() => _api.postJson(Endpoints.twoFactorEmail);
+
+  // ── two-factor enrolment ──────────────────────────────────────────────────
+  //
+  // ⚠️ NEVER CALL DURING DEVELOPMENT. Enabling 2FA on the owner's live account
+  // puts a factor between them and their own data; disabling one they rely on
+  // is just as bad. The bodies are recovered from the deployed bundle so the
+  // Security card has a contract to call, not so anything here exercises it.
+
+  /// Starts enrolment. No body; returns the QR data URI and the manual key.
+  Future<TwoFactorEnrolment> twoFactorSetup() async {
+    final json = await _api.postJson(Endpoints.twoFactorSetup);
+    return TwoFactorEnrolment.fromJson(J.map(json));
+  }
+
+  /// Confirms enrolment with a 6-digit code from the authenticator app and
+  /// returns the one-time backup codes, which are shown once and never again.
+  Future<List<String>> twoFactorEnable(String code) async {
+    final json = await _api.postJson(
+      Endpoints.twoFactorEnable,
+      body: {'code': code},
+    );
+    return J.stringList(J.map(json)['backupCodes']);
+  }
+
+  /// Exactly one of [currentPassword] or [code] is sent — the password when the
+  /// account has one, otherwise a current authenticator or backup code.
+  Future<void> twoFactorDisable({String? currentPassword, String? code}) =>
+      _api.postJson(
+        Endpoints.twoFactorDisable,
+        body: {'currentPassword': ?currentPassword, 'code': ?code},
+      );
+
+  /// Turns the emailed-code fallback on or off.
+  Future<void> twoFactorEmailFallback(bool enabled) => _api.postJson(
+    Endpoints.twoFactorEmailFallback,
+    body: {'enabled': enabled},
+  );
+
+  /// Replaces the backup codes, authorised by a current code. The old ones
+  /// stop working the moment this succeeds.
+  Future<List<String>> regenerateBackupCodes(String code) async {
+    final json = await _api.postJson(
+      Endpoints.twoFactorBackupCodes,
+      body: {'code': code},
+    );
+    return J.stringList(J.map(json)['backupCodes']);
+  }
 }
 
 final authRepositoryProvider = Provider<AuthRepository>(

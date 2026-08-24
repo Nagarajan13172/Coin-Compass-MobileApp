@@ -1,5 +1,6 @@
 import 'package:coincompass/core/api/enums.dart';
 import 'package:coincompass/features/loans/domain/loan.dart';
+import 'package:coincompass/features/loans/presentation/loans_providers.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Ground truth captured from the deployed web app at
@@ -81,5 +82,65 @@ void main() {
         expect(l.progress, inInclusiveRange(0, 1));
       },
     );
+  });
+
+  group('web parity — figures executed from the deployed bundle', () {
+    // These expectations were produced by extracting the web app's own `Ma`
+    // function out of assets/index-BCZVpAqp.js and running it under Node, not
+    // by re-deriving the formula. If one of these fails, the app and the
+    // website are telling the owner different things about the same loan.
+
+    test('a knife-edge EMI reports a term, exactly as the web does', () {
+      // EMI Rs 1,20,834 against monthly interest of Rs 1,20,833.33 — it clears,
+      // but only after 2011 months. The app used to bail out above 1200 months
+      // and call this "EMI too low" while the website quoted 167 yr 7 mo.
+      final s = amortiseReducingBalance(
+        outstanding: 20000000,
+        annualRatePct: 7.25,
+        emi: 120834,
+      );
+
+      expect(s.feasible, isTrue);
+      expect(s.months, 2011);
+      expect(s.totalPaid, 242997174);
+      expect(s.totalInterest, 222997174);
+      expect(s.isImplausible, isTrue,
+          reason: 'a 167-year term must still be flagged for presentation');
+    });
+
+    test('an EMI that cannot service the interest is still infeasible', () {
+      final s = amortiseReducingBalance(
+        outstanding: 20000000,
+        annualRatePct: 7.25,
+        emi: 100000,
+      );
+      expect(s.feasible, isFalse);
+    });
+
+    test('the real loan is not flagged implausible', () {
+      final s = amortiseReducingBalance(
+        outstanding: 20000000,
+        annualRatePct: 7.25,
+        emi: 137000,
+      );
+      expect(s.months, 355);
+      expect(s.isImplausible, isFalse);
+    });
+
+    test('+Rs 10,000 a month matches the website to the rupee', () {
+      // Web, executed: 287 months, interest 22189000, saved 6446000.
+      final plan = planPrepayment(
+        outstanding: 20000000,
+        annualRatePct: 7.25,
+        emi: 137000,
+        extraPerMonth: 10000,
+      );
+
+      expect(plan.withPlan.months, 287);
+      expect(plan.withPlan.totalInterest, 22189000);
+      expect(plan.monthsSaved, 68);
+      expect(plan.interestSaved, 6446000);
+      expect(plan.netBenefit, 6446000);
+    });
   });
 }

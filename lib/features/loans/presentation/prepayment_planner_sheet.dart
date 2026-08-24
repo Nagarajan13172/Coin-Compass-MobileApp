@@ -160,7 +160,13 @@ class _PrepaymentPlannerSheetState extends State<PrepaymentPlannerSheet> {
               ],
             ),
           ),
-          if (plan.hasPlan) ...[
+          // Match the web's gate exactly. `hasPlan` alone is not enough: the
+          // web shows this block only when the plan actually achieves
+          // something, so typing an extra ₹5 against a ₹2Cr balance shows
+          // nothing there, where mobile used to print a "does not shorten the
+          // term" verdict with four zeroes under it.
+          if (plan.hasPlan &&
+              (plan.monthsSaved > 0 || plan.interestSaved > 0)) ...[
             const SizedBox(height: 12),
             _Verdict(plan: plan),
           ],

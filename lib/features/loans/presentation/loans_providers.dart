@@ -79,6 +79,14 @@ class LoanSchedule {
   final num totalInterest;
 
   bool get isPaidOff => feasible && months == 0;
+
+  /// A term so long the figures stop meaning anything — an EMI barely above the
+  /// monthly interest can amortise for centuries. The arithmetic is still the
+  /// web app's, and [months] is still exact; this only tells the UI to frame it
+  /// as "longer than a lifetime" rather than quoting "167 yr 7 mo" deadpan.
+  static const int implausibleMonths = 1200;
+
+  bool get isImplausible => feasible && months > implausibleMonths;
 }
 
 /// Amortises [outstanding] at [annualRatePct] p.a. paying [emi] every month.
@@ -117,10 +125,15 @@ LoanSchedule amortiseReducingBalance({
   if (emi <= balance * r) return const LoanSchedule.infeasible();
 
   final exact = -math.log(1 - balance * r / emi) / math.log(1 + r);
-  // Rounding noise on a knife-edge EMI can produce a term of a few million
-  // months. Anything past a century is not a loan any more, and `.ceil()` on a
-  // non-finite double throws, so both are reported as "EMI too low".
-  if (!exact.isFinite || exact <= 0 || exact > 1200) {
+  // `.ceil()` on a non-finite double throws, so a knife-edge EMI that lands on
+  // infinity has to be caught here. NOTHING ELSE IS CAPPED: this used to bail
+  // out above 1200 months, which made the app disagree with the web app about
+  // whether a loan was payable at all. For an EMI a few rupees above the
+  // monthly interest the web quotes a finite (if absurd) term, and a term the
+  // user can see beats a flat "EMI too low" that contradicts their other
+  // screen. An implausibly long term is a *presentation* problem — see
+  // [LoanSchedule.isImplausible] — not a reason to withhold the arithmetic.
+  if (!exact.isFinite || exact <= 0) {
     return const LoanSchedule.infeasible();
   }
   final months = exact.ceil();

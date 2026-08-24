@@ -1,4 +1,5 @@
 import '../../../core/api/json.dart';
+import '../../../core/utils/date_x.dart';
 
 /// `GET /reports/summary`
 class ReportSummary {
@@ -25,6 +26,10 @@ class ReportSummary {
   final int expenseCount;
   final num oneoffIncome;
   final num oneoffExpense;
+
+  /// Spending that actually left the household — the web's savings rate is
+  /// `(income − consumption) / income`, NOT `(income − expense) / income`.
+  /// Money moved into a goal or a deposit lands in [nonConsumption] instead.
   final num consumption;
   final num nonConsumption;
   final num netWorth;
@@ -76,7 +81,12 @@ class CategorySlice {
   final int count;
   final String? color;
   final String? icon;
+
+  /// The category's group key (`food`, `transport`, …) or null. The donut's
+  /// "Groups" mode buckets by this; rows without one fall under `ungrouped`.
   final String? group;
+
+  /// Server-computed share of the window's total, already scaled 0–100.
   final num percent;
 
   factory CategorySlice.fromJson(Map<String, dynamic> json) => CategorySlice(
@@ -91,41 +101,77 @@ class CategorySlice {
   );
 }
 
-/// One slice of `GET /reports/by-account`
+/// One row of `GET /reports/by-account`.
+///
+/// The shape is `{_id, name, color, income, expense, transferIn, transferOut}`
+/// — recovered from the deployed web bundle (`GZ`, offset 1019028, and the
+/// identical `account.stats` block at 868106). There is **no** `net`, `total`,
+/// `count` or `type`: the web derives money-in/out/net itself, which is what
+/// [moneyIn], [moneyOut] and [net] do here.
+///
+/// The owner has no accounts, so the live response is `[]` — the field names
+/// could not be confirmed against real rows and come from the bundle only.
 class AccountSlice {
   const AccountSlice({
+    required this.accountId,
     required this.name,
-    this.accountId,
+    this.color,
     this.income = 0,
     this.expense = 0,
-    this.net = 0,
-    this.total = 0,
-    this.count = 0,
-    this.type,
+    this.transferIn = 0,
+    this.transferOut = 0,
   });
 
+  final String accountId;
   final String name;
-  final String? accountId;
+  final String? color;
   final num income;
   final num expense;
-  final num net;
-  final num total;
-  final int count;
-  final String? type;
+  final num transferIn;
+  final num transferOut;
+
+  /// Everything that arrived: income plus transfers in.
+  num get moneyIn => income + transferIn;
+
+  /// Everything that left: expense plus transfers out.
+  num get moneyOut => expense + transferOut;
+
+  num get net => moneyIn - moneyOut;
 
   factory AccountSlice.fromJson(Map<String, dynamic> json) => AccountSlice(
+    accountId: J.refId(json['_id'] ?? json['accountId'] ?? json['account']) ?? '',
     name: J.str(json['name']),
-    accountId: J.refId(json['accountId'] ?? json['account']),
+    color: J.strOrNull(json['color']),
     income: J.number(json['income']),
     expense: J.number(json['expense']),
-    net: J.number(json['net']),
-    total: J.number(json['total']),
-    count: J.integer(json['count']),
-    type: J.strOrNull(json['type']),
+    transferIn: J.number(json['transferIn']),
+    transferOut: J.number(json['transferOut']),
   );
 }
 
-/// One bucket of `GET /reports/trend`. `bucket` is a `yyyy-MM-dd` label.
+/// The `granularity` **query** parameter of `GET /reports/trend`.
+///
+/// Note the asymmetry that has already cost this project a debugging session:
+/// the query key is `granularity`, while the key on every row of the response
+/// is `bucket`. Sending `?bucket=month` is not an error — it is ignored, and
+/// the server quietly returns daily rows.
+///
+/// [week] is supported server-side but nothing sends it: its buckets come back
+/// as ISO week strings (`2026-W32`) that no label formatter here or on the web
+/// can parse. Reports uses [day] for a week/month window and [month] for a year.
+enum TrendGranularity {
+  day('day'),
+  week('week'),
+  month('month');
+
+  const TrendGranularity(this.api);
+  final String api;
+}
+
+/// One bucket of `GET /reports/trend`.
+///
+/// Rows are **sparse**: a whole year of the owner's data is a single row. Any
+/// chart built on this has to survive one data point.
 class TrendPoint {
   const TrendPoint({
     required this.bucket,
@@ -134,12 +180,57 @@ class TrendPoint {
     this.net = 0,
   });
 
+  /// `2026-08-04` (day granularity), `2026-08` (month) or `2026-W32` (week).
   final String bucket;
   final num income;
   final num expense;
   final num net;
 
-  DateTime? get date => J.date(bucket);
+  /// Which shape [bucket] is in, or null when it is none of them.
+  TrendGranularity? get granularity {
+    if (_dayBucket.hasMatch(bucket)) return TrendGranularity.day;
+    if (_monthBucket.hasMatch(bucket)) return TrendGranularity.month;
+    if (_weekBucket.hasMatch(bucket)) return TrendGranularity.week;
+    return null;
+  }
+
+  /// The first instant of the bucket, or null for a bucket we cannot place
+  /// (an ISO week string, or anything unexpected). `DateTime.parse` alone is
+  /// not enough — it rejects `2026-08` because it has no day.
+  DateTime? get date => switch (granularity) {
+    TrendGranularity.day => DateX.parse(bucket),
+    TrendGranularity.month => DateX.parse('$bucket-01'),
+    _ => null,
+  };
+
+  /// The half-open window this bucket covers, for the drill-through to
+  /// `/transactions?from=&to=`. Null when [date] is — the web treats a tap on
+  /// such a bucket as a no-op rather than navigating to a guessed range.
+  ({DateTime from, DateTime to})? get window {
+    final start = date;
+    if (start == null) return null;
+    return switch (granularity) {
+      TrendGranularity.day => (
+        from: start,
+        to: DateTime(start.year, start.month, start.day + 1),
+      ),
+      TrendGranularity.month => (
+        from: start,
+        to: DateTime(start.year, start.month + 1),
+      ),
+      _ => null,
+    };
+  }
+
+  /// The chart axis tick: `04 Aug` for a day, `Aug` for a month, and the raw
+  /// bucket for anything else — matching the web's tick formatter.
+  String get axisLabel {
+    final at = date;
+    if (at == null) return bucket;
+    return granularity == TrendGranularity.month
+        ? DateX.monthShort(at)
+        : DateX.shortDay(at);
+  }
 
   factory TrendPoint.fromJson(Map<String, dynamic> json) => TrendPoint(
     bucket: J.str(json['bucket']),
@@ -147,143 +238,8 @@ class TrendPoint {
     expense: J.number(json['expense']),
     net: J.number(json['net']),
   );
-}
 
-/// A period-over-period metric: `{current, previous, delta, pct}`.
-/// `pct` is null when the previous period was zero.
-class Delta {
-  const Delta({this.current = 0, this.previous = 0, this.delta = 0, this.pct});
-
-  final num current;
-  final num previous;
-  final num delta;
-  final num? pct;
-
-  bool get isUp => delta > 0;
-
-  factory Delta.fromJson(Map<String, dynamic> json) => Delta(
-    current: J.number(json['current']),
-    previous: J.number(json['previous']),
-    delta: J.number(json['delta']),
-    pct: J.numberOrNull(json['pct']),
-  );
-}
-
-/// `pace` block of `GET /reports/insights`
-class Pace {
-  const Pace({
-    this.isCurrent = false,
-    this.daysElapsed = 0,
-    this.daysInPeriod = 0,
-    this.avgPerDay = 0,
-    this.projected = 0,
-    this.previousToDate = 0,
-  });
-
-  final bool isCurrent;
-  final int daysElapsed;
-  final int daysInPeriod;
-  final num avgPerDay;
-  final num projected;
-  final num previousToDate;
-
-  double get progress => daysInPeriod <= 0
-      ? 0
-      : (daysElapsed / daysInPeriod).clamp(0, 1).toDouble();
-
-  factory Pace.fromJson(Map<String, dynamic> json) => Pace(
-    isCurrent: J.boolean(json['isCurrent']),
-    daysElapsed: J.integer(json['daysElapsed']),
-    daysInPeriod: J.integer(json['daysInPeriod']),
-    avgPerDay: J.number(json['avgPerDay']),
-    projected: J.number(json['projected']),
-    previousToDate: J.number(json['previousToDate']),
-  );
-}
-
-/// A category that moved the most between periods.
-class Mover {
-  const Mover({
-    required this.name,
-    this.categoryId,
-    this.color,
-    this.icon,
-    this.current = 0,
-    this.previous = 0,
-    this.delta = 0,
-    this.pct,
-  });
-
-  final String name;
-  final String? categoryId;
-  final String? color;
-  final String? icon;
-  final num current;
-  final num previous;
-  final num delta;
-  final num? pct;
-
-  bool get isUp => delta > 0;
-
-  factory Mover.fromJson(Map<String, dynamic> json) => Mover(
-    name: J.str(json['name']),
-    categoryId: J.refId(json['categoryId']),
-    color: J.strOrNull(json['color']),
-    icon: J.strOrNull(json['icon']),
-    current: J.number(json['current']),
-    previous: J.number(json['previous']),
-    delta: J.number(json['delta']),
-    pct: J.numberOrNull(json['pct']),
-  );
-}
-
-/// `GET /reports/insights`
-class Insights {
-  const Insights({
-    this.period = 'month',
-    this.currentStart,
-    this.currentEnd,
-    this.previousStart,
-    this.previousEnd,
-    this.expense = const Delta(),
-    this.income = const Delta(),
-    this.net = const Delta(),
-    this.savingsRateCurrent,
-    this.savingsRatePrevious,
-    this.pace = const Pace(),
-    this.movers = const [],
-  });
-
-  final String period;
-  final DateTime? currentStart;
-  final DateTime? currentEnd;
-  final DateTime? previousStart;
-  final DateTime? previousEnd;
-  final Delta expense;
-  final Delta income;
-  final Delta net;
-  final num? savingsRateCurrent;
-  final num? savingsRatePrevious;
-  final Pace pace;
-  final List<Mover> movers;
-
-  factory Insights.fromJson(Map<String, dynamic> json) {
-    final current = J.map(json['current']);
-    final previous = J.map(json['previous']);
-    final savings = J.map(json['savingsRate']);
-    return Insights(
-      period: J.str(json['period'], 'month'),
-      currentStart: J.date(current['start']),
-      currentEnd: J.date(current['end']),
-      previousStart: J.date(previous['start']),
-      previousEnd: J.date(previous['end']),
-      expense: Delta.fromJson(J.map(json['expense'])),
-      income: Delta.fromJson(J.map(json['income'])),
-      net: Delta.fromJson(J.map(json['net'])),
-      savingsRateCurrent: J.numberOrNull(savings['current']),
-      savingsRatePrevious: J.numberOrNull(savings['previous']),
-      pace: Pace.fromJson(J.map(json['pace'])),
-      movers: J.list(json['movers'], Mover.fromJson),
-    );
-  }
+  static final RegExp _dayBucket = RegExp(r'^\d{4}-\d{2}-\d{2}$');
+  static final RegExp _monthBucket = RegExp(r'^\d{4}-\d{2}$');
+  static final RegExp _weekBucket = RegExp(r'^\d{4}-W\d{2}$');
 }

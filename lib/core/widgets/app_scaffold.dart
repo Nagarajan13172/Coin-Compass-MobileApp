@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../features/auth/presentation/auth_providers.dart';
+import '../../features/notifications/data/notifications_repository.dart';
 import '../i18n/locale_controller.dart';
 import '../router/destinations.dart';
 import '../theme/app_colors.dart';
@@ -175,8 +176,13 @@ class _BarIcon extends StatelessWidget {
   }
 }
 
-/// The bell carries an unread badge once the notifications feature lands; the
-/// count provider arrives in phase 5, so it renders bare for now.
+/// The bell, with the feed's unread count on it. The count is the server's own
+/// `unread` — not a tally of the rows on screen, which the endpoint caps —
+/// capped for display at "9+", and hidden entirely at zero, matching the web.
+///
+/// This watches the same session-cached [notificationFeedProvider] the
+/// Notifications screen reads, so opening that screen costs no extra request
+/// and marking something read updates the badge on the next invalidation.
 class _BellIcon extends ConsumerWidget {
   const _BellIcon({required this.onTap});
 
@@ -184,7 +190,45 @@ class _BellIcon extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return _BarIcon(icon: LucideIcons.bell, onTap: onTap);
+    final c = context.colors;
+    final badge = ref.watch(unreadBadgeLabelProvider);
+    final bell = _BarIcon(icon: LucideIcons.bell, onTap: onTap);
+    if (badge.isEmpty) return bell;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        bell,
+        // Ignores pointers so the badge never steals a tap from the bell.
+        Positioned(
+          right: 2,
+          top: 3,
+          child: IgnorePointer(
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 16),
+              height: 16,
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                color: c.primary,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: c.background, width: 1.5),
+              ),
+              child: Text(
+                badge,
+                maxLines: 1,
+                style: const TextStyle(
+                  fontSize: 9.5,
+                  height: 1,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 

@@ -50,6 +50,10 @@ class DateX {
   static String weekdayNarrow(DateTime d) => _fmt('EEEEE').format(d);
 
   static String shortDay(DateTime d) => _fmt('dd MMM').format(d);
+  static String dateLabel(DateTime d) => _fmt('dd MMM yyyy').format(d);
+
+  /// `Aug` — the month-bucket tick on the trend charts.
+  static String monthShort(DateTime d) => _fmt('MMM').format(d);
   static String timeLabel(DateTime d) => _fmt('h:mm a').format(d);
 
   /// `1 Aug – 1 Sep 2026`, collapsing the year when both ends share it.
@@ -70,6 +74,54 @@ class DateX {
     if (diff.inDays < 7) return '${diff.inDays}d ago';
     return shortDay(d);
   }
+
+  /// date-fns `formatDistanceToNow(date, {addSuffix: true})`, which is what the
+  /// web renders under every notification: "20 days ago", "about 2 months ago".
+  ///
+  /// Deliberately not [relative]: that one is this app's own compact form
+  /// ("20d ago") and is used in denser rows. The thresholds below are the
+  /// date-fns ones, transcribed — including the odd 42-hour cut between
+  /// "1 day" and "2 days", and the "about"/"over"/"almost" year wording.
+  static String timeAgo(DateTime? d, {DateTime? now}) {
+    if (d == null) return '';
+    final at = now ?? DateTime.now();
+    final forward = d.isAfter(at);
+    final diff = forward ? d.difference(at) : at.difference(d);
+    final suffix = forward ? 'from now' : 'ago';
+    return '${_distance(diff)} $suffix';
+  }
+
+  static String _distance(Duration diff) {
+    final seconds = diff.inSeconds;
+    if (seconds < 30) return 'less than a minute';
+    if (seconds < 90) return '1 minute';
+
+    final minutes = (seconds / 60).round();
+    if (minutes < 45) return '$minutes minutes';
+    if (minutes < 90) return 'about 1 hour';
+
+    final hours = (minutes / 60).round();
+    if (hours < 24) return 'about $hours hours';
+    if (hours < 42) return '1 day';
+
+    final days = (hours / 24).round();
+    if (days < 30) return '$days days';
+    if (days < 45) return 'about 1 month';
+    if (days < 60) return 'about 2 months';
+
+    final months = (days / 30).round();
+    if (months < 12) return '$months months';
+
+    // Year wording repeats every 12 months: 0–3 months over -> "about N",
+    // 3–9 -> "over N", 9–12 -> "almost N+1".
+    final years = months ~/ 12;
+    final remainder = months % 12;
+    if (remainder < 3) return 'about ${_years(years)}';
+    if (remainder < 9) return 'over ${_years(years)}';
+    return 'almost ${_years(years + 1)}';
+  }
+
+  static String _years(int n) => n == 1 ? '1 year' : '$n years';
 }
 
 extension DateTimeX on DateTime {

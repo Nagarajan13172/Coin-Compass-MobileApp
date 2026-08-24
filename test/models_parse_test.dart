@@ -7,6 +7,7 @@ import 'package:coincompass/features/accounts/domain/account.dart';
 import 'package:coincompass/features/categories/domain/category.dart';
 import 'package:coincompass/features/credits/domain/credit.dart';
 import 'package:coincompass/features/gold/domain/metal_price.dart';
+import 'package:coincompass/features/insights/domain/insights.dart';
 import 'package:coincompass/features/loans/domain/loan.dart';
 import 'package:coincompass/features/networth/domain/net_worth_point.dart';
 import 'package:coincompass/features/notifications/domain/app_notification.dart';
@@ -212,7 +213,8 @@ void main() {
     expect(n.amount, 12312);
     expect(n.currency, 'INR');
     expect(n.countParam, 1);
-    expect(n.title, 'Recurring');
+    // The title is the type's fixed heading — `ruleTitle` belongs in the body.
+    expect(NotificationCopy.of(n).title, 'Recurring posted');
   });
 
   test('two-factor status', () {

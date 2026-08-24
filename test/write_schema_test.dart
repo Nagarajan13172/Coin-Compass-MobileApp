@@ -7,6 +7,7 @@ import 'package:coincompass/features/goals/domain/goal.dart';
 import 'package:coincompass/features/holdings/domain/holding.dart';
 import 'package:coincompass/features/loans/domain/loan.dart';
 import 'package:coincompass/features/people/domain/person.dart';
+import 'package:coincompass/features/settings/data/settings_repository.dart';
 import 'package:coincompass/features/splits/domain/split.dart';
 import 'package:coincompass/features/stocks/domain/stock.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -163,6 +164,56 @@ void main() {
   const acceptedLoanPreclose = {'chargePct'};
   const acceptedSplitApply = {'symbol', 'date'};
 
+  // ── Phase 5 ────────────────────────────────────────────────────────────────
+  //
+  // The settings tree is the first place this app writes with **PUT**, and the
+  // first place SPEC.md has the verb wrong: it says `PATCH /settings`, while
+  // `patch("/settings` appears zero times across all five bundle files and the
+  // deployed client only ever calls `q.put("/settings", body)`. Whether the
+  // backend also accepts PATCH is unknown and cannot be probed against a live
+  // account, so PUT — the verb that demonstrably works — is what is pinned.
+  //
+  // There is no whole-object write anywhere in the web client. The mutation is
+  // called from three sites and issues exactly five bodies, one concern each,
+  // which is why each has its own set below rather than one union: sending
+  // `{theme}` alongside `{name, description}` would not fail, it would just be
+  // a body the web has never sent to a handler nobody here has read.
+  const acceptedSettingsWallet = {'name', 'description'};
+  const acceptedSettingsBaseCurrency = {'baseCurrency'};
+  const acceptedSettingsLanguage = {'language'};
+  const acceptedSettingsEmailReports = {'emailReports'};
+  const acceptedSettingsTheme = {'theme'};
+
+  const acceptedSettingsPin = {'pin'};
+  const acceptedWealthPasscode = {'passcode'};
+  const acceptedUnlockWealth = {'passcode'};
+  const acceptedChangePassword = {'currentPassword', 'newPassword'};
+  const acceptedTwoFactorEnable = {'code'};
+  const acceptedTwoFactorDisable = {'currentPassword', 'code'};
+  const acceptedTwoFactorEmailFallback = {'enabled'};
+  const acceptedTwoFactorBackupCodes = {'code'};
+
+  /// Read-only keys of the settings document. Six of them come back from every
+  /// GET, which makes them exactly the ones a "just send the object back"
+  /// refactor would reintroduce. Two are worse than merely stripped:
+  /// `currencies` is a server-seeded table with no editor anywhere in the web
+  /// client, and `pinEnabled`/`wealthLockEnabled` are flipped by their own
+  /// POST/DELETE endpoints — a PUT of those flags is not how either lock is
+  /// turned on or off.
+  const strippedSettings = {
+    'locale',
+    'firstDayOfWeek',
+    'monthStartDay',
+    'currencies',
+    'pinEnabled',
+    'wealthLockEnabled',
+    'user',
+    'id',
+    'symbol',
+    'createdAt',
+    'updatedAt',
+  };
+
   /// The keys the server drops on the floor. Named so a failure says *which*
   /// mistake was made, not just "unexpected key".
   const stripped = {
@@ -184,6 +235,14 @@ void main() {
     'POST /stocks/buy': {'date', 'exchange', 'name', 'charges', 'brokerage',
         'fees'},
     'POST /stocks/sell': {'date', 'lot', 'charges', 'brokerage', 'fees'},
+    // Phase 5. Same set for every one of the five bodies, so whichever one a
+    // stray key is added to, the failure names it.
+    'PUT /settings': strippedSettings,
+    'PUT /settings (wallet)': strippedSettings,
+    'PUT /settings (base currency)': strippedSettings,
+    'PUT /settings (language)': strippedSettings,
+    'PUT /settings (email reports)': strippedSettings,
+    'PUT /settings (theme)': strippedSettings,
   };
 
   /// One assertion, phrased so the failure names the offending key and says
@@ -437,6 +496,64 @@ void main() {
       expect(body['symbol'], 'RELIANCE.NS');
     });
 
+    test('PUT /settings — the five bodies, built one concern at a time', () {
+      // Each builder is the only thing that can produce its body, so this is
+      // the whole write vocabulary of the settings tree.
+      expectWithin(
+        'PUT /settings (wallet)',
+        acceptedSettingsWallet,
+        SettingsRepository.walletBody('  My Wallet  ', '  Personal  '),
+      );
+      // Both keys always travel together — the web sends `description` even
+      // when it is empty, which is how a label gets cleared.
+      expect(SettingsRepository.walletBody('  My Wallet  ', '   '), {
+        'name': 'My Wallet',
+        'description': '',
+      });
+
+      expectWithin(
+        'PUT /settings (base currency)',
+        acceptedSettingsBaseCurrency,
+        SettingsRepository.baseCurrencyBody('USD'),
+      );
+      expectWithin(
+        'PUT /settings (language)',
+        acceptedSettingsLanguage,
+        SettingsRepository.languageBody('ta'),
+      );
+      expectWithin(
+        'PUT /settings (email reports)',
+        acceptedSettingsEmailReports,
+        SettingsRepository.emailReportsBody(false),
+      );
+      expectWithin(
+        'PUT /settings (theme)',
+        acceptedSettingsTheme,
+        SettingsRepository.themeBody('dark'),
+      );
+
+      // A boolean must go out as a boolean: `'false'` would be stripped by the
+      // Zod schema exactly like an unknown key, and the switch would silently
+      // never persist.
+      expect(SettingsRepository.emailReportsBody(false)['emailReports'], false);
+    });
+
+    test('the two lock bodies are single-key', () {
+      expectWithin(
+        'POST /settings/pin',
+        acceptedSettingsPin,
+        SettingsRepository.pinBody('1234'),
+      );
+      expectWithin(
+        'POST /settings/wealth-passcode',
+        acceptedWealthPasscode,
+        SettingsRepository.passcodeBody('open sesame'),
+      );
+      // The PIN is a *string* of digits, not a number — a leading zero has to
+      // survive the round trip.
+      expect(SettingsRepository.pinBody('0421')['pin'], '0421');
+    });
+
     test('a bare instance still carries every required key', () {
       expect(
         Person(id: 'p', name: 'A').toWriteJson().keys,
@@ -672,6 +789,214 @@ void main() {
       'Endpoints.loanPreclose(id),',
       acceptedLoanPreclose,
     );
+  });
+
+  group('phase 5 repositories build only accepted bodies', () {
+    // The settings writes never pass through a model — there is deliberately
+    // no `AppSettings.toWriteJson()`, because the one thing this endpoint must
+    // never receive is the whole document. Each body is built by its own named
+    // builder instead, which is what the guard reads: a sixth key added to any
+    // of them fails here.
+    const settingsRepository =
+        'lib/features/settings/data/settings_repository.dart';
+
+    checkSheet(
+      'PUT /settings (wallet)',
+      settingsRepository,
+      'Map<String, dynamic> walletBody',
+      acceptedSettingsWallet,
+    );
+    checkSheet(
+      'PUT /settings (base currency)',
+      settingsRepository,
+      'Map<String, dynamic> baseCurrencyBody',
+      acceptedSettingsBaseCurrency,
+    );
+    checkSheet(
+      'PUT /settings (language)',
+      settingsRepository,
+      'Map<String, dynamic> languageBody',
+      acceptedSettingsLanguage,
+    );
+    checkSheet(
+      'PUT /settings (email reports)',
+      settingsRepository,
+      'Map<String, dynamic> emailReportsBody',
+      acceptedSettingsEmailReports,
+    );
+    checkSheet(
+      'PUT /settings (theme)',
+      settingsRepository,
+      'Map<String, dynamic> themeBody',
+      acceptedSettingsTheme,
+    );
+    checkSheet(
+      'POST /settings/pin',
+      settingsRepository,
+      'Map<String, dynamic> pinBody',
+      acceptedSettingsPin,
+    );
+    checkSheet(
+      'POST /settings/wealth-passcode',
+      settingsRepository,
+      'Map<String, dynamic> passcodeBody',
+      acceptedWealthPasscode,
+    );
+
+    // The account-level writes are assembled inline at their call sites, so
+    // the guard anchors on the endpoint constant and reads the map that
+    // follows — the same trick the stocks and loans checks use.
+    const authRepository = 'lib/features/auth/data/auth_repository.dart';
+
+    checkSheet(
+      'POST /auth/unlock-wealth',
+      authRepository,
+      'Endpoints.unlockWealth,',
+      acceptedUnlockWealth,
+    );
+    checkSheet(
+      'POST /auth/change-password',
+      authRepository,
+      'Endpoints.changePassword,',
+      acceptedChangePassword,
+    );
+    checkSheet(
+      'POST /auth/2fa/enable',
+      authRepository,
+      'Endpoints.twoFactorEnable,',
+      acceptedTwoFactorEnable,
+    );
+    checkSheet(
+      'POST /auth/2fa/disable',
+      authRepository,
+      'Endpoints.twoFactorDisable,',
+      acceptedTwoFactorDisable,
+    );
+    checkSheet(
+      'POST /auth/2fa/email-fallback',
+      authRepository,
+      'Endpoints.twoFactorEmailFallback,',
+      acceptedTwoFactorEmailFallback,
+    );
+    checkSheet(
+      'POST /auth/2fa/backup-codes',
+      authRepository,
+      'Endpoints.twoFactorBackupCodes,',
+      acceptedTwoFactorBackupCodes,
+    );
+  });
+
+  group('phase 5 verbs and shapes', () {
+    // Half of what went wrong in earlier phases was not a stray key but a
+    // wrong verb or a wrong param name — neither of which produces an error,
+    // both of which produce wrong data. These pin the four that SPEC.md gets
+    // wrong or omits.
+
+    test('settings writes go out as PUT, never PATCH', () {
+      final source = File(
+        'lib/features/settings/data/settings_repository.dart',
+      ).readAsStringSync();
+
+      expect(
+        source.contains('putJson(Endpoints.settings'),
+        isTrue,
+        reason:
+            'the deployed web client calls q.put("/settings", body); PUT is '
+            'the only verb known to work on this endpoint.',
+      );
+      expect(
+        source.contains('patchJson('),
+        isFalse,
+        reason:
+            'SPEC.md says PATCH /settings, but `patch("/settings` appears zero '
+            'times in the web bundle and PATCH has never been tried against '
+            'this deployment. Do not probe it on a live account.',
+      );
+    });
+
+    test('there is no whole-object settings write to reach for', () {
+      // A `toPatchJson()` that sent the entire document shipped in an earlier
+      // phase. It carried `locale`, `firstDayOfWeek` and `monthStartDay`,
+      // which the web never sends, and would have put the server-seeded
+      // `currencies` table in reach of a write handler nobody here has read.
+      final source = File(
+        'lib/features/settings/domain/app_settings.dart',
+      ).readAsStringSync();
+
+      for (final method in const ['toPatchJson', 'toWriteJson']) {
+        expect(
+          source.contains(method),
+          isFalse,
+          reason:
+              'AppSettings.$method is back. Settings are written one concern '
+              'at a time through SettingsRepository, whose bodies are pinned '
+              'above. `toJson()` is the read shape and must stay unsent.',
+        );
+      }
+    });
+
+    test('notification mutations carry no body at all', () {
+      // All four are bodiless. A body here would not fail — it would be
+      // stripped — but it would also mean somebody had invented a contract.
+      final source = File(
+        'lib/features/notifications/data/notifications_repository.dart',
+      ).readAsStringSync();
+
+      expect(
+        source.contains('body:'),
+        isFalse,
+        reason:
+            'POST /notifications/:id/read, POST /notifications/read-all, '
+            'DELETE /notifications/:id and DELETE /notifications all take no '
+            'body in the deployed client.',
+      );
+      expect(
+        source.contains('postJson(Endpoints.notificationRead('),
+        isTrue,
+        reason:
+            'marking one notification read is a POST. SPEC.md says PATCH — it '
+            'is wrong; the bundle calls q.post(`/notifications/\${id}/read`).',
+      );
+      expect(
+        RegExp(r'patchJson\(').hasMatch(source),
+        isFalse,
+        reason: 'nothing on the notifications tree is a PATCH.',
+      );
+    });
+
+    test('the trend query sends granularity, never bucket', () {
+      // `bucket` is the response key. Sending it as the query param is not an
+      // error: the server ignores it and returns daily rows, so a year view
+      // would quietly render 365 buckets of the wrong size.
+      final source = File(
+        'lib/features/reports/data/reports_repository.dart',
+      ).readAsStringSync();
+
+      expect(source.contains("'granularity':"), isTrue);
+      expect(
+        source.contains("'bucket':"),
+        isFalse,
+        reason:
+            "GET /reports/trend takes `granularity`; `bucket` is what comes "
+            'back on each row. Verified live.',
+      );
+    });
+
+    test('the CSV export asks for bytes, not JSON', () {
+      // /export/csv returns a file. Left on the client's default JSON
+      // responseType the body would be decoded as text and the share sheet
+      // would hand out a mangled file.
+      final source = File(
+        'lib/features/reports/data/export_repository.dart',
+      ).readAsStringSync();
+
+      expect(source.contains('ResponseType.bytes'), isTrue);
+      expect(
+        source.contains('body:'),
+        isFalse,
+        reason: 'GET /export/csv is a GET — it takes from/to and nothing else.',
+      );
+    });
   });
 
   group('action sheets cannot assemble a body of their own', () {

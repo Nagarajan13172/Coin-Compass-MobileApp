@@ -129,11 +129,14 @@ class LoanCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
+            // Stated in full, like the web card. These are balances, not axis
+            // labels: '₹2Cr left of ₹2Cr' hides the very digits someone opens
+            // this screen to read. Two lines so a full pair still fits at 360dp.
             Text(
               '${(loan.progress * 100).round()}% paid · '
-              '${Money.compact(loan.outstanding)} left of '
-              '${Money.compact(loan.principal)}',
-              maxLines: 1,
+              '${Money.format(loan.outstanding)} left of '
+              '${Money.format(loan.principal)}',
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(fontSize: 12.5, color: c.mutedForeground),
             ),
@@ -151,7 +154,7 @@ class LoanCard extends StatelessWidget {
               Expanded(
                 child: _Fact(
                   label: 'EMI',
-                  value: loan.emi > 0 ? Money.compact(loan.emi) : '—',
+                  value: loan.emi > 0 ? Money.format(loan.emi) : '—',
                 ),
               ),
               Expanded(
@@ -232,6 +235,10 @@ class LoanCard extends StatelessWidget {
   String _tenureValue(LoanSchedule schedule) {
     if (!loan.isActive || loan.outstanding <= 0) return '—';
     if (!schedule.feasible) return 'EMI too low';
+    // An EMI a few rupees above the monthly interest amortises for centuries.
+    // The web quotes it deadpan ('167 yr 7 mo'); we keep the same arithmetic
+    // but refuse to present it as a term anyone could serve.
+    if (schedule.isImplausible) return '100 yr+';
     return formatMonths(schedule.months);
   }
 
@@ -240,6 +247,7 @@ class LoanCard extends StatelessWidget {
     if (!schedule.feasible) {
       return loan.emi > 0 ? 'Balance never reduces' : 'No EMI set';
     }
+    if (schedule.isImplausible) return 'EMI barely covers the interest';
     final eta = payoffEtaLabel(schedule);
     return eta == null ? null : 'ETA $eta';
   }

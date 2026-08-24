@@ -12,6 +12,23 @@ class Money {
   static const num crore = 10000000;
   static const String minus = '−'; // real minus sign, matches the web app
 
+  /// Symbols for the four currencies the backend seeds. Only a fallback: when
+  /// the settings document has loaded, prefer the symbol it carries in
+  /// `currencies[]` (see `currencySymbolProvider`). Used directly where no
+  /// settings read is available — a notification carries its own `currency`
+  /// code, and the web formats it with that currency rather than the base one.
+  static const Map<String, String> seededSymbols = {
+    'INR': rupee,
+    'USD': r'$',
+    'EUR': '€',
+    'GBP': '£',
+  };
+
+  /// The symbol for an ISO code, falling back to the rupee — which is the base
+  /// currency of the account this app ships against.
+  static String symbolFor(String? code) =>
+      code == null ? rupee : (seededSymbols[code.toUpperCase()] ?? rupee);
+
   static final NumberFormat _whole = NumberFormat.decimalPattern('en_IN')
     ..maximumFractionDigits = 0;
   static final NumberFormat _decimal = NumberFormat.decimalPattern('en_IN')
@@ -44,27 +61,45 @@ class Money {
   ///
   /// [signed] adds a leading `+` to a positive value, matching [format] — an
   /// income row reads `+₹1.5L`, not `₹1.5L`.
-  static String compact(num amount, {String symbol = rupee, bool signed = false}) {
+  ///
+  /// [decimals] fixes how many digits follow the point. Left null the value is
+  /// trimmed to at most two, which is what every screen before Phase 5 wanted.
+  /// The two call sites that need something else are on Reports and Insights:
+  /// the delta pill compacts money with **0** decimals (`₹13K`, matching JS
+  /// `Intl` with `maximumFractionDigits: 0`) while a chart's Y axis uses **1**
+  /// (`13.3K`). Two different roundings of the same number on one screen — the
+  /// web does exactly this, so the knob is the parity, not a convenience.
+  static String compact(
+    num amount, {
+    String symbol = rupee,
+    bool signed = false,
+    int? decimals,
+  }) {
     final abs = amount.abs();
     final sign = amount < 0
         ? minus
         : (signed && amount > 0 ? '+' : '');
 
+    String scaled(num value) =>
+        decimals == null ? _trim(value) : _round(value, decimals);
+
     String body;
     if (abs >= 10000000) {
-      body = '${_trim(abs / 10000000)}Cr';
+      body = '${scaled(abs / 10000000)}Cr';
     } else if (abs >= 100000) {
-      body = '${_trim(abs / 100000)}L';
+      body = '${scaled(abs / 100000)}L';
     } else if (abs >= 1000) {
-      body = '${_trim(abs / 1000)}K';
+      body = '${scaled(abs / 1000)}K';
     } else {
-      body = abs % 1 == 0 ? abs.toStringAsFixed(0) : _trim(abs);
+      body = abs % 1 == 0 ? abs.toStringAsFixed(0) : scaled(abs);
     }
     return '$sign$symbol$body';
   }
 
-  /// Same as [compact] without the currency symbol — for chart axis labels.
-  static String compactPlain(num amount) => compact(amount, symbol: '');
+  /// Same as [compact] without the currency symbol — for chart axis labels,
+  /// which the web renders with one decimal (`13.3K`).
+  static String compactPlain(num amount, {int? decimals}) =>
+      compact(amount, symbol: '', decimals: decimals);
 
   /// `percent(0.4667)` -> `46.7%`; pass alreadyScaled for API values like 46.7.
   static String percent(
@@ -95,5 +130,12 @@ class Money {
   static String _trim(num v) {
     final s = v.toStringAsFixed(2);
     return s.replaceFirst(RegExp(r'\.?0+$'), '');
+  }
+
+  /// Rounds to [decimals] places and drops a trailing `.0`, so 13.35 -> `13.4`
+  /// at one decimal and 13 -> `13`, never `13.0`.
+  static String _round(num v, int decimals) {
+    final s = v.toStringAsFixed(decimals);
+    return decimals == 0 ? s : s.replaceFirst(RegExp(r'\.?0+$'), '');
   }
 }

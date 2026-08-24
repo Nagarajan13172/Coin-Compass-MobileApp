@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/utils/date_x.dart';
 import '../../../../core/utils/money.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/empty_state.dart';
@@ -287,9 +286,7 @@ double niceMaxY(num peak) {
   return (value / magnitude).ceil() * magnitude;
 }
 
-/// `2026-08-04` -> `04 Aug`. Falls back to the raw bucket for coarser buckets
-/// the API may return unparsed (e.g. `2026-08`).
-String bucketLabel(TrendPoint point) {
-  final date = point.date;
-  return date == null ? point.bucket : DateX.shortDay(date);
-}
+/// `2026-08-04` -> `04 Aug`, `2026-08` -> `Aug`, anything else -> the raw
+/// bucket. The rule lives on the model so Reports and the dashboard label the
+/// same axis the same way.
+String bucketLabel(TrendPoint point) => point.axisLabel;

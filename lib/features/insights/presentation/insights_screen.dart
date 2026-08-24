@@ -1,0 +1,1259 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+
+import '../../../core/api/enums.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/date_x.dart';
+import '../../../core/utils/money.dart';
+import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/category_avatar.dart';
+import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/error_retry.dart';
+import '../../../core/widgets/loading_shimmer.dart';
+import '../../../core/widgets/money_text.dart';
+import '../../../core/widgets/screen_header.dart';
+import '../../../core/widgets/section_header.dart';
+import '../../../core/widgets/segmented_period_selector.dart';
+import '../../../core/widgets/stat_card.dart';
+import '../../reports/presentation/period.dart';
+import '../../transactions/data/transactions_repository.dart';
+import '../../transactions/presentation/transactions_providers.dart';
+import '../domain/insights.dart';
+import 'insights_providers.dart';
+
+/// `/insights` — how this period compares with the last one.
+///
+/// Body only; [AppScaffold] supplies the app bar and bottom nav.
+///
+/// The whole screen is driven by one read, `GET /reports/insights`, and the
+/// single hardest thing about it is that **every percentage can be null**. The
+/// server returns `pct: null` — not 0 — whenever the previous period was zero,
+/// and on this account that is currently true of expense, income, net, the
+/// savings rate and every mover at once. So a first period with no history is
+/// treated here as a *designed* state, not a fallback: the delta pill states
+/// the amount instead of a percentage, the sub-line says "nothing last month"
+/// rather than printing a dead "Last month: ₹0", and the highlights card ends
+/// with a line explaining that comparisons start next period. Nothing on this
+/// screen ever divides by [Delta.previous].
+class InsightsScreen extends ConsumerWidget {
+  const InsightsScreen({super.key});
+
+  static const String routePath = '/insights';
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final insights = ref.watch(currentInsightsProvider);
+
+    return RefreshIndicator(
+      onRefresh: () => refreshInsights(ref),
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(bottom: 110),
+        children: [
+          const ScreenHeader(
+            title: 'Insights',
+            subtitle: 'How your spending is changing, period over period.',
+          ),
+          const _PeriodBar(),
+          const _Caption(),
+          switch (insights) {
+            // Stale-while-revalidate: paging to another period keeps the last
+            // payload on screen until the new one lands, so the pager the user
+            // just tapped does not jump around under a skeleton. An
+            // `AsyncData` pattern would not match the `AsyncLoading` that
+            // carries the previous value, so the value is matched instead.
+            AsyncValue(:final valueOrNull?) when valueOrNull.hasData => _Body(
+              insights: valueOrNull,
+            ),
+            AsyncValue(valueOrNull: _?) => const _NotEnoughData(),
+            AsyncError(:final error) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: ErrorRetry(
+                error: error,
+                onRetry: () => ref.invalidate(insightsProvider),
+              ),
+            ),
+            _ => const _Skeleton(),
+          },
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Chrome: period bar, caption, skeleton, empty
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Week | Month | Year, then the ◀ label ▶ pager. The web keeps both on one
+/// wrapping row; at 360dp there is no room for that, so they stack — the same
+/// two controls, one above the other.
+class _PeriodBar extends ConsumerWidget {
+  const _PeriodBar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final kind = ref.watch(insightsPeriodKindProvider);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // The three pills measure ~215dp, which fits — but a longer label in
+          // another language would not, and a clipped segmented control is a
+          // dead control.
+          Align(
+            alignment: Alignment.centerLeft,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SegmentedPeriodSelector<PeriodKind>(
+                options: [
+                  for (final option in PeriodKind.values)
+                    SegmentOption(option, option.shortLabel),
+                ],
+                value: kind,
+                onChanged: (next) =>
+                    ref.read(insightsPeriodKindProvider.notifier).state = next,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          const _PeriodPager(),
+        ],
+      ),
+    );
+  }
+}
+
+/// `[◀]  August 2026  [▶]`. Deliberately not clamped to today: the web lets
+/// you page into the future, where the server simply answers `hasData: false`.
+class _PeriodPager extends ConsumerWidget {
+  const _PeriodPager();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
+    final kind = ref.watch(insightsPeriodKindProvider);
+    final range = ref.watch(insightsRangeProvider);
+    final radius = BorderRadius.circular(AppTheme.radius);
+
+    void shift(int steps) {
+      final anchor = ref.read(insightsAnchorProvider);
+      ref.read(insightsAnchorProvider.notifier).state = shiftAnchor(
+        kind,
+        anchor,
+        steps,
+      );
+    }
+
+    Widget arrow(IconData icon, String tooltip, VoidCallback onTap) =>
+        Semantics(
+          button: true,
+          label: tooltip,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: radius,
+            child: Container(
+              width: 46,
+              height: 44,
+              decoration: BoxDecoration(
+                color: c.card,
+                borderRadius: radius,
+                border: Border.all(color: c.border),
+              ),
+              child: Icon(icon, size: 18, color: c.foreground),
+            ),
+          ),
+        );
+
+    return Row(
+      children: [
+        arrow(
+          LucideIcons.chevronLeft,
+          'Previous period',
+          () => shift(-1),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Container(
+            height: 44,
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: c.card,
+              borderRadius: radius,
+              border: Border.all(color: c.border),
+            ),
+            // '04 Aug – 10 Aug' is the widest of the three forms; scaling it
+            // down beats losing an end of the range to an ellipsis.
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                range.periodLabel,
+                maxLines: 1,
+                style: const TextStyle(
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.w600,
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        arrow(LucideIcons.chevronRight, 'Next period', () => shift(1)),
+      ],
+    );
+  }
+}
+
+/// `Showing **August 2026**`. Unlike Reports there is no "· Month view"
+/// suffix here — the web omits it on this screen.
+class _Caption extends ConsumerWidget {
+  const _Caption();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
+    final range = ref.watch(insightsRangeProvider);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+      child: Text.rich(
+        TextSpan(
+          text: 'Showing ',
+          children: [
+            TextSpan(
+              text: range.periodLabel,
+              style: TextStyle(
+                color: c.foreground,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        style: TextStyle(fontSize: 13.5, color: c.mutedForeground),
+      ),
+    );
+  }
+}
+
+class _Skeleton extends StatelessWidget {
+  const _Skeleton();
+
+  @override
+  Widget build(BuildContext context) => const Padding(
+    padding: EdgeInsets.fromLTRB(20, 12, 20, 0),
+    child: Column(
+      children: [
+        LoadingCard(lines: 2),
+        SizedBox(height: 12),
+        LoadingCard(lines: 2),
+        SizedBox(height: 12),
+        LoadingCard(lines: 2),
+        SizedBox(height: 12),
+        LoadingCard(lines: 3),
+        SizedBox(height: 12),
+        LoadingCard(lines: 4),
+      ],
+    ),
+  );
+}
+
+class _NotEnoughData extends StatelessWidget {
+  const _NotEnoughData();
+
+  @override
+  Widget build(BuildContext context) => const Padding(
+    padding: EdgeInsets.fromLTRB(20, 8, 20, 0),
+    child: EmptyState(
+      icon: LucideIcons.sparkles,
+      title: 'Not enough data yet',
+      message:
+          'Add a few transactions and insights about your spending will show '
+          'up here.',
+    ),
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Body
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _Body extends StatelessWidget {
+  const _Body({required this.insights});
+
+  final Insights insights;
+
+  @override
+  Widget build(BuildContext context) {
+    final noun = _nounOf(insights.period);
+
+    return Column(
+      children: [
+        const SizedBox(height: 8),
+        _Padded(child: _HighlightsCard(insights: insights, noun: noun)),
+        _Padded(
+          child: _CompareCard(
+            label: 'Spending',
+            metric: insights.expense,
+            noun: noun,
+            noBaselineNote: 'nothing spent last $noun',
+            goodWhenUp: false,
+          ),
+        ),
+        _Padded(
+          child: _CompareCard(
+            label: 'Income',
+            metric: insights.income,
+            noun: noun,
+            noBaselineNote: 'nothing earned last $noun',
+            goodWhenUp: true,
+          ),
+        ),
+        _Padded(
+          child: _CompareCard(
+            label: 'Net',
+            metric: insights.net,
+            noun: noun,
+            noBaselineNote: 'nothing recorded last $noun',
+            goodWhenUp: true,
+          ),
+        ),
+        _Padded(child: _SavingsRateCard(insights: insights, noun: noun)),
+        _Padded(child: _PaceCard(insights: insights, noun: noun)),
+        _Padded(child: _MoversCard(insights: insights, noun: noun)),
+        _Padded(child: _TopExpensesCard(insights: insights)),
+      ],
+    );
+  }
+}
+
+class _Padded extends StatelessWidget {
+  const _Padded({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+    child: child,
+  );
+}
+
+/// `week` / `month` / `year`, straight off the response so the copy always
+/// names the window the numbers actually came from.
+String _nounOf(String period) => switch (period) {
+  'week' => 'week',
+  'year' => 'year',
+  'month' => 'month',
+  _ => 'period',
+};
+
+/// True once there is something to compare against. Every "vs last …" phrase
+/// on this screen is gated on it.
+bool _hasBaseline(Insights insights) =>
+    insights.expense.previous != 0 ||
+    insights.income.previous != 0 ||
+    insights.net.previous != 0;
+
+// ── highlights ─────────────────────────────────────────────────────────────
+
+class _Highlight {
+  const _Highlight(this.icon, this.color, this.text);
+
+  final IconData icon;
+  final Color color;
+  final String text;
+}
+
+/// Up to three plain-English sentences about the period, in the web's order:
+/// what you spent, what rose the most, where the period is heading.
+class _HighlightsCard extends StatelessWidget {
+  const _HighlightsCard({required this.insights, required this.noun});
+
+  final Insights insights;
+  final String noun;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final rows = _build(c);
+    final firstPeriod = !_hasBaseline(insights);
+
+    if (rows.isEmpty && !firstPeriod) return const SizedBox.shrink();
+
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Color.alphaBlend(c.primary.withValues(alpha: 0.10), c.card),
+          Color.alphaBlend(c.income.withValues(alpha: 0.05), c.card),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0) const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 1),
+                  child: Icon(rows[i].icon, size: 16, color: rows[i].color),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    rows[i].text,
+                    style: const TextStyle(fontSize: 13.5, height: 1.35),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (firstPeriod) ...[
+            if (rows.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Divider(height: 1, color: c.border),
+              const SizedBox(height: 12),
+            ],
+            Text(
+              'This is your first $noun with data — the comparisons fill in '
+              'once there is a $noun to compare against.',
+              style: TextStyle(
+                fontSize: 12.5,
+                height: 1.35,
+                color: c.mutedForeground,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  List<_Highlight> _build(AppColors c) {
+    final rows = <_Highlight>[];
+    final expense = insights.expense;
+
+    // 1 — always a spend line. With no baseline it simply states the amount;
+    // there is no percentage to quote and none is invented.
+    if (expense.pct == null) {
+      rows.add(
+        _Highlight(
+          LucideIcons.sparkles,
+          c.primary,
+          "You've spent ${Money.format(expense.current)} this $noun.",
+        ),
+      );
+    } else {
+      final up = expense.delta > 0;
+      rows.add(
+        _Highlight(
+          up ? LucideIcons.trendingUp : LucideIcons.trendingDown,
+          up ? c.expense : c.income,
+          "You've spent ${Money.format(expense.current)} this $noun — "
+          '${Money.percent(expense.pct!.abs(), alreadyScaled: true)} '
+          '${up ? 'more' : 'less'} than last $noun.',
+        ),
+      );
+    }
+
+    // 2 — the biggest riser, if anything rose.
+    final riser = insights.topRiser;
+    if (riser != null) {
+      rows.add(
+        _Highlight(
+          LucideIcons.lightbulb,
+          c.primary,
+          riser.pct == null
+              // "rose the most" reads oddly against a category that did not
+              // exist last period, so a category with no history says so.
+              ? '${riser.name} is new this $noun — '
+                    '${Money.format(riser.delta)}.'
+              : '${riser.name} rose the most — up '
+                    '${Money.format(riser.delta)} '
+                    '(${Money.percent(riser.pct!.abs(), alreadyScaled: true)}) '
+                    'versus last $noun.',
+        ),
+      );
+    }
+
+    // 3 — where the period lands if nothing changes.
+    if (insights.pace.isCurrent && insights.pace.projected > 0) {
+      rows.add(
+        _Highlight(
+          LucideIcons.gauge,
+          c.primary,
+          "At this rate, you'll spend about "
+          '${Money.format(insights.pace.projected)} by the end of the $noun.',
+        ),
+      );
+    }
+
+    return rows.length > 3 ? rows.sublist(0, 3) : rows;
+  }
+}
+
+// ── compare cards ──────────────────────────────────────────────────────────
+
+/// One metric, this period against the last. The value itself is never
+/// colour-coded — a negative Net renders in plain foreground, as on the web;
+/// only the pill carries the good/bad signal.
+class _CompareCard extends StatelessWidget {
+  const _CompareCard({
+    required this.label,
+    required this.metric,
+    required this.noun,
+    required this.noBaselineNote,
+    required this.goodWhenUp,
+  });
+
+  final String label;
+  final Delta metric;
+  final String noun;
+
+  /// What the line beside the pill says when there is nothing to compare
+  /// against — "nothing spent last month" instead of a dead "Last month: ₹0".
+  final String noBaselineNote;
+  final bool goodWhenUp;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final hasBaseline = metric.previous != 0;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(fontSize: 13, color: c.mutedForeground),
+          ),
+          const SizedBox(height: 4),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: MoneyText(
+              metric.current,
+              style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w700),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _DeltaPill(metric: metric, goodWhenUp: goodWhenUp),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  hasBaseline ? 'vs last $noun' : noBaselineNote,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, color: c.mutedForeground),
+                ),
+              ),
+            ],
+          ),
+          if (hasBaseline) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Text(
+                  'Last $noun: ',
+                  style: TextStyle(fontSize: 12, color: c.mutedForeground),
+                ),
+                Flexible(
+                  child: MoneyText(
+                    metric.previous,
+                    tone: MoneyTone.muted,
+                    compactAbove: Money.crore,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The delta chip. Three states, and only one of them shows a percentage:
+///
+/// * `delta == 0`      → a muted "No change".
+/// * `pct == null`     → the compact **amount** ("↗ ₹13K"). This is the branch
+///   the owner's account takes on every metric right now.
+/// * otherwise         → "↗ 12%".
+class _DeltaPill extends StatelessWidget {
+  const _DeltaPill({required this.metric, required this.goodWhenUp});
+
+  final Delta metric;
+  final bool goodWhenUp;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final flat = metric.delta == 0;
+    final up = metric.delta > 0;
+    final good = up == goodWhenUp;
+    final accent = flat
+        ? c.mutedForeground
+        : (good ? c.income : c.expense);
+
+    final pct = metric.pct;
+    final text = flat
+        ? 'No change'
+        : (pct == null
+              // maximumFractionDigits 0, the way the web compacts this one
+              // value — "₹13K", not "₹13.31K".
+              ? Money.compact(metric.delta.abs(), decimals: 0)
+              : Money.percent(pct.abs(), alreadyScaled: true));
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: flat ? c.secondary : accent.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            flat
+                ? LucideIcons.minus
+                : (up ? LucideIcons.arrowUpRight : LucideIcons.arrowDownRight),
+            size: 13,
+            color: accent,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: accent,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── savings rate ───────────────────────────────────────────────────────────
+
+/// `savingsRate: {current, previous}` — both null whenever the period had no
+/// income, which is this account's state today.
+///
+/// A deliberate mobile addition: the web parses this block on /insights and
+/// renders it nowhere (its Reports screen computes its own rate from
+/// `/reports/summary` instead). Showing the server's own figure here costs
+/// nothing and is one fewer number the two screens can disagree about.
+class _SavingsRateCard extends StatelessWidget {
+  const _SavingsRateCard({required this.insights, required this.noun});
+
+  final Insights insights;
+  final String noun;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final current = insights.savingsRateCurrent;
+    final previous = insights.savingsRatePrevious;
+
+    final subtitle = current == null
+        ? 'No income this $noun — a savings rate needs income to divide by.'
+        : (previous == null
+              ? 'No income last $noun, so there is nothing to compare with yet.'
+              : 'Last $noun: '
+                    '${Money.percent(previous, alreadyScaled: true)}');
+
+    return StatCard(
+      label: 'Savings rate',
+      icon: LucideIcons.percent,
+      accent: current == null || current < 0 ? c.mutedForeground : c.income,
+      // Money.percent renders an em dash for null, which is exactly what the
+      // web prints for an absent rate.
+      valueText: Money.percent(current, alreadyScaled: true),
+      subtitle: subtitle,
+    );
+  }
+}
+
+// ── pace ───────────────────────────────────────────────────────────────────
+
+/// How fast the period is being spent. The web lays this out as a three-up
+/// grid that collapses to one column on mobile; one column it is, as
+/// label-left / value-right rows.
+class _PaceCard extends StatelessWidget {
+  const _PaceCard({required this.insights, required this.noun});
+
+  final Insights insights;
+  final String noun;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final pace = insights.pace;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(
+            title: 'Spending pace',
+            leading: Icon(
+              LucideIcons.gauge,
+              size: 17,
+              color: c.mutedForeground,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _PaceStat(
+            label: 'Spent so far',
+            value: insights.expense.current,
+          ),
+          _PaceStat(
+            // avgPerDay comes back unrounded (554.6666…); the web rounds this
+            // one to whole rupees while the Reports screen's own average keeps
+            // its paise. Same number, two deliberate roundings.
+            label: 'Avg per day',
+            value: pace.avgPerDay.round(),
+          ),
+          _PaceStat(
+            label: pace.isCurrent
+                ? 'Projected this $noun'
+                : 'Total this $noun',
+            value: pace.projected,
+            tone: MoneyTone.expense,
+          ),
+          if (pace.isCurrent && pace.daysInPeriod > 0) ...[
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Day ${pace.daysElapsed} of ${pace.daysInPeriod}',
+                    style: TextStyle(fontSize: 12, color: c.mutedForeground),
+                  ),
+                ),
+                Text(
+                  '${pace.percentElapsed}%',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: c.mutedForeground,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                // Determinate, always — an indeterminate bar here would spin
+                // forever and take every widget test's `pumpAndSettle` with it.
+                value: pace.progress,
+                minHeight: 8,
+                backgroundColor: c.secondary,
+                valueColor: AlwaysStoppedAnimation<Color>(c.primary),
+              ),
+            ),
+          ],
+          // Only says something when there is a previous period to be ahead
+          // of. previousToDate == 0 hides it entirely rather than reporting an
+          // infinite percentage.
+          if (pace.previousToDate > 0) ...[
+            const SizedBox(height: 14),
+            _PaceComparison(
+              spent: insights.expense.current,
+              previousToDate: pace.previousToDate,
+              noun: noun,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PaceStat extends StatelessWidget {
+  const _PaceStat({
+    required this.label,
+    required this.value,
+    this.tone = MoneyTone.neutral,
+  });
+
+  final String label;
+  final num value;
+  final MoneyTone tone;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(fontSize: 13, color: c.mutedForeground),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: MoneyText(
+                value,
+                tone: tone,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PaceComparison extends StatelessWidget {
+  const _PaceComparison({
+    required this.spent,
+    required this.previousToDate,
+    required this.noun,
+  });
+
+  final num spent;
+  final num previousToDate;
+  final String noun;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final diff = spent - previousToDate;
+    final pct = (diff / previousToDate * 100).round().abs();
+
+    final (IconData icon, Color color, String text) = switch (diff) {
+      > 0 => (
+        LucideIcons.trendingUp,
+        c.expense,
+        '$pct% faster than last $noun at this point',
+      ),
+      < 0 => (
+        LucideIcons.trendingDown,
+        c.income,
+        '$pct% slower than last $noun at this point',
+      ),
+      _ => (
+        LucideIcons.minus,
+        c.mutedForeground,
+        "Right on last $noun's pace",
+      ),
+    };
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 1),
+          child: Icon(icon, size: 15, color: color),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 13, height: 1.3),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── movers ─────────────────────────────────────────────────────────────────
+
+/// "What changed" — the categories that moved most, each with a diverging bar
+/// pinned to a shared centre line.
+class _MoversCard extends ConsumerWidget {
+  const _MoversCard({required this.insights, required this.noun});
+
+  final Insights insights;
+  final String noun;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
+    final movers = insights.movers;
+    // Floored at 1 so a list of nothing-but-zeros cannot divide by zero.
+    final maxAbs = movers.fold<num>(
+      1,
+      (acc, m) => m.delta.abs() > acc ? m.delta.abs() : acc,
+    );
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(
+            title: 'What changed',
+            subtitle: 'Biggest shifts vs last $noun',
+            leading: Icon(
+              LucideIcons.trendingUp,
+              size: 17,
+              color: c.mutedForeground,
+            ),
+          ),
+          if (movers.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Center(
+                child: Text(
+                  'No category changes to show.',
+                  style: TextStyle(fontSize: 13.5, color: c.mutedForeground),
+                ),
+              ),
+            )
+          else ...[
+            const SizedBox(height: 6),
+            for (final mover in movers)
+              _MoverRow(
+                mover: mover,
+                maxAbsDelta: maxAbs,
+                onTap: () => _openTransactions(
+                  context,
+                  ref,
+                  from: insights.currentStart,
+                  to: insights.currentEnd,
+                  type: TransactionType.expense,
+                  categoryId: mover.categoryId,
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MoverRow extends StatelessWidget {
+  const _MoverRow({
+    required this.mover,
+    required this.maxAbsDelta,
+    required this.onTap,
+  });
+
+  final Mover mover;
+  final num maxAbsDelta;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final up = mover.delta > 0;
+    final accent = up ? c.expense : c.income;
+    final sign = up ? '+' : Money.minus;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CategoryAvatar(
+                  icon: mover.icon,
+                  colorHex: mover.color,
+                  size: 30,
+                  fallbackColor: c.mutedForeground,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    mover.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Sign is stated explicitly: the delta is an absolute figure
+                // and "₹13,312" alone would not say which way it went.
+                Text(
+                  '$sign${Money.compact(mover.delta.abs(), decimals: 0)}',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: accent,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 46,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      // pct is null when this category had nothing last
+                      // period. "New" is what that means, and it is what the
+                      // web prints.
+                      mover.pct == null
+                          ? 'New'
+                          : '$sign'
+                                '${Money.percent(mover.pct!.abs(), alreadyScaled: true)}',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: c.mutedForeground,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 7),
+            Padding(
+              padding: const EdgeInsets.only(left: 40),
+              child: _DivergingBar(
+                delta: mover.delta,
+                maxAbsDelta: maxAbsDelta,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A track with a centre tick: increases grow right in expense red, decreases
+/// grow left in income green, both scaled against the largest mover.
+class _DivergingBar extends StatelessWidget {
+  const _DivergingBar({required this.delta, required this.maxAbsDelta});
+
+  final num delta;
+  final num maxAbsDelta;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final half = width / 2;
+        final ceiling = maxAbsDelta <= 0 ? 1 : maxAbsDelta;
+        final extent =
+            (delta.abs() / ceiling).clamp(0.0, 1.0).toDouble() * half;
+        final left = delta > 0 ? half : half - extent;
+
+        return SizedBox(
+          height: 6,
+          width: width,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: c.secondary,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: half - 0.5,
+                top: 0,
+                bottom: 0,
+                width: 1,
+                child: ColoredBox(color: c.border),
+              ),
+              if (extent > 0)
+                Positioned(
+                  left: left,
+                  top: 0,
+                  bottom: 0,
+                  width: extent,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: delta > 0 ? c.expense : c.income,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ── biggest expenses ───────────────────────────────────────────────────────
+
+/// The largest single transactions in the window. Not tappable — the rows
+/// carry a category *stub* with no id, so there is nothing to navigate to.
+class _TopExpensesCard extends StatelessWidget {
+  const _TopExpensesCard({required this.insights});
+
+  final Insights insights;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final rows = insights.topExpenses;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(
+            title: 'Biggest expenses',
+            subtitle: 'Your largest single transactions this period',
+            leading: Icon(
+              LucideIcons.receipt,
+              size: 17,
+              color: c.mutedForeground,
+            ),
+          ),
+          if (rows.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Center(
+                child: Text(
+                  'No expenses in this period.',
+                  style: TextStyle(fontSize: 13.5, color: c.mutedForeground),
+                ),
+              ),
+            )
+          else ...[
+            const SizedBox(height: 4),
+            for (var i = 0; i < rows.length; i++) ...[
+              if (i > 0) Divider(height: 1, color: c.border),
+              _TopExpenseRow(expense: rows[i]),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _TopExpenseRow extends StatelessWidget {
+  const _TopExpenseRow({required this.expense});
+
+  final TopExpense expense;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final category = expense.category;
+    final date = expense.date;
+    final subtitle = [
+      category?.name.isNotEmpty == true ? category!.name : 'Uncategorized',
+      if (date != null) DateX.shortDay(date),
+    ].join(' · ');
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          CategoryAvatar(
+            icon: category?.icon,
+            colorHex: category?.color,
+            size: 32,
+            fallbackColor: c.mutedForeground,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  expense.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, color: c.mutedForeground),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          MoneyText(
+            expense.amount,
+            tone: MoneyTone.expense,
+            compactAbove: Money.crore,
+            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── drill-through ──────────────────────────────────────────────────────────
+
+/// Opens the ledger filtered the way the web filters it.
+///
+/// The window comes from the server's own `current.start` / `current.end`, not
+/// from this screen's client-side range, so the list can never disagree with
+/// the figure that was tapped.
+///
+/// One honest limitation: the Transactions screen re-stamps its month over the
+/// query on mount, so the window it actually opens on is the calendar month
+/// containing [from]. For the default Month period that is exactly the
+/// insights window; for Week or Year it is wider or narrower, and that screen's
+/// own month header states which. The category and type filters always survive.
+void _openTransactions(
+  BuildContext context,
+  WidgetRef ref, {
+  DateTime? from,
+  DateTime? to,
+  TransactionType? type,
+  String? categoryId,
+}) {
+  final start = from ?? DateTime.now();
+  ref.read(transactionsMonthProvider.notifier).state = DateTime(
+    start.year,
+    start.month,
+  );
+  ref.read(transactionQueryProvider.notifier).state = TransactionQuery(
+    from: from,
+    to: to,
+    type: type,
+    categoryId: categoryId,
+  );
+  context.go('/transactions');
+}

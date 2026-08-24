@@ -46,10 +46,12 @@ final dashboardTrendProvider = FutureProvider.autoDispose<List<TrendPoint>>((
   ref,
 ) {
   final range = ref.watch(periodRangeProvider);
-  final bucket = range.kind == PeriodKind.year ? 'month' : 'day';
+  final granularity = range.kind == PeriodKind.year
+      ? TrendGranularity.month
+      : TrendGranularity.day;
   return ref
       .watch(reportsRepositoryProvider)
-      .trend(from: range.start, to: range.end, bucket: bucket);
+      .trend(from: range.start, to: range.end, granularity: granularity);
 });
 
 /// `/reports/by-category` (expenses) — feeds the donut and "Biggest category".

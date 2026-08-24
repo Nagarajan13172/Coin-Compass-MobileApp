@@ -121,3 +121,92 @@ the selected class rather than offering all nine.
 The wrong-typed-value probe only answers "is this key declared?". It cannot
 detect a relationship *between* two accepted keys, so constraints like this one
 have to be read off the web bundle or inferred from the rendered UI.
+
+---
+
+# Phase 5 write contracts (from the deployed web bundle, not probed)
+
+Recovered from `scratchpad/assets/index-BCZVpAqp.js`. Nothing below was probed: every one
+of these endpoints mutates existing state on the owner's live account, and several are
+irreversible, so the rule at the top of this file applies — read the bundle, do not POST.
+
+## The verb is **PUT /settings**, not PATCH
+
+    function lm(){return ne({mutationFn:async e=>(await q.put("/settings",e)).data,onSuccess:oo})}
+
+`patch("/settings` appears **zero** times across all five bundle files. SPEC.md's
+`GET|PATCH /settings` is unverified and contradicted by the deployed client. Whether the
+backend also accepts PATCH is unknown and must not be probed on a live account.
+
+## One concern per request — five bodies, and no whole-object write
+
+| Call | Body | Sent by |
+|---|---|---|
+| `PUT /settings` | name, description | the Wallet card's Save (always both keys together) |
+| `PUT /settings` | baseCurrency | the base-currency select |
+| `PUT /settings` | language | the language select and the top-bar language pill |
+| `PUT /settings` | emailReports | the email-reports switch |
+| `PUT /settings` | theme | the top-bar theme dropdown **only** |
+
+**Never sent by the web — do not add them to a body:** `locale`, `firstDayOfWeek`,
+`monthStartDay`, `currencies`, `pinEnabled`, `wealthLockEnabled`, `_id`, `user`.
+
+`firstDayOfWeek` and `monthStartDay` appear zero times in the bundle: the web has no control
+for either, so their Zod status on write is unknown. This app *reads* both (they size week
+and month windows) and offers no control for them.
+
+`currencies[]` is a server-seeded table — `rateToBase` appears zero times in the bundle and
+there is no add/edit/remove/rate control anywhere in the deployed client. A whole-object PUT
+is the single most dangerous call this app could make: if the handler replaces rather than
+merges, an incomplete body could overwrite it. `AppSettings` therefore has **no** write-body
+builder at all; each body above is built by its own named builder in `SettingsRepository`.
+
+⚠️ PARITY NOTE — theme: the `/settings` theme buttons are device-local on the web (they call
+the zustand setter and send nothing; the help text says "Applies instantly, on this device
+only"). Only the top-bar dropdown persists `{theme}`, and that dropdown is `hidden sm:flex`,
+so a phone-width web session cannot persist the theme at all. `updateTheme` exists here and
+IS a deliberate divergence.
+
+## Locks
+
+| Call | Body | Notes |
+|---|---|---|
+| `POST /settings/pin` | pin | string of 4–8 digits, `/^\d{4,8}$/` |
+| `POST /settings/pin/verify` | pin | response `{ok: bool}` — a wrong PIN is `false`, not an error |
+| `DELETE /settings/pin` | *(none)* | how the PIN lock is turned OFF |
+| `POST /settings/wealth-passcode` | passcode | 4–32 characters, any characters |
+| `DELETE /settings/wealth-passcode` | *(none)* | how the Net Worth lock is turned OFF |
+| `POST /auth/lock-wealth` | *(none)* | returns `{user}` |
+| `POST /auth/unlock-wealth` | passcode | returns `{user}` |
+
+The two DELETEs are absent from SPEC.md and are irreversible from the app's point of view —
+the owner's PIN/passcode is gone.
+
+## Account
+
+| Call | Body |
+|---|---|
+| `POST /auth/change-password` | currentPassword *(omitted entirely when `me.hasPassword` is false)*, newPassword (min 8) |
+| `POST /auth/2fa/setup` | *(none)* — returns `{qrDataUrl, secret}` |
+| `POST /auth/2fa/enable` | code (6 digits) — returns `{backupCodes}` |
+| `POST /auth/2fa/disable` | exactly one of currentPassword **or** code |
+| `POST /auth/2fa/email-fallback` | enabled (bool) |
+| `POST /auth/2fa/backup-codes` | code — returns `{backupCodes}` |
+
+## Notifications — four bodiless mutations, two of them bulk
+
+| Call | Body | Notes |
+|---|---|---|
+| `POST /notifications/:id/read` | *(none)* | **POST, not PATCH** — SPEC.md has the verb wrong |
+| `POST /notifications/read-all` | *(none)* | irreversible; the owner has 6 real unread |
+| `DELETE /notifications/:id` | *(none)* | irreversible |
+| `DELETE /notifications` | *(none)* | "Clear all" — **absent from SPEC.md**, irreversible bulk delete |
+
+## Reads whose params are easy to get wrong
+
+| Call | Note |
+|---|---|
+| `GET /reports/trend` | query param is **`granularity`** (day\|week\|month); the response key is `bucket`. Sending `?bucket=` is ignored and silently returns daily rows. |
+| `GET /reports/insights` | takes **`period`** + **`ref`** (an ISO instant), not from/to. Without `ref` the period pager cannot move. |
+| `GET /export/csv` | returns a **file**, not JSON. `from`/`to` accept full ISO (half-open) or bare `yyyy-MM-dd` (whole-day inclusive). Filename: `coincompass-transactions-{today}-{baseCurrency}.csv`. |
+| `POST /reports/email-now?kind=midmonth` | POST with the kind in the **query string** and no body — SPEC.md says GET. Sends the owner a real email; on the never-call list. |
