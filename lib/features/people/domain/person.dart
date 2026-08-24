@@ -1,29 +1,52 @@
 import '../../../core/api/json.dart';
 
+/// `people.relation` — the only field besides `name` the write schema declares.
+/// See docs/WRITE_SCHEMAS.md. Follows the `fromApi` / `api` / `label` shape of
+/// lib/core/api/enums.dart; it lives here rather than there because this
+/// vocabulary belongs to a single feature.
+enum PersonRelation {
+  family('family'),
+  friend('friend'),
+  colleague('colleague'),
+  other('other');
+
+  const PersonRelation(this.api);
+  final String api;
+
+  /// Tolerant like every other `fromApi`: an unknown value falls back to the
+  /// server's own default rather than throwing.
+  static PersonRelation fromApi(String? value) => PersonRelation.values
+      .firstWhere((e) => e.api == value, orElse: () => PersonRelation.other);
+
+  String get label => switch (this) {
+    PersonRelation.family => 'Family',
+    PersonRelation.friend => 'Friend',
+    PersonRelation.colleague => 'Colleague',
+    PersonRelation.other => 'Other',
+  };
+}
+
+/// Someone in the address book.
+///
+/// `POST /people` accepts `name` and `relation` and nothing else — every other
+/// key is stripped by the server's Zod schema without an error, so no other
+/// writable field is modelled here. `key` is a server-computed slug.
 class Person {
   const Person({
     required this.id,
     required this.name,
-    this.phone,
-    this.email,
-    this.note,
-    this.groupId,
-    this.avatarColor,
-    this.balance,
+    this.key,
+    this.relation = PersonRelation.other,
     this.createdAt,
     this.updatedAt,
   });
 
   final String id;
   final String name;
-  final String? phone;
-  final String? email;
-  final String? note;
-  final String? groupId;
-  final String? avatarColor;
 
-  /// Net position with this person when the server computes it.
-  final num? balance;
+  /// Server-computed slug (`"Karthik"` -> `"karthik"`). Read-only.
+  final String? key;
+  final PersonRelation relation;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -40,32 +63,25 @@ class Person {
   factory Person.fromJson(Map<String, dynamic> json) => Person(
     id: J.id(json['_id']),
     name: J.str(json['name']),
-    phone: J.strOrNull(json['phone']),
-    email: J.strOrNull(json['email']),
-    note: J.strOrNull(json['note']),
-    groupId: J.refId(json['group']),
-    avatarColor: J.strOrNull(json['color']),
-    balance: J.numberOrNull(json['balance']),
+    key: J.strOrNull(json['key']),
+    relation: PersonRelation.fromApi(J.strOrNull(json['relation'])),
     createdAt: J.date(json['createdAt']),
     updatedAt: J.date(json['updatedAt']),
   );
 
+  /// The complete accepted body for `POST`/`PATCH /people`.
   Map<String, dynamic> toWriteJson() => {
     'name': name,
-    if (phone != null) 'phone': phone,
-    if (email != null) 'email': email,
-    if (note != null) 'note': note,
-    if (groupId != null) 'group': groupId,
-    if (avatarColor != null) 'color': avatarColor,
+    'relation': relation.api,
   };
 }
 
+/// A household, a trip, a team. `POST /people/groups` accepts `name` and
+/// `members` only.
 class PersonGroup {
   const PersonGroup({
     required this.id,
     required this.name,
-    this.note,
-    this.color,
     this.memberIds = const [],
     this.memberCount,
     this.createdAt,
@@ -74,8 +90,6 @@ class PersonGroup {
 
   final String id;
   final String name;
-  final String? note;
-  final String? color;
   final List<String> memberIds;
   final int? memberCount;
   final DateTime? createdAt;
@@ -86,8 +100,6 @@ class PersonGroup {
     return PersonGroup(
       id: J.id(json['_id']),
       name: J.str(json['name']),
-      note: J.strOrNull(json['note']),
-      color: J.strOrNull(json['color']),
       memberIds: raw is List
           ? raw.map(J.refId).whereType<String>().toList()
           : const [],
@@ -97,10 +109,9 @@ class PersonGroup {
     );
   }
 
+  /// The complete accepted body for `POST`/`PATCH /people/groups`.
   Map<String, dynamic> toWriteJson() => {
     'name': name,
-    if (note != null) 'note': note,
-    if (color != null) 'color': color,
     if (memberIds.isNotEmpty) 'members': memberIds,
   };
 }

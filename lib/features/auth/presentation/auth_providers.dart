@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_exception.dart';
@@ -23,14 +23,21 @@ class AuthState {
     this.user,
     this.busy = false,
     this.error,
-    this.twoFactorEmailFallback = false,
+    this.twoFactorMethods = const ['totp'],
   });
 
   final AuthStatus status;
   final AppUser? user;
   final bool busy;
   final ApiException? error;
-  final bool twoFactorEmailFallback;
+
+  /// Factors the server will accept for the pending 2FA challenge, straight
+  /// from the sign-in response's `methods`. Only meaningful while
+  /// [status] is [AuthStatus.needsTwoFactor].
+  final List<String> twoFactorMethods;
+
+  /// The pending challenge offers an emailed one-time code.
+  bool get twoFactorEmailFallback => twoFactorMethods.contains('email');
 
   bool get isSignedIn => status == AuthStatus.signedIn && user != null;
   bool get isResolved =>
@@ -43,15 +50,14 @@ class AuthState {
     bool? busy,
     ApiException? error,
     bool clearError = false,
-    bool? twoFactorEmailFallback,
+    List<String>? twoFactorMethods,
   }) {
     return AuthState(
       status: status ?? this.status,
       user: clearUser ? null : (user ?? this.user),
       busy: busy ?? this.busy,
       error: clearError ? null : (error ?? this.error),
-      twoFactorEmailFallback:
-          twoFactorEmailFallback ?? this.twoFactorEmailFallback,
+      twoFactorMethods: twoFactorMethods ?? this.twoFactorMethods,
     );
   }
 }
@@ -95,11 +101,11 @@ class AuthController extends StateNotifier<AuthState> {
             busy: false,
           );
           return true;
-        case SignInNeedsTwoFactor(emailFallback: final fallback):
+        case SignInNeedsTwoFactor(methods: final methods):
           state = state.copyWith(
             status: AuthStatus.needsTwoFactor,
             busy: false,
-            twoFactorEmailFallback: fallback,
+            twoFactorMethods: methods,
           );
           return false;
       }
@@ -133,12 +139,14 @@ class AuthController extends StateNotifier<AuthState> {
     }
   }
 
-  Future<bool> verifyTwoFactor(String code, {bool backupCode = false}) async {
+  /// [method] is one of `totp`, `backup` or `email` — the factor the code
+  /// came from. The server picks which secret to check from it.
+  Future<bool> verifyTwoFactor(String code, {String method = 'totp'}) async {
     state = state.copyWith(busy: true, clearError: true);
     try {
       final user = await _repository.verifyTwoFactor(
         code: code,
-        backupCode: backupCode,
+        method: method,
       );
       state = state.copyWith(
         status: AuthStatus.signedIn,
@@ -178,6 +186,29 @@ final authControllerProvider = StateNotifierProvider<AuthController, AuthState>(
     return AuthController(ref.watch(authRepositoryProvider));
   },
 );
+
+/// Drops the shared [AuthState.error] when an auth screen is mounted.
+///
+/// [AuthState] is app-scoped, so a failure raised on one auth screen would
+/// otherwise still be rendered by the next one the user opens (a blank sign-up
+/// form showing "invalid credentials" from the login screen behind it). Screens
+/// mix this in and also call [clearAuthError] on the way *out*, which covers
+/// popping back to a screen that never unmounted.
+mixin AuthErrorReset<T extends ConsumerStatefulWidget> on ConsumerState<T> {
+  @override
+  void initState() {
+    super.initState();
+    // Post-frame: mutating a watched notifier during the first build throws
+    // "Tried to modify a provider while the widget tree was building".
+    WidgetsBinding.instance.addPostFrameCallback((_) => clearAuthError());
+  }
+
+  /// Safe to call from a navigation callback or after an await.
+  void clearAuthError() {
+    if (!mounted) return;
+    ref.read(authControllerProvider.notifier).clearError();
+  }
+}
 
 /// Convenience for widgets that only need the user.
 final currentUserProvider = Provider<AppUser?>(

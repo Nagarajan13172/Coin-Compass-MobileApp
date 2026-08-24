@@ -1,17 +1,22 @@
 import '../../../core/api/json.dart';
 
+/// A bill shared with other people.
+///
+/// The write keys here are exactly the ones `POST /splits` declares — see
+/// `docs/WRITE_SCHEMAS.md`. `group`, `currency` and `settled` are not among
+/// them: the server strips them without an error, so the model does not carry
+/// them and the form does not offer them.
 class Split {
   const Split({
     required this.id,
     required this.description,
     required this.totalAmount,
     required this.yourShare,
-    this.groupId,
     this.participantIds = const [],
     this.date,
-    this.settled = false,
     this.note,
-    this.currency = 'INR',
+    this.categoryId,
+    this.accountId,
     this.createdAt,
     this.updatedAt,
   });
@@ -20,12 +25,16 @@ class Split {
   final String description;
   final num totalAmount;
   final num yourShare;
-  final String? groupId;
   final List<String> participantIds;
   final DateTime? date;
-  final bool settled;
   final String? note;
-  final String currency;
+
+  /// References arrive as either an id string or a populated object; only the
+  /// id is kept — the pickers resolve it against the categories / accounts
+  /// lists they already load.
+  final String? categoryId;
+  final String? accountId;
+
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -39,14 +48,13 @@ class Split {
       description: J.str(json['description']),
       totalAmount: J.number(json['totalAmount']),
       yourShare: J.number(json['yourShare']),
-      groupId: J.refId(json['group']),
       participantIds: raw is List
           ? raw.map(J.refId).whereType<String>().toList()
           : const [],
       date: J.date(json['date']),
-      settled: J.boolean(json['settled']),
       note: J.strOrNull(json['note']),
-      currency: J.str(json['currency'], 'INR'),
+      categoryId: J.refId(json['category']),
+      accountId: J.refId(json['account']),
       createdAt: J.date(json['createdAt']),
       updatedAt: J.date(json['updatedAt']),
     );
@@ -56,10 +64,10 @@ class Split {
     'description': description,
     'totalAmount': totalAmount,
     'yourShare': yourShare,
-    if (groupId != null) 'group': groupId,
     if (participantIds.isNotEmpty) 'participants': participantIds,
     if (date != null) 'date': date!.toUtc().toIso8601String(),
     if (note != null) 'note': note,
-    'currency': currency,
+    if (categoryId != null) 'category': categoryId,
+    if (accountId != null) 'account': accountId,
   };
 }

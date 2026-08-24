@@ -6,6 +6,10 @@ class Money {
   const Money._();
 
   static const String rupee = '₹';
+
+  /// 1,00,00,000 — the point past which a full figure stops fitting in a
+  /// dense row. See `MoneyText.compactAbove`.
+  static const num crore = 10000000;
   static const String minus = '−'; // real minus sign, matches the web app
 
   static final NumberFormat _whole = NumberFormat.decimalPattern('en_IN')

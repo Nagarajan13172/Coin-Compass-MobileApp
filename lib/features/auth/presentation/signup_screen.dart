@@ -17,7 +17,8 @@ class SignupScreen extends ConsumerStatefulWidget {
   ConsumerState<SignupScreen> createState() => _SignupScreenState();
 }
 
-class _SignupScreenState extends ConsumerState<SignupScreen> {
+class _SignupScreenState extends ConsumerState<SignupScreen>
+    with AuthErrorReset {
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
@@ -58,7 +59,12 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     return AuthScaffold(
       title: 'Create your account',
       subtitle: 'Start tracking your money',
-      onBack: () => context.pop(),
+      onBack: () {
+        // Popping back to a screen that never unmounted, so clear the shared
+        // auth error here rather than relying on the other screen's initState.
+        clearAuthError();
+        context.pop();
+      },
       child: AppCard(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -115,15 +121,21 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               onPressed: _submit,
             ),
             const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            // Wrap, not Row: at large system font scales the prompt and the
+            // link no longer fit on one 280dp line, and a Row would overflow.
+            Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Text(
                   'Already have an account? ',
                   style: TextStyle(fontSize: 14, color: c.mutedForeground),
                 ),
                 GestureDetector(
-                  onTap: () => context.go('/login'),
+                  onTap: () {
+                    clearAuthError();
+                    context.go('/login');
+                  },
                   child: Text(
                     'Sign in',
                     style: TextStyle(

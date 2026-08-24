@@ -58,19 +58,25 @@ class Category {
 }
 
 /// Human labels for the 14 `group` values the API seeds.
+///
+/// Both the wording and the *declaration order* are load-bearing: this is the
+/// only label source in the app, and its key order drives the section order on
+/// the Categories screen, the category picker and the spending donut's Groups
+/// mode. Keep it identical to the web dictionary — expense groups in seed order
+/// 1-10, then income in seed order (earnings, returns, inflows), then `other`.
 const Map<String, String> categoryGroupLabels = {
   'food': 'Food',
   'transport': 'Transport',
   'home': 'Home',
-  'bills': 'Bills',
+  'bills': 'Bills & Subscriptions',
   'health': 'Health',
   'education': 'Education',
   'lifestyle': 'Lifestyle',
   'family_giving': 'Family & Giving',
-  'savings': 'Savings',
-  'debt_transfers': 'Debt & Transfers',
+  'savings': 'Savings & Deposits',
+  'debt_transfers': 'Loans & Transfers',
   'earnings': 'Earnings',
-  'inflows': 'Inflows',
-  'returns': 'Returns',
+  'returns': 'Returns & Interest',
+  'inflows': 'Other Inflows',
   'other': 'Other',
 };

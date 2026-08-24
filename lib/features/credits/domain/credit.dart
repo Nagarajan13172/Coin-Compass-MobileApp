@@ -2,6 +2,12 @@ import '../../../core/api/enums.dart';
 import '../../../core/api/json.dart';
 import '../../people/domain/person.dart';
 
+/// One entry in the lending ledger.
+///
+/// The write keys here are exactly the ones `POST /credits` declares —
+/// see `docs/WRITE_SCHEMAS.md`. `dueDate`, `currency`, `settled` and
+/// `settledAt` are not among them: the server strips them without an error,
+/// so the model does not carry them and the form does not offer them.
 class Credit {
   const Credit({
     required this.id,
@@ -12,11 +18,9 @@ class Credit {
     this.personName,
     this.note,
     this.date,
-    this.dueDate,
-    this.settled = false,
-    this.settledAt,
+    this.accountId,
+    this.categoryId,
     this.outstanding,
-    this.currency = 'INR',
     this.createdAt,
     this.updatedAt,
   });
@@ -31,18 +35,19 @@ class Credit {
   final String? personName;
   final String? note;
   final DateTime? date;
-  final DateTime? dueDate;
-  final bool settled;
-  final DateTime? settledAt;
+
+  /// References arrive as either an id string or a populated object; only the
+  /// id is kept — the pickers resolve it against the accounts / categories
+  /// lists they already load.
+  final String? accountId;
+  final String? categoryId;
+
   final num? outstanding;
-  final String currency;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
   String get displayName => person?.name ?? personName ?? 'Unknown';
   num get outstandingOrAmount => outstanding ?? amount;
-  bool get isOverdue =>
-      !settled && dueDate != null && dueDate!.isBefore(DateTime.now());
 
   factory Credit.fromJson(Map<String, dynamic> json) {
     final personObject = J.refObject(json['person']);
@@ -55,11 +60,9 @@ class Credit {
       personName: personObject == null ? J.strOrNull(json['person']) : null,
       note: J.strOrNull(json['note']),
       date: J.date(json['date']),
-      dueDate: J.date(json['dueDate']),
-      settled: J.boolean(json['settled']),
-      settledAt: J.date(json['settledAt']),
+      accountId: J.refId(json['account']),
+      categoryId: J.refId(json['category']),
       outstanding: J.numberOrNull(json['outstanding']),
-      currency: J.str(json['currency'], 'INR'),
       createdAt: J.date(json['createdAt']),
       updatedAt: J.date(json['updatedAt']),
     );
@@ -71,8 +74,8 @@ class Credit {
     'amount': amount,
     if (note != null) 'note': note,
     if (date != null) 'date': date!.toUtc().toIso8601String(),
-    if (dueDate != null) 'dueDate': dueDate!.toUtc().toIso8601String(),
-    'currency': currency,
+    if (accountId != null) 'account': accountId,
+    if (categoryId != null) 'category': categoryId,
   };
 }
 
@@ -92,6 +95,12 @@ class CreditsSummary {
   final num repaid;
   final num net;
 
+  /// What is still owed to you: what you gave out, less what came back.
+  num get owedToYou => given - received;
+
+  /// What you still owe: what you borrowed, less what you have repaid.
+  num get youOwe => borrowed - repaid;
+
   factory CreditsSummary.fromJson(Map<String, dynamic> json) => CreditsSummary(
     given: J.number(json['given']),
     received: J.number(json['received']),
@@ -99,4 +108,37 @@ class CreditsSummary {
     repaid: J.number(json['repaid']),
     net: J.number(json['net']),
   );
+
+  /// Client-side totals, used when `/credits/summary` sends nothing usable —
+  /// on an account with no credits it answers with an empty array. Every entry
+  /// counts: the API has no settled flag, so a closed loan is recorded as the
+  /// matching `received` / `repaid` entry, which nets the original out.
+  factory CreditsSummary.fromCredits(List<Credit> credits) {
+    num given = 0;
+    num received = 0;
+    num borrowed = 0;
+    num repaid = 0;
+
+    for (final credit in credits) {
+      final amount = credit.outstandingOrAmount;
+      switch (credit.direction) {
+        case CreditDirection.given:
+          given += amount;
+        case CreditDirection.received:
+          received += amount;
+        case CreditDirection.borrowed:
+          borrowed += amount;
+        case CreditDirection.repaid:
+          repaid += amount;
+      }
+    }
+
+    return CreditsSummary(
+      given: given,
+      received: received,
+      borrowed: borrowed,
+      repaid: repaid,
+      net: (given - received) - (borrowed - repaid),
+    );
+  }
 }

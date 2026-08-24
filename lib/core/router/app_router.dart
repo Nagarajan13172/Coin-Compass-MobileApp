@@ -4,11 +4,22 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../features/_placeholder/placeholder_screen.dart';
+import '../../features/accounts/presentation/accounts_screen.dart';
 import '../../features/auth/presentation/auth_providers.dart';
 import '../../features/auth/presentation/forgot_password_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/signup_screen.dart';
 import '../../features/auth/presentation/two_factor_screen.dart';
+import '../../features/budgets/presentation/budgets_screen.dart';
+import '../../features/calendar/presentation/calendar_screen.dart';
+import '../../features/categories/presentation/categories_screen.dart';
+import '../../features/credits/presentation/credits_screen.dart';
+import '../../features/dashboard/presentation/dashboard_screen.dart';
+import '../../features/goals/presentation/goals_screen.dart';
+import '../../features/people/presentation/people_screen.dart';
+import '../../features/recurring/presentation/recurring_screen.dart';
+import '../../features/splits/presentation/splits_screen.dart';
+import '../../features/transactions/presentation/transactions_screen.dart';
 import '../theme/app_colors.dart';
 import '../widgets/app_scaffold.dart';
 import 'destinations.dart';
@@ -31,45 +42,17 @@ bool _isAuthRoute(String location) =>
 // lands. Everything else (shell, nav, redirects) stays untouched.
 // ─────────────────────────────────────────────────────────────────────────────
 Widget _screenFor(Destination d) => switch (d.path) {
-  // phase 2
-  '/' => PlaceholderScreen(title: d.label, icon: d.icon, phase: 'phase 2'),
-  '/transactions' => PlaceholderScreen(
-    title: d.label,
-    icon: d.icon,
-    phase: 'phase 2',
-  ),
-  '/accounts' => PlaceholderScreen(
-    title: d.label,
-    icon: d.icon,
-    phase: 'phase 2',
-  ),
-  '/categories' => PlaceholderScreen(
-    title: d.label,
-    icon: d.icon,
-    phase: 'phase 2',
-  ),
-  // phase 3
-  '/budgets' => PlaceholderScreen(
-    title: d.label,
-    icon: d.icon,
-    phase: 'phase 3',
-  ),
-  '/goals' => PlaceholderScreen(title: d.label, icon: d.icon, phase: 'phase 3'),
-  '/recurring' => PlaceholderScreen(
-    title: d.label,
-    icon: d.icon,
-    phase: 'phase 3',
-  ),
-  '/calendar' => PlaceholderScreen(
-    title: d.label,
-    icon: d.icon,
-    phase: 'phase 3',
-  ),
-  '/credits' => PlaceholderScreen(
-    title: d.label,
-    icon: d.icon,
-    phase: 'phase 3',
-  ),
+  // phase 2 — shipped
+  '/' => const DashboardScreen(),
+  '/transactions' => const TransactionsScreen(),
+  '/accounts' => const AccountsScreen(),
+  '/categories' => const CategoriesScreen(),
+  // phase 3 — shipped
+  '/budgets' => const BudgetsScreen(),
+  '/goals' => const GoalsScreen(),
+  '/recurring' => const RecurringScreen(),
+  '/calendar' => const CalendarScreen(),
+  '/credits' => const CreditsScreen(),
   // phase 4
   '/net-worth' => PlaceholderScreen(
     title: d.label,
@@ -166,6 +149,17 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           for (final d in appDestinations)
             GoRoute(path: d.path, builder: (_, _) => _screenFor(d)),
+          // Credits' own sub-screens. They live under /credits so the bottom
+          // nav keeps "More" lit, and they are reached from that screen rather
+          // than from the nav — the web app has no separate entry for either.
+          GoRoute(
+            path: '/credits/people',
+            builder: (_, _) => const PeopleScreen(),
+          ),
+          GoRoute(
+            path: '/credits/splits',
+            builder: (_, _) => const SplitsScreen(),
+          ),
         ],
       ),
     ],

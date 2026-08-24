@@ -42,6 +42,8 @@ const Map<String, IconData> _lucideByName = <String, IconData>{
   'wallet': LucideIcons.wallet,
   'compass': LucideIcons.compass,
   'landmark': LucideIcons.landmark,
+  // every AccountType.icon must resolve here — 'smartphone' is UPI's glyph
+  'smartphone': LucideIcons.smartphone,
   'coins': LucideIcons.coins,
   'chart-pie': LucideIcons.chartPie,
   'bell': LucideIcons.bell,

@@ -41,15 +41,36 @@ class AppButton extends StatelessWidget {
           );
 
     final handler = busy ? null : onPressed;
+
+    // The shared theme sets `minimumSize: Size.fromHeight(48)` — an *infinite*
+    // minimum width — so ButtonStyleButton's ConstrainedBox clamps minWidth up
+    // to the parent's maxWidth and an `expand: false` button still fills the
+    // row. Override only the sizing here; colours, shape and textStyle keep
+    // resolving from the theme, because a widget-level style merges per
+    // property over `themeStyleOf`.
+    final compact = expand
+        ? null
+        : const ButtonStyle(
+            minimumSize: WidgetStatePropertyAll(Size(0, 46)),
+            padding: WidgetStatePropertyAll(
+              EdgeInsets.symmetric(horizontal: 18),
+            ),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          );
+
     final button = switch (variant) {
       AppButtonVariant.primary => FilledButton(
         onPressed: handler,
+        style: compact,
         child: child,
       ),
       AppButtonVariant.outlined => OutlinedButton(
         onPressed: handler,
+        style: compact,
         child: child,
       ),
+      // TextButton is left alone: textButtonTheme sets no minimumSize, so it
+      // already hugs its label at its own (smaller) default metrics.
       AppButtonVariant.text => TextButton(onPressed: handler, child: child),
     };
 

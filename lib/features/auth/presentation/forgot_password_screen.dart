@@ -18,7 +18,8 @@ class ForgotPasswordScreen extends ConsumerStatefulWidget {
       _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
+class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen>
+    with AuthErrorReset {
   final _email = TextEditingController();
   bool _sent = false;
 
@@ -47,7 +48,10 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
         icon: LucideIcons.mailCheck,
         title: 'Check your inbox',
         subtitle: 'We sent a reset link to ${_email.text.trim()}',
-        onBack: () => context.pop(),
+        onBack: () {
+          clearAuthError();
+          context.pop();
+        },
         child: AppCard(
           padding: const EdgeInsets.all(20),
           child: Column(
@@ -61,7 +65,10 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
               const SizedBox(height: 20),
               AppButton(
                 label: 'Back to sign in',
-                onPressed: () => context.go('/login'),
+                onPressed: () {
+                  clearAuthError();
+                  context.go('/login');
+                },
               ),
             ],
           ),
@@ -73,7 +80,12 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       icon: LucideIcons.keyRound,
       title: 'Reset your password',
       subtitle: "We'll email you a reset link",
-      onBack: () => context.pop(),
+      onBack: () {
+        // Popping back to a screen that never unmounted, so clear the shared
+        // auth error here rather than relying on the other screen's initState.
+        clearAuthError();
+        context.pop();
+      },
       child: AppCard(
         padding: const EdgeInsets.all(20),
         child: Column(

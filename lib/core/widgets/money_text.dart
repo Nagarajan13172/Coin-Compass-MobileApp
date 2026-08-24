@@ -12,6 +12,7 @@ class MoneyText extends StatelessWidget {
     this.tone = MoneyTone.neutral,
     this.signed = false,
     this.compact = false,
+    this.compactAbove,
     this.style,
     this.symbol = Money.rupee,
   });
@@ -19,7 +20,15 @@ class MoneyText extends StatelessWidget {
   final num amount;
   final MoneyTone tone;
   final bool signed;
+
+  /// Always render as `₹12.35Cr` rather than `₹12,34,56,789`.
   final bool compact;
+
+  /// Render compactly only once the amount reaches this magnitude. Dense rows
+  /// pass [Money.crore]: a nine-figure figure otherwise grows the amount
+  /// column until the label beside it has nothing left to occupy.
+  final num? compactAbove;
+
   final TextStyle? style;
   final String symbol;
 
@@ -34,7 +43,10 @@ class MoneyText extends StatelessWidget {
       MoneyTone.neutral => null,
     };
 
-    final text = compact
+    final threshold = compactAbove;
+    final asCompact =
+        compact || (threshold != null && amount.abs() >= threshold);
+    final text = asCompact
         ? Money.compact(amount, symbol: symbol)
         : Money.format(amount, symbol: symbol, signed: signed);
 

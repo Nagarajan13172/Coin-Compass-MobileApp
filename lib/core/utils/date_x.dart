@@ -42,6 +42,13 @@ class DateX {
 
   static String monthLabel(DateTime d) => _fmt('MMMM yyyy').format(d);
   static String dayLabel(DateTime d) => _fmt('EEEE, dd MMM yyyy').format(d);
+
+  /// `Mon`, `Tue`, … — the calendar's weekday header row.
+  static String weekdayShort(DateTime d) => _fmt('EEE').format(d);
+
+  /// `M`, `T`, … for very tight layouts.
+  static String weekdayNarrow(DateTime d) => _fmt('EEEEE').format(d);
+
   static String shortDay(DateTime d) => _fmt('dd MMM').format(d);
   static String timeLabel(DateTime d) => _fmt('h:mm a').format(d);
 
@@ -88,9 +95,15 @@ extension DateTimeX on DateTime {
     firstDayOfWeek,
   ).add(const Duration(days: 7)).subtract(const Duration(milliseconds: 1));
 
+  /// Steps [months] forward (or backward, for a negative value), clamping the
+  /// day to the target month's length: `31 Jan + 1 month` -> `28 Feb`.
+  ///
+  /// The year carry must be *floor* division, not `~/`: Dart truncates toward
+  /// zero while `%` stays non-negative, so `~/` would leave January - 1 month
+  /// as December of the *same* year instead of the previous one.
   DateTime addMonths(int months) {
     final total = month - 1 + months;
-    final y = year + (total ~/ 12);
+    final y = year + (total - (total % 12)) ~/ 12;
     final m = total % 12 + 1;
     final lastDay = DateTime(y, m + 1, 0).day;
     return DateTime(y, m, day > lastDay ? lastDay : day, hour, minute);

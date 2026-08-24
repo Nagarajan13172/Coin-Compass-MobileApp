@@ -114,12 +114,8 @@ class TransactionQuery {
   TransactionQuery firstPage() => copyWith(page: 1);
 
   /// Keeps only the date window and paging; drops every user-set filter.
-  TransactionQuery clearedFilters() => TransactionQuery(
-    page: 1,
-    limit: limit,
-    from: from,
-    to: to,
-  );
+  TransactionQuery clearedFilters() =>
+      TransactionQuery(page: 1, limit: limit, from: from, to: to);
 
   // Value equality matters: this type is a `.family` key and the list
   // controller compares queries to decide whether to reload.
@@ -179,10 +175,7 @@ class TransactionsRepository {
 
   /// [patch] uses wire field names (`account`, `category`, `toAccount`).
   Future<Transaction> update(String id, Map<String, dynamic> patch) async {
-    final json = await _api.patchJson(
-      Endpoints.transaction(id),
-      body: patch,
-    );
+    final json = await _api.patchJson(Endpoints.transaction(id), body: patch);
     return Transaction.fromJson(_document(json));
   }
 

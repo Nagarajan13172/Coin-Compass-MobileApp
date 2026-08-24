@@ -26,7 +26,10 @@ List<Map<String, dynamic>> asList(Object? v) =>
 
 void main() {
   test('transactions envelope + populated category ref', () {
-    final page = Paginated.fromJson(fixture('transactions'), Transaction.fromJson);
+    final page = Paginated.fromJson(
+      fixture('transactions'),
+      Transaction.fromJson,
+    );
     expect(page.total, 2);
     expect(page.hasMore, isFalse);
     expect(page.items, hasLength(2));
@@ -46,7 +49,9 @@ void main() {
   });
 
   test('transactions summary + balance', () {
-    final s = TransactionSummary.fromJson(asMap(fixture('transactions_summary')));
+    final s = TransactionSummary.fromJson(
+      asMap(fixture('transactions_summary')),
+    );
     expect(s.expense, 13312);
     expect(s.net, -13312);
     expect(s.count, 2);
@@ -88,7 +93,9 @@ void main() {
   });
 
   test('recurring — upcoming projections and cadence', () {
-    final list = asList(fixture('recurring')).map(RecurringRule.fromJson).toList();
+    final list = asList(
+      fixture('recurring'),
+    ).map(RecurringRule.fromJson).toList();
     expect(list, hasLength(2));
     final r = list.first;
     expect(r.frequency, Frequency.monthly);
@@ -112,7 +119,10 @@ void main() {
     expect(s.emailReports, isTrue);
     expect(s.pinEnabled, isFalse);
     expect(s.currencies, hasLength(4));
-    expect(s.currencies.map((c) => c.code), containsAll(['INR', 'USD', 'EUR', 'GBP']));
+    expect(
+      s.currencies.map((c) => c.code),
+      containsAll(['INR', 'USD', 'EUR', 'GBP']),
+    );
     expect(s.currencies.firstWhere((c) => c.code == 'USD').rateToBase, 83);
   });
 
@@ -140,7 +150,9 @@ void main() {
   });
 
   test('net worth history — tolerates rows missing stocksTotal', () {
-    final list = asList(fixture('networth_history')).map(NetWorthPoint.fromJson).toList();
+    final list = asList(
+      fixture('networth_history'),
+    ).map(NetWorthPoint.fromJson).toList();
     expect(list, hasLength(2));
     expect(list.first.stocksTotal, 0); // absent on the older row
     expect(list.last.stocksTotal, 0);
@@ -156,14 +168,18 @@ void main() {
     expect(s.rangeStart, isNotNull);
     expect(s.rangeEnd, isNotNull);
 
-    final slices = asList(fixture('reports_by-category')).map(CategorySlice.fromJson).toList();
+    final slices = asList(
+      fixture('reports_by-category'),
+    ).map(CategorySlice.fromJson).toList();
     expect(slices, hasLength(1));
     expect(slices.first.name, 'Groceries');
     expect(slices.first.percent, 100);
     expect(slices.first.color, '#22C55E');
     expect(slices.first.group, 'food');
 
-    final trend = asList(fixture('reports_trend')).map(TrendPoint.fromJson).toList();
+    final trend = asList(
+      fixture('reports_trend'),
+    ).map(TrendPoint.fromJson).toList();
     expect(trend, hasLength(1));
     expect(trend.first.bucket, '2026-08-04');
     expect(trend.first.expense, 13312);
@@ -207,7 +223,16 @@ void main() {
   });
 
   test('empty-array endpoints parse to empty lists', () {
-    for (final name in ['accounts', 'budgets', 'goals', 'credits', 'holdings', 'templates', 'splits', 'people']) {
+    for (final name in [
+      'accounts',
+      'budgets',
+      'goals',
+      'credits',
+      'holdings',
+      'templates',
+      'splits',
+      'people',
+    ]) {
       final raw = fixture(name);
       expect(raw, isA<List>(), reason: '$name should be a JSON array');
       expect((raw as List), isEmpty, reason: '$name is empty on this account');

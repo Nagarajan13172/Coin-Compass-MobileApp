@@ -62,7 +62,11 @@ class PeriodRange {
   PeriodRange shifted(int steps, {int firstDayOfWeek = 1}) {
     if (steps == 0) return this;
     final anchor = switch (kind) {
-      PeriodKind.week => DateTime(start.year, start.month, start.day + 7 * steps),
+      PeriodKind.week => DateTime(
+        start.year,
+        start.month,
+        start.day + 7 * steps,
+      ),
       PeriodKind.month => DateTime(start.year, start.month + steps, 1),
       PeriodKind.year => DateTime(start.year + steps),
     };

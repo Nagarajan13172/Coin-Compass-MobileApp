@@ -56,7 +56,7 @@ straight to the dashboard (persistent cookie jar works); all 17 routes navigable
 
 ---
 
-## Phase 2 — Core money loop
+## Phase 2 — Core money loop  [x]
 
 The daily-use path. Highest value; do it first.
 
@@ -74,22 +74,43 @@ The daily-use path. Highest value; do it first.
 | 2.10 | Accounts screen: list by type, balances, totals, CRUD | `/accounts` |
 | 2.11 | Categories screen: grouped list, icon+color picker, subcategories, CRUD | `/categories` |
 
-**Gate:** log a real expense on the phone, confirm it appears in the web app.
+**Gate: PASSED (24 Aug 2026).** Created an account and logged a ₹250 expense on the OnePlus;
+both reached the live backend and the expense appeared in the web app ("3 transactions · August
+2026 · Net −₹250"). Test data deleted afterwards. A follow-up adversarial review raised 29
+claims, 20 confirmed; all fixed — see docs/PHASE2_FINDINGS.md. 75 tests green.
 
 ---
 
-## Phase 3 — Planning & tracking
+## Phase 3 — Planning & tracking  [x] built · tested 24 Aug 2026  [~]
 
-| # | Task | Endpoints |
-|---|---|---|
-| 3.1 | Budgets: per-category progress bars, on-track/near-limit states, CRUD | `/budgets` |
-| 3.2 | Goals: progress rings, remaining/monthsLeft, **contribute** flow, CRUD | `/goals`, `/goals/:id/contribute` |
-| 3.3 | Recurring: rules list, next/last run, `upcoming` preview, active toggle | `/recurring` |
-| 3.4 | Recurring actions: run, skip, post-one, per-rule transaction history | `/recurring/:id/*` |
-| 3.5 | Calendar: month grid with per-day income/expense, day drill-down | `/transactions?from&to` |
-| 3.6 | Credits: given/received/borrowed/repaid, summary, settle, CRUD | `/credits`, `/credits/summary` |
-| 3.7 | People & Groups: CRUD, merge duplicates | `/people`, `/people/groups` |
-| 3.8 | Splits: shared expenses (description, total, your share), CRUD | `/splits` |
+| # | Task | Endpoints | Status |
+|---|---|---|---|
+| 3.1 | Budgets: per-category progress bars, on-track/near-limit states, CRUD | `/budgets` | [x] |
+| 3.2 | Goals: progress rings, remaining/monthsLeft, **contribute** flow, CRUD | `/goals`, `/goals/:id/contribute` | [x] |
+| 3.3 | Recurring: rules list, next/last run, `upcoming` preview, active toggle | `/recurring` | [x] |
+| 3.4 | Recurring actions: run, skip, post-one, per-rule transaction history | `/recurring/:id/*` | [x] |
+| 3.5 | Calendar: month grid with per-day income/expense, day drill-down | `/transactions?from&to` | [x] |
+| 3.6 | Credits: given/received/borrowed/repaid, summary, settle, CRUD | `/credits`, `/credits/summary` | [x] |
+| 3.7 | People & Groups: CRUD, merge duplicates | `/people`, `/people/groups` | [x] |
+| 3.8 | Splits: shared expenses (description, total, your share), CRUD | `/splits` | [x] |
+
+Five routes now render real screens (`/budgets`, `/goals`, `/recurring`, `/calendar`,
+`/credits`); People and Splits hang off Credits at `/credits/people` and `/credits/splits`,
+so the nav still has exactly 17 destinations.
+
+Notes on what the API could not confirm:
+- **Budget spend** is not on `/budgets`, so progress is measured against `/reports/summary`
+  and `/reports/by-category` for the window the budget's period describes. A server-sent
+  `spent` wins when it is there.
+- **`/credits/summary`** answers with an empty array on an account with no credits, so the
+  screen totals the list itself whenever the response is not an object.
+- **Person merge** — the recorded account has no people, so the field name for the merge
+  target is unverified. `POST /people/:id/merge` goes out with both `into` and `target`;
+  a mismatch surfaces as a field error on the sheet.
+
+**Gate: not yet run.** 96 tests green and `flutter analyze` clean, but nothing here has been
+exercised against the live API on the phone — create a budget and a rule on the device, run
+the rule, and confirm both land in the web app.
 
 ---
 

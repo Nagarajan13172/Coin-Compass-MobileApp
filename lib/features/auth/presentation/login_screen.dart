@@ -17,7 +17,8 @@ class LoginScreen extends ConsumerStatefulWidget {
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen>
+    with AuthErrorReset {
   final _email = TextEditingController();
   final _password = TextEditingController();
   bool _obscure = true;
@@ -39,6 +40,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!mounted) return;
     if (!ok &&
         ref.read(authControllerProvider).status == AuthStatus.needsTwoFactor) {
+      clearAuthError();
       context.go('/login/2fa');
     }
     // On success the router's redirect moves us to the dashboard.
@@ -78,7 +80,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               autofillHints: const [AutofillHints.password],
               errorText: error?.fieldError('password'),
               labelAction: GestureDetector(
-                onTap: () => context.push('/forgot-password'),
+                onTap: () {
+                  // The auth error is app-scoped; drop it so the next screen
+                  // does not open showing this screen's failure.
+                  clearAuthError();
+                  context.push('/forgot-password');
+                },
                 child: Text(
                   'Forgot password?',
                   style: TextStyle(
@@ -141,15 +148,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               },
             ),
             const SizedBox(height: 18),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            // Wrap, not Row: at large system font scales the prompt and the
+            // link no longer fit on one 280dp line, and a Row would overflow.
+            Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Text(
                   "Don't have an account? ",
                   style: TextStyle(fontSize: 14, color: c.mutedForeground),
                 ),
                 GestureDetector(
-                  onTap: () => context.push('/signup'),
+                  onTap: () {
+                    clearAuthError();
+                    context.push('/signup');
+                  },
                   child: Text(
                     'Sign up',
                     style: TextStyle(

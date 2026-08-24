@@ -52,6 +52,11 @@ class ReportsRepository {
   /// Income/expense/net per bucket, oldest first.
   /// [bucket] is `day`, `week` or `month`; omit it to let the server size the
   /// buckets from the window.
+  ///
+  /// The wire key is `granularity`, not `bucket` — `bucket` is only the name of
+  /// the *response* field. Verified live: `?granularity=month` returns
+  /// `bucket: "2026-08"`, while `?bucket=month` is ignored and falls back to
+  /// daily `bucket: "2026-08-04"`.
   Future<List<TrendPoint>> trend({
     DateTime? from,
     DateTime? to,
@@ -59,7 +64,7 @@ class ReportsRepository {
   }) async {
     final json = await _api.getJson(
       Endpoints.reportsTrend,
-      query: {..._range(from, to), 'bucket': ?bucket},
+      query: {..._range(from, to), 'granularity': ?bucket},
     );
     return J.list(_items(json), TrendPoint.fromJson);
   }

@@ -9,6 +9,25 @@ import '../router/destinations.dart';
 import '../theme/app_colors.dart';
 import 'more_sheet.dart';
 
+/// Height of the shell's bottom nav bar, excluding the system inset below it.
+const double kShellNavBarHeight = 62;
+
+/// The raised FAB's 18dp overhang plus 10dp of breathing room.
+const double kShellFabClearance = 28;
+
+/// Space the shell's chrome occupies *over* the body, which renders with
+/// `extendBody: true`: the nav bar, the system inset under it, and the raised
+/// FAB's overhang. Every scrollable screen in the shell must pad its tail by
+/// this much, or its last row ends up under the FAB.
+///
+/// Uses `viewPaddingOf`, not `paddingOf`: inside a `extendBody: true` Scaffold
+/// body, Flutter rewrites `MediaQuery.padding.bottom` to include the nav bar,
+/// so `paddingOf` would count it twice.
+double shellBottomInset(BuildContext context) =>
+    kShellNavBarHeight +
+    MediaQuery.viewPaddingOf(context).bottom +
+    kShellFabClearance;
+
 /// The persistent chrome: CoinCompass app bar on top, five-slot bottom nav with
 /// a raised centre FAB below. Mirrors the web app's mobile layout.
 class AppScaffold extends ConsumerWidget {
@@ -202,7 +221,7 @@ class _LanguagePill extends StatelessWidget {
   }
 }
 
-class _BottomNav extends StatelessWidget {
+class _BottomNav extends ConsumerWidget {
   const _BottomNav({required this.location});
 
   final String location;
@@ -216,7 +235,7 @@ class _BottomNav extends StatelessWidget {
   bool get _moreActive => moreDestinations.any((d) => _isActive(d.path));
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
 
     return Container(
@@ -227,7 +246,7 @@ class _BottomNav extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 62,
+          height: kShellNavBarHeight,
           // The FAB overhangs the bar, so the Stack must not clip.
           child: Stack(
             clipBehavior: Clip.none,
@@ -267,7 +286,7 @@ class _BottomNav extends StatelessWidget {
               Positioned(
                 top: -18,
                 child: GestureDetector(
-                  onTap: () => AddSheet.show(context),
+                  onTap: () => AddSheet.show(context, ref, location: location),
                   child: Container(
                     width: 60,
                     height: 60,
@@ -321,12 +340,25 @@ class _NavItem extends StatelessWidget {
         children: [
           Icon(destination.icon, size: 21, color: color),
           const SizedBox(height: 3),
-          Text(
-            destination.label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: active ? FontWeight.w600 : FontWeight.w500,
-              color: color,
+          // The slot is 72dp wide inside a 62dp-tall bar. Left bare, a scaled
+          // "Transactions" wraps to two lines and overflows the bar on every
+          // shell screen. maxLines/softWrap stop the wrap, FittedBox shrinks
+          // the word instead of ellipsising it, Flexible caps the Column, and
+          // the explicit height drops bodyMedium's inherited 1.45 leading.
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                destination.label,
+                maxLines: 1,
+                softWrap: false,
+                style: TextStyle(
+                  fontSize: 11,
+                  height: 1.2,
+                  fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                  color: color,
+                ),
+              ),
             ),
           ),
         ],

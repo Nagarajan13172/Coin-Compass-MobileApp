@@ -1,20 +1,40 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
+import '../../../core/api/endpoints.dart';
 import '../../../core/api/enums.dart';
+import '../../../core/api/json.dart';
 import '../../../core/api/paginated.dart';
 import '../../../core/utils/date_x.dart';
+import '../../accounts/data/accounts_repository.dart';
+import '../../networth/data/networth_repository.dart';
 import '../data/transactions_repository.dart';
 import '../domain/transaction.dart';
 
 // ─── one-shot reads ────────────────────────────────────────────────────────
 
+/// The month the ledger is showing. It drives the query's `from`/`to`, so it is
+/// the one piece of screen state [transactionQueryProvider] derives from rather
+/// than owns.
+final transactionsMonthProvider = StateProvider<DateTime>(
+  (ref) => DateTime.now().startOfMonth,
+);
+
 /// The filter set the Transactions screen is currently showing. Writing to it
 /// makes [transactionsListProvider] reload.
-final transactionQueryProvider = StateProvider<TransactionQuery>(
-  (ref) => const TransactionQuery(),
-);
+///
+/// It opens on [transactionsMonthProvider]'s window rather than on "all time",
+/// so the list controller is built with the month already stamped on it — one
+/// request per session instead of an all-time fetch the screen throws away a
+/// frame later. `read`, not `watch`: the month is only a seed here, and
+/// re-creating this provider on every month change would drop the user's
+/// filters with it.
+final transactionQueryProvider = StateProvider<TransactionQuery>((ref) {
+  final month = ref.read(transactionsMonthProvider);
+  return TransactionQuery(from: month.startOfMonth, to: month.endOfMonth);
+});
 
 /// A single page, keyed by its query. Use this for one-shot reads (dashboard
 /// "Recent transactions", a day drill-down). For the infinite-scrolling screen
@@ -39,9 +59,59 @@ final transactionBalanceProvider = FutureProvider<BalanceSnapshot>(
   (ref) => ref.watch(transactionsRepositoryProvider).balance(),
 );
 
+/// `GET /transactions/balance?asOf=…` — the balance as it stood at the *end of
+/// [asOf]*, which is the only figure an end-of-day running balance can roll
+/// backwards from. A null key asks for the live all-time figure, exactly like
+/// [transactionBalanceProvider].
+///
+/// The request is issued here rather than through
+/// [TransactionsRepository.balance] only because that method takes no `asOf`
+/// argument yet; fold this back into the repository next time it is touched.
+///
+/// autoDispose, because the key is a window end: browsing a year of months
+/// would otherwise leave twelve snapshots cached for the whole session.
+final transactionBalanceAsOfProvider =
+    FutureProvider.autoDispose.family<BalanceSnapshot, DateTime?>((
+      ref,
+      asOf,
+    ) async {
+      final json = await ref
+          .watch(apiClientProvider)
+          .getJson(
+            Endpoints.transactionsBalance,
+            query: {if (asOf != null) 'asOf': DateX.toApi(asOf)},
+          );
+      return BalanceSnapshot.fromJson(J.map(json));
+    });
+
 final transactionTagsProvider = FutureProvider<List<String>>(
   (ref) => ref.watch(transactionsRepositoryProvider).tags(),
 );
+
+/// Drops every cache a transaction write moves: both balance snapshots, the
+/// summary windows, the server-computed per-account balances on `/accounts`,
+/// the net-worth history behind the dashboard hero, and the one-shot pages the
+/// dashboard's "Recent" card reads. Pass `tags: true` when the written row
+/// carried tags.
+///
+/// Every write path goes through this, so no new one can drift out of sync
+/// with the others. It takes a [ProviderContainer] rather than a `WidgetRef`
+/// on purpose: `invalidate` has no disposal assertion, so the refresh still
+/// happens when the sheet or row that started the write has already left the
+/// tree.
+void invalidateTransactionDerived(
+  ProviderContainer container, {
+  bool tags = false,
+}) {
+  container
+    ..invalidate(transactionBalanceProvider)
+    ..invalidate(transactionBalanceAsOfProvider)
+    ..invalidate(transactionsSummaryProvider)
+    ..invalidate(accountsProvider)
+    ..invalidate(netWorthHistoryProvider)
+    ..invalidate(transactionsPageProvider);
+  if (tags) container.invalidate(transactionTagsProvider);
+}
 
 // ─── accumulating list (infinite scroll) ───────────────────────────────────
 
@@ -207,7 +277,20 @@ class TransactionsListController extends StateNotifier<TransactionsListState> {
     final next = query.firstPage();
     if (next == _query) return;
     _query = next;
-    state = state.copyWith(query: next, hasMore: false, page: 1);
+    // The rows on screen belong to the *previous* window — keeping them would
+    // paint August's ledger under September's header until the fetch lands.
+    // Emptying them is also what makes `isInitialLoad` true, so the screen
+    // shows its skeleton for the whole re-query.
+    state = state.copyWith(
+      items: const [],
+      total: 0,
+      query: next,
+      loading: true,
+      loadingMore: false,
+      hasMore: false,
+      page: 1,
+      clearError: true,
+    );
     onQueryChanged?.call(next);
     refresh();
   }
