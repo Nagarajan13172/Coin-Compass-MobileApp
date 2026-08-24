@@ -41,9 +41,14 @@ class Money {
 
   /// Indian short scale for chart axes and tight rows.
   /// 14000 -> `14K`, 150000 -> `1.5L`, 12500000 -> `1.25Cr`
-  static String compact(num amount, {String symbol = rupee}) {
+  ///
+  /// [signed] adds a leading `+` to a positive value, matching [format] — an
+  /// income row reads `+₹1.5L`, not `₹1.5L`.
+  static String compact(num amount, {String symbol = rupee, bool signed = false}) {
     final abs = amount.abs();
-    final sign = amount < 0 ? minus : '';
+    final sign = amount < 0
+        ? minus
+        : (signed && amount > 0 ? '+' : '');
 
     String body;
     if (abs >= 10000000) {

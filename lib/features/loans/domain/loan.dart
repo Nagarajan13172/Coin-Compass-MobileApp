@@ -87,6 +87,12 @@ class Loan {
     updatedAt: J.date(json['updatedAt']),
   );
 
+  /// Only the keys `POST /loans` declares — see docs/WRITE_SCHEMAS.md.
+  ///
+  /// `interestPaid` and `chargesPaid` are read-only: the server accumulates
+  /// them from part-payments and preclosure and **strips them on write**, so
+  /// echoing them back would silently do nothing. `tenure` and `account` are
+  /// not columns at all. Guarded by test/write_schema_test.dart.
   Map<String, dynamic> toWriteJson() => {
     'name': name,
     'outstanding': outstanding,
@@ -96,10 +102,20 @@ class Loan {
     'roi': roi,
     'emi': emi,
     'foreclosureChargePct': foreclosureChargePct,
-    if (startDate != null) 'startDate': startDate!.toUtc().toIso8601String(),
-    if (endDate != null) 'endDate': endDate!.toUtc().toIso8601String(),
+    if (startDate != null) 'startDate': _apiDay(startDate!),
+    if (endDate != null) 'endDate': _apiDay(endDate!),
     'status': status.api,
     'note': note,
     'currency': currency,
   };
+
 }
+
+/// A calendar day as the API stores it: UTC midnight of that day.
+///
+/// `toUtc()` on a local midnight moves an IST date back to the previous day
+/// (`2026-07-03 00:00 +05:30` -> `2026-07-02T18:30Z`), which is how a loan's
+/// start date drifts by one. The real payload in `scratchpad/api/loans.json`
+/// stores `2026-07-03T00:00:00.000Z`.
+String _apiDay(DateTime date) =>
+    DateTime.utc(date.year, date.month, date.day).toIso8601String();

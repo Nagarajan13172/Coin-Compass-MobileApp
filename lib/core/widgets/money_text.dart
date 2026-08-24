@@ -47,7 +47,7 @@ class MoneyText extends StatelessWidget {
     final asCompact =
         compact || (threshold != null && amount.abs() >= threshold);
     final text = asCompact
-        ? Money.compact(amount, symbol: symbol)
+        ? Money.compact(amount, symbol: symbol, signed: signed)
         : Money.format(amount, symbol: symbol, signed: signed);
 
     return Text(

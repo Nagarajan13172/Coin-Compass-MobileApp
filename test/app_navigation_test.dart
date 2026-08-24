@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:coincompass/core/api/api_client.dart';
 import 'package:coincompass/core/api/enums.dart';
 import 'package:coincompass/core/router/app_router.dart';
+import 'package:coincompass/core/widgets/more_sheet.dart';
 import 'package:coincompass/core/theme/app_theme.dart';
 import 'package:coincompass/core/theme/theme_controller.dart';
 import 'package:coincompass/features/accounts/presentation/accounts_screen.dart';
@@ -13,9 +14,14 @@ import 'package:coincompass/features/categories/presentation/categories_screen.d
 import 'package:coincompass/features/credits/presentation/credits_screen.dart';
 import 'package:coincompass/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:coincompass/features/goals/presentation/goals_screen.dart';
+import 'package:coincompass/features/gold/presentation/gold_screen.dart';
+import 'package:coincompass/features/holdings/presentation/holdings_screen.dart';
+import 'package:coincompass/features/loans/presentation/loans_screen.dart';
+import 'package:coincompass/features/networth/presentation/net_worth_screen.dart';
 import 'package:coincompass/features/people/presentation/people_screen.dart';
 import 'package:coincompass/features/recurring/presentation/recurring_screen.dart';
 import 'package:coincompass/features/splits/presentation/splits_screen.dart';
+import 'package:coincompass/features/stocks/presentation/stocks_screen.dart';
 import 'package:coincompass/features/transactions/presentation/transaction_form_sheet.dart';
 import 'package:coincompass/features/transactions/presentation/transactions_screen.dart';
 import 'package:dio/dio.dart';
@@ -29,7 +35,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// Boots the real app shell — router, redirects, bottom nav, centre FAB — with
 /// a restored session, and walks the shipped routes the way a user does:
-/// phase 2's four, phase 3's five, and the two screens that hang off Credits.
+/// phase 2's four, phase 3's five, phase 4's four, and the three screens that
+/// hang off another one (People and Splits under Credits, Holdings under Net
+/// Worth).
 void main() {
   late Directory tempDir;
 
@@ -167,6 +175,74 @@ void main() {
     expect(find.text('Coming in phase 3'), findsNothing);
   });
 
+  testWidgets('the More sheet reaches every phase-4 screen', (tester) async {
+    await boot(tester);
+
+    // Scoped to the sheet: "Stocks" and "Loans" also appear on the Net Worth
+    // breakdown, so a bare find.text would be ambiguous once that screen is up.
+    // The sheet's list is 14 rows tall and caps at 78% of an 800dp phone, so
+    // the last few — Gold & Silver among them — have to be scrolled to.
+    Future<void> open(String label) async {
+      await tester.tap(find.text('More'));
+      await settle(tester);
+      final row = find.descendant(
+        of: find.byType(MoreSheet),
+        matching: find.text(label),
+      );
+      if (row.evaluate().isEmpty) {
+        await tester.scrollUntilVisible(
+          row,
+          120,
+          scrollable: find
+              .descendant(
+                of: find.byType(MoreSheet),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await settle(tester);
+      }
+      await tester.tap(row);
+      await settle(tester);
+    }
+
+    await open('Net Worth');
+    expect(find.byType(NetWorthScreen), findsOneWidget);
+
+    await open('Stocks');
+    expect(find.byType(StocksScreen), findsOneWidget);
+
+    await open('Loans');
+    expect(find.byType(LoansScreen), findsOneWidget);
+
+    await open('Gold & Silver');
+    expect(find.byType(GoldScreen), findsOneWidget);
+
+    // Phase 1's stand-in must be gone from all four.
+    expect(find.text('Coming in phase 4'), findsNothing);
+  });
+
+  testWidgets('Net Worth leads to Holdings, and back again', (tester) async {
+    // Holdings has no nav slot — the sidebar has exactly 17 destinations, so
+    // it hangs off Net Worth at /net-worth/holdings the way People hangs off
+    // Credits. That mounting is the only way to reach it.
+    await boot(tester);
+
+    await tester.tap(find.text('More'));
+    await settle(tester);
+    await tester.tap(find.text('Net Worth'));
+    await settle(tester);
+    expect(find.byType(NetWorthScreen), findsOneWidget);
+
+    await tester.tap(find.text('Manage holdings').first);
+    await settle(tester);
+    expect(find.byType(HoldingsScreen), findsOneWidget);
+
+    await tester.tap(find.text('Back'));
+    await settle(tester);
+    expect(find.byType(NetWorthScreen), findsOneWidget);
+  });
+
   testWidgets('Credits leads to People and Splits, and back again', (
     tester,
   ) async {
@@ -256,6 +332,10 @@ class _FixtureAdapter implements HttpClientAdapter {
     '/people': 'people',
     '/people/groups': 'people_groups',
     '/splits': 'splits',
+    '/loans': 'loans',
+    '/holdings': 'holdings',
+    '/stocks/portfolio': 'stocks_portfolio',
+    '/metals/history': 'metals_history',
   };
 
   @override

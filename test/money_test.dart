@@ -114,4 +114,24 @@ void _weekdayHeaderTests() {
       }
     });
   });
+
+  group('compact carries a sign', () {
+    test('signed adds a leading + to a positive compact value', () {
+      expect(Money.compact(150000, signed: true), '+\u20b91.5L');
+      expect(Money.compact(12500000, signed: true), '+\u20b91.25Cr');
+    });
+
+    test('a negative compact value keeps its minus either way', () {
+      expect(Money.compact(-150000, signed: true), Money.compact(-150000));
+      expect(Money.compact(-150000).startsWith('\u2212'), isTrue);
+    });
+
+    test('zero never takes a plus', () {
+      expect(Money.compact(0, signed: true), Money.compact(0));
+    });
+
+    test('unsigned is unchanged', () {
+      expect(Money.compact(150000), '\u20b91.5L');
+    });
+  });
 }

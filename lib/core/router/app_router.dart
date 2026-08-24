@@ -16,9 +16,14 @@ import '../../features/categories/presentation/categories_screen.dart';
 import '../../features/credits/presentation/credits_screen.dart';
 import '../../features/dashboard/presentation/dashboard_screen.dart';
 import '../../features/goals/presentation/goals_screen.dart';
+import '../../features/gold/presentation/gold_screen.dart';
+import '../../features/holdings/presentation/holdings_screen.dart';
+import '../../features/loans/presentation/loans_screen.dart';
+import '../../features/networth/presentation/net_worth_screen.dart';
 import '../../features/people/presentation/people_screen.dart';
 import '../../features/recurring/presentation/recurring_screen.dart';
 import '../../features/splits/presentation/splits_screen.dart';
+import '../../features/stocks/presentation/stocks_screen.dart';
 import '../../features/transactions/presentation/transactions_screen.dart';
 import '../theme/app_colors.dart';
 import '../widgets/app_scaffold.dart';
@@ -53,19 +58,11 @@ Widget _screenFor(Destination d) => switch (d.path) {
   '/recurring' => const RecurringScreen(),
   '/calendar' => const CalendarScreen(),
   '/credits' => const CreditsScreen(),
-  // phase 4
-  '/net-worth' => PlaceholderScreen(
-    title: d.label,
-    icon: d.icon,
-    phase: 'phase 4',
-  ),
-  '/loans' => PlaceholderScreen(title: d.label, icon: d.icon, phase: 'phase 4'),
-  '/stocks' => PlaceholderScreen(
-    title: d.label,
-    icon: d.icon,
-    phase: 'phase 4',
-  ),
-  '/gold' => PlaceholderScreen(title: d.label, icon: d.icon, phase: 'phase 4'),
+  // phase 4 — shipped
+  '/net-worth' => const NetWorthScreen(),
+  '/loans' => const LoansScreen(),
+  '/stocks' => const StocksScreen(),
+  '/gold' => const GoldScreen(),
   // phase 5
   '/reports' => PlaceholderScreen(
     title: d.label,
@@ -159,6 +156,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/credits/splits',
             builder: (_, _) => const SplitsScreen(),
+          ),
+          // Holdings has no nav slot of its own — the sidebar has exactly 17
+          // destinations and the web app reaches savings & investments from
+          // Net Worth. Mounting it under /net-worth keeps that entry lit.
+          GoRoute(
+            path: HoldingsScreen.routePath,
+            builder: (_, _) => const HoldingsScreen(),
           ),
         ],
       ),

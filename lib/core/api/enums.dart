@@ -206,20 +206,33 @@ enum HoldingClass {
   String get label => this == HoldingClass.saving ? 'Saving' : 'Investment';
 }
 
+/// A subtype belongs to exactly one class. The API accepts `class` and
+/// `subtype` as two independent keys and validates each against its own enum,
+/// so `{class: 'saving', subtype: 'stocks'}` is written without complaint — and
+/// the holding then lands on the wrong side of the saving/investment split. The
+/// pairing is the web app's, and it lives here so a form cannot get it wrong.
 enum HoldingSubtype {
-  fixedDeposit('fixed_deposit', 'Fixed Deposit'),
-  recurringDeposit('recurring_deposit', 'Recurring Deposit'),
-  emergencyFund('emergency_fund', 'Emergency Fund'),
-  retirementFund('retirement_fund', 'Retirement Fund'),
-  stocks('stocks', 'Stocks'),
-  mutualFunds('mutual_funds', 'Mutual Funds'),
-  realEstate('real_estate', 'Real Estate'),
-  bonds('bonds', 'Bonds'),
-  gold('gold', 'Gold');
+  fixedDeposit('fixed_deposit', 'Fixed Deposit', HoldingClass.saving),
+  recurringDeposit('recurring_deposit', 'Recurring Deposit',
+      HoldingClass.saving),
+  emergencyFund('emergency_fund', 'Emergency Fund', HoldingClass.saving),
+  retirementFund('retirement_fund', 'Retirement Fund', HoldingClass.saving),
+  stocks('stocks', 'Stocks', HoldingClass.investment),
+  mutualFunds('mutual_funds', 'Mutual Funds', HoldingClass.investment),
+  realEstate('real_estate', 'Real Estate', HoldingClass.investment),
+  bonds('bonds', 'Bonds', HoldingClass.investment),
+  gold('gold', 'Gold', HoldingClass.investment);
 
-  const HoldingSubtype(this.api, this.label);
+  const HoldingSubtype(this.api, this.label, this.holdingClass);
   final String api;
   final String label;
+
+  /// The class this subtype must be filed under.
+  final HoldingClass holdingClass;
+
+  /// The subtypes a given class may hold — the Type select's whole option list.
+  static List<HoldingSubtype> forClass(HoldingClass c) =>
+      values.where((s) => s.holdingClass == c).toList();
 
   static HoldingSubtype fromApi(String? value) =>
       HoldingSubtype.values.firstWhere(
