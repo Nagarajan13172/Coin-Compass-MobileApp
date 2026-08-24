@@ -10,7 +10,6 @@ import '../../../../core/widgets/loading_shimmer.dart';
 import '../../../../core/api/response_cache.dart';
 import '../../../../core/widgets/money_text.dart';
 import '../../../../core/widgets/stale_banner.dart';
-import '../../../accounts/data/accounts_repository.dart';
 import '../../../networth/data/networth_repository.dart';
 import '../dashboard_screen.dart';
 
@@ -25,7 +24,6 @@ class NetWorthCard extends ConsumerWidget {
     final c = context.colors;
     final history = ref.watch(netWorthHistoryProvider);
     final summary = ref.watch(dashboardSummaryProvider);
-    final accounts = ref.watch(accountsProvider);
 
     final points = history.valueOrNull;
     num? value = (points != null && points.isNotEmpty)
@@ -50,8 +48,6 @@ class NetWorthCard extends ConsumerWidget {
       }
       value = 0;
     }
-
-    final count = accounts.valueOrNull?.length ?? 0;
 
     return AppCard(
       // A whisper of primary on the leading edge — the same tint the web app
@@ -100,9 +96,24 @@ class NetWorthCard extends ConsumerWidget {
           const SizedBox(height: 6),
           Row(
             children: [
+              // Found on the owner's phone during the 6.10 device pass. This
+              // used to read "Sum of N accounts", which is not what the figure
+              // above it is: net worth is accounts + holdings + stocks MINUS
+              // loans. On the owner's own account it printed
+              //
+              //     −₹2,00,00,000
+              //     Sum of 0 accounts
+              //
+              // and the sum of zero accounts is ₹0 — the −₹2Cr is entirely a
+              // loan. A caption that misdescribes a money figure is the exact
+              // failure this project cares most about, so it now states what
+              // the number IS. It was wrong with accounts too, just less
+              // visibly: any holding, stock or loan made the label a lie.
+              // The account count belongs on the Accounts card; the full
+              // derivation is one tap away behind "Breakdown".
               Flexible(
                 child: Text(
-                  'Sum of $count ${count == 1 ? 'account' : 'accounts'}',
+                  'Everything you own, minus what you owe',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 12.5, color: c.mutedForeground),

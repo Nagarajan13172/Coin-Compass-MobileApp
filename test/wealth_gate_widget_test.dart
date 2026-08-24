@@ -112,7 +112,7 @@ void main() {
       expect(find.byType(NetWorthCard), findsNothing);
       expect(find.text('Net worth'), findsNothing);
       expect(find.text('Breakdown'), findsNothing);
-      expect(find.textContaining('Sum of'), findsNothing);
+      expect(find.textContaining('minus what you owe'), findsNothing);
       // Everything the web keeps is still there.
       expect(find.text('Income'), findsWidgets);
       expect(tester.takeException(), isNull);
@@ -128,6 +128,35 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('the net-worth caption describes the figure it sits under', (
+    tester,
+  ) async {
+    // Found on the owner's phone during the 6.10 device pass, on these exact
+    // numbers: the fixture is their real snapshot — `accountsTotal: 0`,
+    // `assets: 0`, `liabilities: 20000000`, `netWorth: -20000000`, and zero
+    // accounts. The card used to print
+    //
+    //     −₹2,00,00,000
+    //     Sum of 0 accounts
+    //
+    // which is false: the sum of no accounts is ₹0. Every rupee of that figure
+    // is the loan. The label was wrong with accounts too — any holding, stock
+    // or loan made it a lie — it was just less obvious.
+    await bootWealthApp(tester, adapter: WealthFixtureAdapter());
+
+    expect(find.byType(NetWorthCard), findsOneWidget);
+    expect(find.textContaining('−₹2,00,00,000'), findsWidgets);
+
+    // The claim that broke, in the shape it broke in.
+    expect(
+      find.textContaining('Sum of'),
+      findsNothing,
+      reason: 'net worth is assets MINUS liabilities, never a sum of accounts',
+    );
+    expect(find.text('Everything you own, minus what you owe'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   // ── the accounts totals card ─────────────────────────────────────────────
 

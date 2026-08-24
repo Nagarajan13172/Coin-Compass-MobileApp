@@ -67,7 +67,7 @@ const Map<String, String> enStrings = {
   'dash.biggestCategory': 'Biggest category',
   'dash.transactions': 'Transactions',
   'dash.noIncome': 'No income this period',
-  'dash.sumOfAccounts': 'Sum of {{count}} accounts',
+  'dash.netWorthCaption': 'Everything you own, minus what you owe',
   'dash.spendingByCategory': 'Spending by category',
   'dash.recent': 'Recent',
   'dash.netThisPeriod': 'Net this period',

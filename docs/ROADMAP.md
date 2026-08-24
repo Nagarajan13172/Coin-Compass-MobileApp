@@ -160,7 +160,7 @@ the rule, and confirm both land in the web app.
 | 6.7 | App icon, adaptive icon, splash screen, app label | [x] built · seen on the device during the 6.2 pass |
 | 6.8 | Widget tests for Money/DateX, model round-trips, auth flow | [x] `auth_flow_test.dart` — 23 tests through the real stack; 4 guards mutation-proven. See `PHASE6_8_REPORT.md` |
 | 6.9 | Release signing keystore, `--release` APK + AAB, size check | [x] signed with a real upload key — see `RELEASE.md` |
-| 6.10 | On-device pass over all 17 screens with real data | [ ] |
+| 6.10 | On-device pass over all 17 screens with real data | [x] all 17 + 4 secondary, live backend. One caption bug found and fixed. See `PHASE6_10_REPORT.md` |
 
 ### 6.9 — release signing
 

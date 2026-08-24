@@ -136,7 +136,7 @@ class DashboardScreen extends ConsumerWidget {
 }
 
 /// The dashboard's one gated surface: the gradient net-worth hero, its
-/// "Breakdown" link and its "Sum of N accounts" line.
+/// "Breakdown" link and its "everything you own, minus what you owe" line.
 ///
 /// The web hides exactly this card and nothing else on the dashboard —
 /// `f && <Card className="surface-gradient …">`, bundle @798903 — so income,
