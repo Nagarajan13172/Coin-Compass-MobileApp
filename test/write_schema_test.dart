@@ -999,6 +999,161 @@ void main() {
     });
   });
 
+  group('phase 5 screens cannot assemble a body of their own', () {
+    // The same guarantee the action sheets carry, extended to the screens
+    // that landed in Phase 5. Every write on these surfaces goes through a
+    // repository whose body is pinned above; a screen that reached the API
+    // directly could send whatever it liked and none of the checks above
+    // would see it. Settings is the dangerous one — the endpoint takes a
+    // whole document and strips what it does not declare, silently.
+    const surfaces = [
+      'lib/features/settings/presentation/settings_screen.dart',
+      'lib/features/settings/presentation/settings_providers.dart',
+      'lib/features/settings/presentation/security_card.dart',
+      'lib/features/settings/presentation/security_sheets.dart',
+      'lib/features/settings/presentation/profile_card.dart',
+      'lib/features/notifications/presentation/notifications_screen.dart',
+      'lib/features/reports/presentation/reports_screen.dart',
+      'lib/features/reports/presentation/export_csv_sheet.dart',
+      'lib/features/insights/presentation/insights_screen.dart',
+    ];
+
+    for (final path in surfaces) {
+      test('${path.split('/').last} goes through its repository', () {
+        final source = File(path).readAsStringSync();
+
+        for (final direct in const [
+          'putJson(',
+          'postJson(',
+          'patchJson(',
+          'deleteJson(',
+          'getJson(',
+        ]) {
+          expect(
+            source.contains(direct),
+            isFalse,
+            reason:
+                '$path reaches the API directly via "$direct". Every read and '
+                'write on this path must go through its repository, whose '
+                'body is checked against docs/WRITE_SCHEMAS.md.',
+          );
+        }
+      });
+    }
+  });
+
+  group('phase 5 bodiless calls stay bodiless', () {
+    // Four Phase-5 mutations take no body at all. A body would not error — it
+    // would be stripped — but it would mean somebody had invented a contract
+    // for an endpoint that cannot be probed on a live account.
+    test('the two lock DELETEs and lock-wealth send nothing', () {
+      final settings = File(
+        'lib/features/settings/data/settings_repository.dart',
+      ).readAsStringSync();
+
+      for (final call in const [
+        'deleteJson(Endpoints.settingsPin)',
+        'deleteJson(Endpoints.settingsWealthPasscode)',
+      ]) {
+        expect(
+          settings.contains(call),
+          isTrue,
+          reason:
+              'turning a lock off is a bodiless DELETE — "$call" is how it is '
+              'spelled, and it is how the deployed client spells it.',
+        );
+      }
+
+      final auth = File(
+        'lib/features/auth/data/auth_repository.dart',
+      ).readAsStringSync();
+      expect(
+        auth.contains('postJson(Endpoints.lockWealth)'),
+        isTrue,
+        reason:
+            'POST /auth/lock-wealth takes no body; the passcode only travels '
+            'on the unlock.',
+      );
+      expect(
+        auth.contains('postJson(Endpoints.logout)'),
+        isTrue,
+        reason: 'POST /auth/logout takes no body either.',
+      );
+    });
+
+    test('verifying a PIN reuses the one pinned body builder', () {
+      // `{pin}` is the same body as setting one. Spelling it inline here is
+      // how the two would drift apart.
+      final source = File(
+        'lib/features/settings/data/settings_repository.dart',
+      ).readAsStringSync();
+      expect(
+        RegExp(r'settingsPinVerify,\s*\n\s*body: pinBody\(pin\),')
+            .hasMatch(source),
+        isTrue,
+        reason:
+            'POST /settings/pin/verify sends {pin} — the same builder as '
+            'POST /settings/pin, so the two cannot diverge.',
+      );
+    });
+  });
+
+  group('phase 5 reads keep their exact query params', () {
+    test('insights sends period and ref, never from/to', () {
+      // /reports/insights is the one report that does not take a window. It
+      // takes a period NAME and a `ref` instant; without `ref` the server
+      // answers the current period no matter which one the pager is on, so
+      // the pager silently stops working.
+      final source = File(
+        'lib/features/insights/data/insights_repository.dart',
+      ).readAsStringSync();
+
+      expect(source.contains("'period': period"), isTrue);
+      expect(
+        source.contains("'ref': DateX.toApi(at)"),
+        isTrue,
+        reason:
+            'without `ref` the insights pager cannot move off the current '
+            'period — verified live.',
+      );
+      expect(
+        source.contains("'from'"),
+        isFalse,
+        reason: '/reports/insights takes no from/to window.',
+      );
+    });
+  });
+
+  group('never-call endpoints stay uncalled', () {
+    test('nothing sends the owner a real email', () {
+      // POST /reports/email-now?kind=midmonth emails the account holder. The
+      // constant exists so the endpoint map is complete; calling it is on
+      // this project's never-call list.
+      final offenders = <String>[];
+      for (final file in Directory('lib')
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.dart'))) {
+        if (file.path.endsWith('core/api/endpoints.dart')) continue;
+        final source = file.readAsStringSync();
+        // A doc comment naming the endpoint is fine; a call site is not.
+        for (final line in source.split('\n')) {
+          final code = line.trimLeft();
+          if (code.startsWith('//') || code.startsWith('///')) continue;
+          if (code.contains('reportsEmailNow')) offenders.add(file.path);
+        }
+      }
+      expect(
+        offenders,
+        isEmpty,
+        reason:
+            'Endpoints.reportsEmailNow is referenced in $offenders. It sends '
+            "the owner a real email — it is on the never-call list, and the "
+            'Settings screen deliberately has no "send a test report" button.',
+      );
+    });
+  });
+
   group('action sheets cannot assemble a body of their own', () {
     // Buy, sell, part-payment and preclose have no `_buildBody`: the body is
     // built inside the repository from typed arguments, which is the only

@@ -47,6 +47,13 @@ const Map<String, IconData> _lucideByName = <String, IconData>{
   'coins': LucideIcons.coins,
   'chart-pie': LucideIcons.chartPie,
   'bell': LucideIcons.bell,
+  // the notification kinds (`NotificationKind.icon`) — without these three the
+  // feed silently rendered a bare circle for half its rows
+  'circle-check': LucideIcons.circleCheck,
+  'clock': LucideIcons.clock,
+  'alarm-clock': LucideIcons.alarmClock,
+  // the web's fallback glyph for a category with no icon of its own
+  'tag': LucideIcons.tag,
   'settings': LucideIcons.settings,
   'search': LucideIcons.search,
   'plus': LucideIcons.plus,

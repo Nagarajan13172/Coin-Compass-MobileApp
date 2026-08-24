@@ -149,18 +149,47 @@ the rule, and confirm both land in the web app.
 
 ## Phase 6 — Mobile-native polish & release
 
-| # | Task |
-|---|---|
-| 6.1 | Biometric + PIN app lock on resume (`local_auth`) |
-| 6.2 | Wealth-lock blur/mask on sensitive amounts |
-| 6.3 | Offline read cache + request retry; graceful no-connection banner |
-| 6.4 | Optimistic updates for create/edit/delete |
-| 6.5 | Audit every screen for loading / empty / error+retry states |
-| 6.6 | Dark mode audit across all 17 screens |
-| 6.7 | App icon, adaptive icon, splash screen, app label |
-| 6.8 | Widget tests for Money/DateX, model round-trips, auth flow |
-| 6.9 | Release signing keystore, `--release` APK + AAB, size check |
-| 6.10 | On-device pass over all 17 screens with real data |
+| # | Task | Status |
+|---|---|---|
+| 6.1 | Biometric + PIN app lock on resume (`local_auth`) | [ ] blocked on 5.9 |
+| 6.2 | Wealth-lock blur/mask on sensitive amounts | [ ] blocked on 5.9 |
+| 6.3 | Offline read cache + request retry; graceful no-connection banner | [ ] |
+| 6.4 | Optimistic updates for create/edit/delete | [ ] |
+| 6.5 | Audit every screen for loading / empty / error+retry states | [ ] blocked on phase 5 |
+| 6.6 | Dark mode audit across all 17 screens | [ ] blocked on phase 5 |
+| 6.7 | App icon, adaptive icon, splash screen, app label | [x] built · not yet seen on a device |
+| 6.8 | Widget tests for Money/DateX, model round-trips, auth flow | [ ] |
+| 6.9 | Release signing keystore, `--release` APK + AAB, size check | [ ] |
+| 6.10 | On-device pass over all 17 screens with real data | [ ] |
+
+### 6.7 — what shipped
+
+The launcher icon is not a redraw: it is the web app's own installed-app icon,
+fetched from `manifest.webmanifest` (`pwa-512x512.png` and the `maskable` variant)
+and re-cut for Android. Note this is a *different* mark from the header logo —
+the header is a white Lucide `Compass` on `#2563EB`, the installed icon is a navy
+`#0F172A` ringed compass. Both are correct; they are used in different places on
+the web too.
+
+- Legacy icon, round icon (API 21-25), adaptive icon with a `<monochrome>` layer
+  for Android 13 themed icons, at all five densities.
+- Splash: Android 12+ via `windowSplashScreenAnimatedIcon`, older via a
+  `launch_background` layer-list. Both follow the OS theme through a night-aware
+  `@color/splash_background` (`#F8FAFC` / `#0F172A`), and the launch theme sets
+  `windowLightStatusBar` to match, so the status bar icons stay readable.
+- Label `coincompass` → **CoinCompass**, via `@string/app_name` so 7.1 can add
+  `values-ta/` without touching the manifest. iOS `CFBundleDisplayName` too.
+- `tool/gen_brand_assets.sh` regenerates every size from the two sources in
+  `tool/brand/`; no new Flutter dependency, `pubspec.yaml` untouched.
+
+Deliberate deviation: the web manifest's `background_color` is `#0F172A`
+unconditionally, so a PWA install always flashes navy. The mobile splash follows
+the OS theme instead — a cold start into the light UI has no navy flash.
+
+**Not yet verified on hardware.** `adb devices` is empty and the OnePlus is not
+answering mDNS, so the icon has only been checked by rendering the shipped
+assets under each launcher mask. Reconnect the phone and confirm the icon in the
+launcher, the themed icon with Material You on, and the splash in both themes.
 
 ---
 

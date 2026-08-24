@@ -1,24 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/api/enums.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/utils/date_x.dart';
 import '../../../core/utils/money.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/error_retry.dart';
 import '../../../core/widgets/loading_shimmer.dart';
 import '../../../core/widgets/money_text.dart';
+import '../../../core/widgets/period_pager.dart';
 import '../../../core/widgets/screen_header.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/segmented_period_selector.dart';
 import '../../../core/widgets/stat_card.dart';
-import '../../transactions/data/transactions_repository.dart';
-import '../../transactions/presentation/transactions_providers.dart';
+import '../../transactions/presentation/open_transactions.dart';
 import '../domain/report_metrics.dart';
 import '../domain/report_models.dart';
 import 'export_csv_sheet.dart';
@@ -91,10 +89,11 @@ class ReportsScreen extends ConsumerWidget {
           _Padded(
             child: CategoryBreakdownCard(
               summary: ref.watch(reportsSummaryProvider(range)).valueOrNull,
-              onOpenCategory: (categoryId, type) => openTransactions(
+              onOpenCategory: (categoryId, type) => openTransactionsFiltered(
                 context,
                 ref,
-                range: range,
+                from: range.start,
+                to: range.end,
                 type: TransactionType.fromApi(type),
                 categoryId: categoryId,
               ),
@@ -105,10 +104,11 @@ class ReportsScreen extends ConsumerWidget {
           const SizedBox(height: 12),
           _Padded(
             child: ByAccountCard(
-              onOpenAccount: (accountId) => openTransactions(
+              onOpenAccount: (accountId) => openTransactionsFiltered(
                 context,
                 ref,
-                range: range,
+                from: range.start,
+                to: range.end,
                 accountId: accountId,
               ),
             ),
@@ -119,42 +119,6 @@ class ReportsScreen extends ConsumerWidget {
       ),
     );
   }
-}
-
-/// Drill-through into the ledger.
-///
-/// The Transactions screen takes no route query parameters — it reads the
-/// shared [transactionQueryProvider] — so the filter is written there and the
-/// navigation is a plain `go`. It also re-stamps `from`/`to` from
-/// [transactionsMonthProvider] on mount, which is why the month is set too.
-///
-/// KNOWN LIMIT: for a Week or Year window that re-stamp widens the window to
-/// the containing month. The type/category/account filter survives intact; the
-/// dates do not. Fixing it properly means teaching the Transactions screen
-/// about an incoming window, which is that screen's file, not this one's.
-///
-/// Does nothing when there is no router above this widget, which is how the
-/// widget tests mount the screen.
-@visibleForTesting
-void openTransactions(
-  BuildContext context,
-  WidgetRef ref, {
-  required PeriodRange range,
-  TransactionType? type,
-  String? categoryId,
-  String? accountId,
-}) {
-  final router = GoRouter.maybeOf(context);
-  if (router == null) return;
-  ref.read(transactionsMonthProvider.notifier).state = range.start.startOfMonth;
-  ref.read(transactionQueryProvider.notifier).state = TransactionQuery(
-    from: range.start,
-    to: range.end,
-    type: type,
-    categoryId: categoryId,
-    accountId: accountId,
-  );
-  router.go('/transactions');
 }
 
 class _Padded extends StatelessWidget {
@@ -194,11 +158,12 @@ class _PeriodBar extends ConsumerWidget {
           options: [
             for (final k in PeriodKind.values) SegmentOption(k, k.shortLabel),
           ],
-          onChanged: (next) {
-            // Re-anchor on the equivalent instant so switching Month -> Week
-            // lands in the week you were already reading, not today's.
-            ref.read(reportsPeriodKindProvider.notifier).state = next;
-          },
+          // The anchor is left alone on purpose: switching Month -> Week
+          // lands in the week containing the month you were reading, not in
+          // today's. That is what the web does — it keeps `refDate` and only
+          // recomputes the window around it.
+          onChanged: (next) =>
+              ref.read(reportsPeriodKindProvider.notifier).state = next,
         ),
         _Pager(range: range),
       ],
@@ -213,9 +178,6 @@ class _Pager extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final c = context.colors;
-    final radius = BorderRadius.circular(AppTheme.radius);
-
     void step(int by) {
       final shifted = range.shifted(by);
       // The anchor, not the range, is the source of truth — the range is
@@ -223,51 +185,14 @@ class _Pager extends ConsumerWidget {
       ref.read(reportsAnchorProvider.notifier).state = shifted.start;
     }
 
-    Widget arrow(IconData icon, String tooltip, VoidCallback onTap) => Semantics(
-      button: true,
-      label: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: radius,
-        child: SizedBox(
-          width: 40,
-          height: 42,
-          child: Icon(icon, size: 18, color: c.foreground),
-        ),
-      ),
-    );
-
-    return Container(
-      decoration: BoxDecoration(
-        color: c.card,
-        borderRadius: radius,
-        border: Border.all(color: c.border),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // The web does not clamp the pager to today — you can page into the
-          // future and see an empty period. Kept, so the two agree.
-          arrow(LucideIcons.chevronLeft, 'Previous period', () => step(-1)),
-          SizedBox(
-            width: 136,
-            child: Center(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  range.periodLabel,
-                  style: const TextStyle(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w600,
-                    fontFeatures: [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          arrow(LucideIcons.chevronRight, 'Next period', () => step(1)),
-        ],
-      ),
+    // The shared stepper, so this screen and Insights page identically.
+    // `expand: false` keeps it intrinsically sized, which is what lets the
+    // Wrap above drop it onto its own line at 360dp instead of overflowing.
+    return PeriodPager(
+      label: range.periodLabel,
+      expand: false,
+      onPrevious: () => step(-1),
+      onNext: () => step(1),
     );
   }
 }
@@ -440,10 +365,11 @@ class _Summary extends ConsumerWidget {
                   ),
             onTap: top == null
                 ? null
-                : () => openTransactions(
+                : () => openTransactionsFiltered(
                     context,
                     ref,
-                    range: range,
+                    from: range.start,
+                    to: range.end,
                     type: TransactionType.expense,
                     categoryId: top.categoryId,
                   ),
@@ -462,10 +388,14 @@ class _Summary extends ConsumerWidget {
           ),
           right: _MetricTile(
             label: 'Spending vs last ${kind.noun}',
+            // `dense`, not `compact`: the sibling tile states the biggest
+            // expense in full, and two captions on one row disagreeing about
+            // whether ₹13,278 is "₹13K" is exactly the drift this pass is
+            // for. Only a crore-scale figure compacts here.
             subtitle: previousSummary == null || previousSummary.expense <= 0
                 ? null
                 : 'Last ${kind.noun}: '
-                      '${Money.compact(previousSummary.expense)}',
+                      '${Money.dense(previousSummary.expense)}',
             value: momPct == null
                 ? _Dash(style: _valueStyle)
                 : _Change(pct: momPct),
@@ -784,7 +714,9 @@ class _InsightBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    const amber = Color(0xFFF59E0B);
+    // The web's `text-amber-500` lightbulb, via the shared `warning` token —
+    // the same amber the Notifications rows and the Insights highlight use.
+    final amber = c.warning;
 
     final spans = <TextSpan>[
       TextSpan(text: 'This ${kind.noun} your biggest expense is '),
@@ -829,8 +761,8 @@ class _InsightBanner extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 2),
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
             child: Icon(LucideIcons.lightbulb, size: 16, color: amber),
           ),
           const SizedBox(width: 9),

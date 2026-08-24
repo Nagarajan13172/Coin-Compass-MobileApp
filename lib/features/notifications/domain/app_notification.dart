@@ -76,9 +76,9 @@ enum NotificationKind {
   };
 }
 
-/// Which colour the row's icon chip takes. `warning` has no token in
-/// [AppColors] yet — the web uses amber-500/600 — so the screen has to pick an
-/// equivalent and say so.
+/// Which colour the row's icon chip takes. `warning` maps to the shared
+/// `AppColors.warning` amber (the web's amber-600 / amber-500), not to
+/// `destructive` — an overdue reminder is not a failure.
 enum NotificationTone { primary, income, expense, warning }
 
 class AppNotification {

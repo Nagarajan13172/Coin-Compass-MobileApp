@@ -10,6 +10,8 @@ import '../../../core/router/destinations.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/date_x.dart';
+import '../../../core/utils/lucide_map.dart';
+import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/confirm_sheet.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/error_retry.dart';
@@ -17,14 +19,6 @@ import '../../../core/widgets/loading_shimmer.dart';
 import '../../../core/widgets/screen_header.dart';
 import '../data/notifications_repository.dart';
 import '../domain/app_notification.dart';
-
-// The shell's chrome overlaps the body (`extendBody: true`), so a scrollable
-// screen has to pad its own tail past the nav bar and the raised FAB.
-const double _navBarHeight = 62;
-const double _fabClearance = 28;
-
-double _shellBottomInset(BuildContext context) =>
-    _navBarHeight + MediaQuery.viewPaddingOf(context).bottom + _fabClearance;
 
 /// `/notifications` — the activity feed: what posted, what is coming up, and
 /// what went wrong while the app was closed. Body only; `AppScaffold` supplies
@@ -62,11 +56,17 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     final unread = loaded?.unread ?? 0;
     final canBulk = loaded != null && !_bulkBusy;
 
+    final c = context.colors;
+
     return RefreshIndicator(
+      color: c.primary,
+      backgroundColor: c.card,
       onRefresh: _refresh,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.only(bottom: _shellBottomInset(context) + 12),
+        // `shellBottomInset` is the shared measure of the nav bar + FAB
+        // overhang; the extra 12 keeps the last card off the FAB's shadow.
+        padding: EdgeInsets.only(bottom: shellBottomInset(context) + 12),
         children: [
           ScreenHeader(
             title: 'Notifications',
@@ -757,34 +757,23 @@ class _DismissButton extends StatelessWidget {
 // ─── tone + icon ────────────────────────────────────────────────────────────
 
 /// The kind's glyph. Resolved with a switch rather than through
-/// `lucideIcon(kind.icon)`: three of the six names (`circle-check`, `clock`,
-/// `alarm-clock`) are not in `core/utils/lucide_map.dart` yet, and an unknown
-/// name there falls back to a bare circle — a silently wrong icon rather than
-/// an error. Mapping here keeps the screen correct without editing a table
-/// three other features share.
-IconData _kindIcon(NotificationKind kind) => switch (kind) {
-  NotificationKind.recurringPosted => LucideIcons.repeat,
-  NotificationKind.recurringEnded => LucideIcons.circleCheck,
-  NotificationKind.recurringDueSoon => LucideIcons.clock,
-  NotificationKind.recurringOverdue => LucideIcons.alarmClock,
-  NotificationKind.budgetExceeded => LucideIcons.chartPie,
-  NotificationKind.balanceLow => LucideIcons.wallet,
-  NotificationKind.unknown => LucideIcons.bell,
-};
+/// All six `NotificationKind.icon` names now resolve through the shared table
+/// in `core/utils/lucide_map.dart` (`circle-check`, `clock` and `alarm-clock`
+/// were added there during integration — before that, half the feed fell back
+/// to a bare circle). The bell is the fallback rather than the map's own
+/// circle, so a type this build predates still looks like a notification.
+IconData _kindIcon(NotificationKind kind) =>
+    lucideIcon(kind.icon, fallback: LucideIcons.bell);
 
-/// `warning` has no token in [AppColors]; the web uses `text-amber-600` in
-/// light and `text-amber-500` in dark, so those two hexes are transcribed
-/// rather than approximated with `destructive` — an overdue reminder is not
-/// the same signal as a failure.
+/// `c.warning` is the amber the web spells `text-amber-600` in light and
+/// `text-amber-500` in dark. Deliberately not `destructive`: an overdue
+/// reminder is not the same signal as a failure.
 Color _toneColor(BuildContext context, NotificationTone tone) {
   final c = context.colors;
   return switch (tone) {
     NotificationTone.primary => c.primary,
     NotificationTone.income => c.income,
     NotificationTone.expense => c.expense,
-    NotificationTone.warning =>
-      Theme.of(context).brightness == Brightness.dark
-          ? const Color(0xFFF59E0B)
-          : const Color(0xFFD97706),
+    NotificationTone.warning => c.warning,
   };
 }

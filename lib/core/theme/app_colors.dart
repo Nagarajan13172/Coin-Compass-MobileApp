@@ -20,6 +20,7 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.destructive,
     required this.income,
     required this.expense,
+    required this.warning,
     required this.border,
     required this.input,
     required this.ring,
@@ -40,6 +41,15 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color destructive;
   final Color income;
   final Color expense;
+
+  /// Amber. Not in the shadcn token set — the web spells it `text-amber-600`
+  /// in light and `text-amber-500` in dark, on exactly one signal: something
+  /// is late or running out (an overdue recurring rule, a low balance, the
+  /// insight lightbulb). It is deliberately **not** `destructive`: an overdue
+  /// reminder is not a failure. Three Phase-5 screens each transcribed one of
+  /// these hexes by hand before this token existed.
+  final Color warning;
+
   final Color border;
   final Color input;
   final Color ring;
@@ -61,6 +71,7 @@ class AppColors extends ThemeExtension<AppColors> {
     destructive: Color(0xFFDC2626),
     income: Color(0xFF089268),
     expense: Color(0xFFDC2626),
+    warning: Color(0xFFD97706), // amber-600
     border: Color(0xFFE2E8F0),
     input: Color(0xFFE2E8F0),
     ring: Color(0xFF2563EB),
@@ -82,6 +93,7 @@ class AppColors extends ThemeExtension<AppColors> {
     destructive: Color(0xFFEF4444),
     income: Color(0xFF11C58A),
     expense: Color(0xFFF26A6A),
+    warning: Color(0xFFF59E0B), // amber-500
     border: Color(0xFF2F3B4E),
     input: Color(0xFF2F3B4E),
     ring: Color(0xFF3B82F6),
@@ -104,6 +116,7 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? destructive,
     Color? income,
     Color? expense,
+    Color? warning,
     Color? border,
     Color? input,
     Color? ring,
@@ -124,6 +137,7 @@ class AppColors extends ThemeExtension<AppColors> {
       destructive: destructive ?? this.destructive,
       income: income ?? this.income,
       expense: expense ?? this.expense,
+      warning: warning ?? this.warning,
       border: border ?? this.border,
       input: input ?? this.input,
       ring: ring ?? this.ring,
@@ -157,6 +171,7 @@ class AppColors extends ThemeExtension<AppColors> {
       destructive: Color.lerp(destructive, other.destructive, t)!,
       income: Color.lerp(income, other.income, t)!,
       expense: Color.lerp(expense, other.expense, t)!,
+      warning: Color.lerp(warning, other.warning, t)!,
       border: Color.lerp(border, other.border, t)!,
       input: Color.lerp(input, other.input, t)!,
       ring: Color.lerp(ring, other.ring, t)!,

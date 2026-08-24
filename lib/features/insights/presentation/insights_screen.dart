@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/api/enums.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/date_x.dart';
 import '../../../core/utils/money.dart';
 import '../../../core/widgets/app_card.dart';
@@ -16,11 +14,12 @@ import '../../../core/widgets/loading_shimmer.dart';
 import '../../../core/widgets/money_text.dart';
 import '../../../core/widgets/screen_header.dart';
 import '../../../core/widgets/section_header.dart';
+import '../../../core/widgets/app_scaffold.dart';
+import '../../../core/widgets/period_pager.dart';
 import '../../../core/widgets/segmented_period_selector.dart';
 import '../../../core/widgets/stat_card.dart';
 import '../../reports/presentation/period.dart';
-import '../../transactions/data/transactions_repository.dart';
-import '../../transactions/presentation/transactions_providers.dart';
+import '../../transactions/presentation/open_transactions.dart';
 import '../domain/insights.dart';
 import 'insights_providers.dart';
 
@@ -47,11 +46,17 @@ class InsightsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final insights = ref.watch(currentInsightsProvider);
 
+    final c = context.colors;
+
     return RefreshIndicator(
+      color: c.primary,
+      backgroundColor: c.card,
       onRefresh: () => refreshInsights(ref),
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: 110),
+        // The shell's chrome overlaps the body, so the tail pads past the nav
+        // bar and the raised FAB — `shellBottomInset`, not a hardcoded 110.
+        padding: EdgeInsets.only(bottom: shellBottomInset(context)),
         children: [
           const ScreenHeader(
             title: 'Insights',
@@ -129,17 +134,15 @@ class _PeriodBar extends ConsumerWidget {
   }
 }
 
-/// `[◀]  August 2026  [▶]`. Deliberately not clamped to today: the web lets
-/// you page into the future, where the server simply answers `hasData: false`.
+/// The shared [PeriodPager], driving this screen's own anchor. Reports uses
+/// the same control, so the two screens page identically.
 class _PeriodPager extends ConsumerWidget {
   const _PeriodPager();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final c = context.colors;
     final kind = ref.watch(insightsPeriodKindProvider);
     final range = ref.watch(insightsRangeProvider);
-    final radius = BorderRadius.circular(AppTheme.radius);
 
     void shift(int steps) {
       final anchor = ref.read(insightsAnchorProvider);
@@ -150,63 +153,10 @@ class _PeriodPager extends ConsumerWidget {
       );
     }
 
-    Widget arrow(IconData icon, String tooltip, VoidCallback onTap) =>
-        Semantics(
-          button: true,
-          label: tooltip,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: radius,
-            child: Container(
-              width: 46,
-              height: 44,
-              decoration: BoxDecoration(
-                color: c.card,
-                borderRadius: radius,
-                border: Border.all(color: c.border),
-              ),
-              child: Icon(icon, size: 18, color: c.foreground),
-            ),
-          ),
-        );
-
-    return Row(
-      children: [
-        arrow(
-          LucideIcons.chevronLeft,
-          'Previous period',
-          () => shift(-1),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Container(
-            height: 44,
-            alignment: Alignment.center,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            decoration: BoxDecoration(
-              color: c.card,
-              borderRadius: radius,
-              border: Border.all(color: c.border),
-            ),
-            // '04 Aug – 10 Aug' is the widest of the three forms; scaling it
-            // down beats losing an end of the range to an ellipsis.
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                range.periodLabel,
-                maxLines: 1,
-                style: const TextStyle(
-                  fontSize: 15.5,
-                  fontWeight: FontWeight.w600,
-                  fontFeatures: [FontFeature.tabularFigures()],
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        arrow(LucideIcons.chevronRight, 'Next period', () => shift(1)),
-      ],
+    return PeriodPager(
+      label: range.periodLabel,
+      onPrevious: () => shift(-1),
+      onNext: () => shift(1),
     );
   }
 }
@@ -473,7 +423,10 @@ class _HighlightsCard extends StatelessWidget {
       rows.add(
         _Highlight(
           LucideIcons.lightbulb,
-          c.primary,
+          // The web's amber lightbulb, via the shared `warning` token — the
+          // same one the Reports insight banner and the Notifications warning
+          // rows use.
+          c.warning,
           riser.pct == null
               // "rose the most" reads oddly against a category that did not
               // exist last period, so a category with no history says so.
@@ -658,8 +611,16 @@ class _DeltaPill extends StatelessWidget {
 ///
 /// A deliberate mobile addition: the web parses this block on /insights and
 /// renders it nowhere (its Reports screen computes its own rate from
-/// `/reports/summary` instead). Showing the server's own figure here costs
-/// nothing and is one fewer number the two screens can disagree about.
+/// `/reports/summary` instead).
+///
+/// ⚠️ CROSS-SCREEN NOTE: this is the **server's** rate; the one on Reports is
+/// derived client-side as `(income − consumption) ÷ income`. The server's
+/// formula is not recoverable from the bundle and cannot be observed against
+/// this account — every period it has ever held has zero income, so both sides
+/// render an em dash and agree today. They can only diverge on a period with
+/// income *and* non-consumption spending. If that ever shows two different
+/// percentages, this card is the one to drop: the web renders no savings rate
+/// on Insights at all.
 class _SavingsRateCard extends StatelessWidget {
   const _SavingsRateCard({required this.insights, required this.noun});
 
@@ -936,7 +897,9 @@ class _MoversCard extends ConsumerWidget {
               _MoverRow(
                 mover: mover,
                 maxAbsDelta: maxAbs,
-                onTap: () => _openTransactions(
+                // The window is the server's own current.start/current.end,
+                // so the ledger can never disagree with the figure tapped.
+                onTap: () => openTransactionsFiltered(
                   context,
                   ref,
                   from: insights.currentStart,
@@ -1000,9 +963,11 @@ class _MoverRow extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 // Sign is stated explicitly: the delta is an absolute figure
-                // and "₹13,312" alone would not say which way it went.
+                // and "₹13,312" alone would not say which way it went. The
+                // figure stays exact — only a nine-figure swing, which would
+                // squeeze the name to nothing, compacts.
                 Text(
-                  '$sign${Money.compact(mover.delta.abs(), decimals: 0)}',
+                  '$sign${Money.dense(mover.delta.abs())}',
                   style: TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w700,
@@ -1048,6 +1013,7 @@ class _MoverRow extends StatelessWidget {
     );
   }
 }
+
 
 /// A track with a centre tick: increases grow right in expense red, decreases
 /// grow left in income green, both scaled against the largest mover.
@@ -1225,35 +1191,3 @@ class _TopExpenseRow extends StatelessWidget {
 
 // ── drill-through ──────────────────────────────────────────────────────────
 
-/// Opens the ledger filtered the way the web filters it.
-///
-/// The window comes from the server's own `current.start` / `current.end`, not
-/// from this screen's client-side range, so the list can never disagree with
-/// the figure that was tapped.
-///
-/// One honest limitation: the Transactions screen re-stamps its month over the
-/// query on mount, so the window it actually opens on is the calendar month
-/// containing [from]. For the default Month period that is exactly the
-/// insights window; for Week or Year it is wider or narrower, and that screen's
-/// own month header states which. The category and type filters always survive.
-void _openTransactions(
-  BuildContext context,
-  WidgetRef ref, {
-  DateTime? from,
-  DateTime? to,
-  TransactionType? type,
-  String? categoryId,
-}) {
-  final start = from ?? DateTime.now();
-  ref.read(transactionsMonthProvider.notifier).state = DateTime(
-    start.year,
-    start.month,
-  );
-  ref.read(transactionQueryProvider.notifier).state = TransactionQuery(
-    from: from,
-    to: to,
-    type: type,
-    categoryId: categoryId,
-  );
-  context.go('/transactions');
-}

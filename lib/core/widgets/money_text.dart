@@ -43,12 +43,19 @@ class MoneyText extends StatelessWidget {
       MoneyTone.neutral => null,
     };
 
+    // `compactAbove` is [Money.dense] — same rule, one implementation, so a
+    // widget and a string interpolation of the same amount cannot disagree.
     final threshold = compactAbove;
-    final asCompact =
-        compact || (threshold != null && amount.abs() >= threshold);
-    final text = asCompact
+    final text = compact
         ? Money.compact(amount, symbol: symbol, signed: signed)
-        : Money.format(amount, symbol: symbol, signed: signed);
+        : threshold == null
+        ? Money.format(amount, symbol: symbol, signed: signed)
+        : Money.dense(
+            amount,
+            threshold: threshold,
+            symbol: symbol,
+            signed: signed,
+          );
 
     return Text(
       text,

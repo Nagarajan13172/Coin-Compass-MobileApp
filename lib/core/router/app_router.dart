@@ -18,10 +18,14 @@ import '../../features/dashboard/presentation/dashboard_screen.dart';
 import '../../features/goals/presentation/goals_screen.dart';
 import '../../features/gold/presentation/gold_screen.dart';
 import '../../features/holdings/presentation/holdings_screen.dart';
+import '../../features/insights/presentation/insights_screen.dart';
 import '../../features/loans/presentation/loans_screen.dart';
 import '../../features/networth/presentation/net_worth_screen.dart';
+import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/people/presentation/people_screen.dart';
 import '../../features/recurring/presentation/recurring_screen.dart';
+import '../../features/reports/presentation/reports_screen.dart';
+import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/splits/presentation/splits_screen.dart';
 import '../../features/stocks/presentation/stocks_screen.dart';
 import '../../features/transactions/presentation/transactions_screen.dart';
@@ -63,27 +67,11 @@ Widget _screenFor(Destination d) => switch (d.path) {
   '/loans' => const LoansScreen(),
   '/stocks' => const StocksScreen(),
   '/gold' => const GoldScreen(),
-  // phase 5
-  '/reports' => PlaceholderScreen(
-    title: d.label,
-    icon: d.icon,
-    phase: 'phase 5',
-  ),
-  '/insights' => PlaceholderScreen(
-    title: d.label,
-    icon: d.icon,
-    phase: 'phase 5',
-  ),
-  '/notifications' => PlaceholderScreen(
-    title: d.label,
-    icon: d.icon,
-    phase: 'phase 5',
-  ),
-  '/settings' => PlaceholderScreen(
-    title: d.label,
-    icon: d.icon,
-    phase: 'phase 5',
-  ),
+  // phase 5 — shipped
+  '/reports' => const ReportsScreen(),
+  '/insights' => const InsightsScreen(),
+  '/notifications' => const NotificationsScreen(),
+  '/settings' => const SettingsScreen(),
   _ => PlaceholderScreen(title: d.label, icon: d.icon),
 };
 

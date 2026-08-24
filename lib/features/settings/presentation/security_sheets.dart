@@ -75,7 +75,8 @@ class _PinSheetState extends ConsumerState<PinSheet> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final busy = ref.watch(settingsWriteControllerProvider) == SettingsWrite.pin;
+    final busy =
+        ref.watch(settingsWriteControllerProvider) == SettingsWrite.pin;
 
     return FormSheetScaffold(
       title: widget.change ? 'Change your PIN' : 'Set a PIN',

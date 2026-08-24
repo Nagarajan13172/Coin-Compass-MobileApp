@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:coincompass/core/api/api_client.dart';
+import 'package:coincompass/core/api/enums.dart';
 import 'package:coincompass/core/theme/app_theme.dart';
 import 'package:coincompass/core/utils/money.dart';
 import 'package:coincompass/core/widgets/loading_shimmer.dart';
@@ -12,7 +13,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:coincompass/features/transactions/presentation/transactions_providers.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// `/insights` at 360 × 800dp, against the shapes the live account actually
 /// returns.
@@ -20,9 +24,15 @@ import 'package:flutter_test/flutter_test.dart';
 /// The whole stack is real — repository, providers, widgets — with only the
 /// Dio transport swapped for an adapter that replays a payload per `period`.
 ///
-/// NOTE ON PUMPING: this screen shows [LoadingShimmer] (an endlessly repeating
-/// controller) and a [RefreshIndicator], so `pumpAndSettle` would never
-/// return. Every wait below is an explicit `pump(Duration)`.
+/// TWO PUMPING RULES, both learned the hard way:
+///
+/// * This screen mounts [LoadingShimmer] (an endlessly repeating controller)
+///   and a [RefreshIndicator], so `pumpAndSettle` would never return. Every
+///   wait below is an explicit `pump(Duration)`.
+/// * A request started inside the fake-async zone only completes while the
+///   test keeps pumping, so `runAsync`-ing its future deadlocks. Anything that
+///   has to *resolve* is therefore set up before the widget is mounted, and
+///   the interaction tests assert on state rather than on a second round trip.
 void main() {
   const Size phone = Size(360, 800);
   late Directory tempDir;
@@ -52,9 +62,9 @@ void main() {
   Future<ProviderContainer> pump(
     WidgetTester tester, {
     String payload = _real,
-    Map<String, String> byPeriod = const {},
     int status = 200,
     ThemeData? theme,
+    PeriodKind? kind,
   }) async {
     tester.view
       ..physicalSize = phone
@@ -64,19 +74,20 @@ void main() {
     late ProviderContainer container;
     await tester.runAsync(() async {
       final api = await ApiClient.create();
-      api.dio.httpClientAdapter = _Adapter(
-        payload: payload,
-        byPeriod: byPeriod,
-        status: status,
-      );
+      api.dio.httpClientAdapter = _Adapter(payload: payload, status: status);
       container = ProviderContainer(
         overrides: [apiClientProvider.overrideWithValue(api)],
       );
+      if (kind != null) {
+        container.read(insightsPeriodKindProvider.notifier).state = kind;
+      }
       // Hold the autoDispose reads open for the life of the test.
       container.listen<Object?>(currentInsightsProvider, (a, b) {});
-      await container
-          .read(currentInsightsProvider.future)
-          .catchError((Object _) => throw _Swallowed());
+      try {
+        await container.read(currentInsightsProvider.future);
+      } catch (_) {
+        // The failure is what the error test is about; the screen renders it.
+      }
     });
     addTearDown(container.dispose);
 
@@ -98,32 +109,21 @@ void main() {
       .stateList<ScrollableState>(find.byType(Scrollable))
       .firstWhere((state) => state.position.axis == Axis.vertical);
 
-  /// Slivers build lazily, so a card below the fold is only laid out once it
-  /// scrolls into view — which is exactly where an overflow hides.
-  Future<void> scrollThrough(WidgetTester tester) async {
-    final position = verticalList(tester).position;
-    for (var offset = 0.0; ; offset += 300) {
-      position.jumpTo(offset.clamp(0.0, position.maxScrollExtent));
-      await tester.pump();
-      expect(tester.takeException(), isNull);
-      if (offset >= position.maxScrollExtent) break;
-    }
-    position.jumpTo(0);
-    await tester.pump();
-  }
-
   String? textOf(Widget widget) {
     final text = widget as Text;
     return text.data ?? text.textSpan?.toPlainText();
   }
 
+  Iterable<String> renderedText(WidgetTester tester) => tester
+      .widgetList<Text>(find.byType(Text))
+      .map(textOf)
+      .whereType<String>();
+
   /// The failure this screen exists to avoid: a null percentage rendered
   /// literally, or a division by a zero previous period.
   void expectNoBrokenNumbers(WidgetTester tester) {
-    for (final widget in tester.widgetList<Text>(find.byType(Text))) {
-      final data = textOf(widget);
-      if (data == null) continue;
-      for (final poison in const ['null', 'NaN', 'Infinity', '%%']) {
+    for (final data in renderedText(tester)) {
+      for (final poison in const ['null', 'NaN', 'Infinity']) {
         expect(
           data.contains(poison),
           isFalse,
@@ -133,10 +133,31 @@ void main() {
     }
   }
 
-  Iterable<String> allText(WidgetTester tester) => tester
-      .widgetList<Text>(find.byType(Text))
-      .map(textOf)
-      .whereType<String>();
+  /// Walks the whole list, collecting everything that renders on the way.
+  ///
+  /// Slivers build lazily, so a card below the fold is only laid out once it
+  /// scrolls into view — which is exactly where an overflow hides, and also
+  /// why an assertion made after scrolling back to the top would miss it.
+  Future<Set<String>> scrollThrough(WidgetTester tester) async {
+    final seen = <String>{};
+    final position = verticalList(tester).position;
+    for (var offset = 0.0; ; offset += 250) {
+      position.jumpTo(offset.clamp(0.0, position.maxScrollExtent));
+      await tester.pump();
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: 'laying out at scroll offset $offset threw — likely a '
+            'RenderFlex overflow at 360dp',
+      );
+      seen.addAll(renderedText(tester));
+      expectNoBrokenNumbers(tester);
+      if (offset >= position.maxScrollExtent) break;
+    }
+    position.jumpTo(0);
+    await tester.pump();
+    return seen;
+  }
 
   // ── loaded ───────────────────────────────────────────────────────────────
 
@@ -148,30 +169,41 @@ void main() {
       find.text('How your spending is changing, period over period.'),
       findsOneWidget,
     );
-    // Week / Month / Year and the pager label.
+    // Week / Month / Year, the pager and the caption.
     expect(find.text('Month'), findsOneWidget);
     expect(find.textContaining('Showing'), findsOneWidget);
+    expect(find.byIcon(LucideIcons.chevronLeft), findsOneWidget);
+    expect(find.byIcon(LucideIcons.chevronRight), findsOneWidget);
 
-    expect(find.text('Spending'), findsOneWidget);
-    expect(find.text('Income'), findsOneWidget);
-    expect(find.text('Net'), findsOneWidget);
-    expect(find.text('₹13,312'), findsWidgets);
-    expect(find.text('${Money.minus}₹13,312'), findsWidgets);
+    final seen = await scrollThrough(tester);
 
-    await scrollThrough(tester);
-
-    expect(find.text('Spending pace'), findsOneWidget);
-    expect(find.text('What changed'), findsOneWidget);
-    expect(find.text('Biggest expenses'), findsOneWidget);
-    expect(find.text('Groceries'), findsWidgets);
-    expectNoBrokenNumbers(tester);
+    expect(seen, containsAll(<String>['Spending', 'Income', 'Net']));
+    expect(seen, contains('₹13,312'));
+    expect(seen, contains('${Money.minus}₹13,312'));
+    expect(seen, contains('Savings rate'));
+    expect(seen, contains('Spending pace'));
+    expect(seen, contains('Spent so far'));
+    expect(seen, contains('Avg per day'));
+    // avgPerDay 554.666… is rounded to whole rupees here, unlike Reports.
+    expect(seen, contains('₹555'));
+    expect(seen, contains('Projected this month'));
+    expect(seen, contains('₹17,195'));
+    expect(seen, contains('Day 24 of 31'));
+    expect(seen, contains('77%'));
+    expect(seen, contains('What changed'));
+    expect(seen, contains('Biggest shifts vs last month'));
+    expect(seen, contains('Groceries'));
+    expect(seen, contains('+₹13,312'));
+    expect(seen, contains('Biggest expenses'));
+    expect(seen, contains('₹12,312'));
+    expect(seen, contains('Groceries · 04 Aug'));
     expect(tester.takeException(), isNull);
   });
 
   testWidgets('loaded — pull-to-refresh is wired', (tester) async {
     await pump(tester);
-    // Not dragged: the indicator is indeterminate and its future is a real
-    // network call, so a drag would spin past the end of the test.
+    // Deliberately not dragged: the indicator is indeterminate and its future
+    // is a real network call, so a drag would spin past the end of the test.
     expect(find.byType(RefreshIndicator), findsOneWidget);
   });
 
@@ -181,46 +213,51 @@ void main() {
     tester,
   ) async {
     await pump(tester);
-    await scrollThrough(tester);
-
-    final texts = allText(tester).toList();
+    final seen = await scrollThrough(tester);
 
     // The delta pill falls back to a compact amount, never a percentage.
-    expect(texts, contains('₹13K'));
+    expect(seen, contains('₹13K'));
     // Spending and Net both moved with no baseline; Income did not move.
-    expect(texts, contains('No change'));
+    expect(seen, contains('No change'));
     // The dead "Last month: ₹0" line is replaced by a statement of fact.
-    expect(texts, contains('nothing spent last month'));
-    expect(texts, contains('nothing earned last month'));
-    expect(texts, contains('nothing recorded last month'));
+    expect(seen, contains('nothing spent last month'));
+    expect(seen, contains('nothing earned last month'));
+    expect(seen, contains('nothing recorded last month'));
     expect(
-      texts.any((t) => t.startsWith('Last month:')),
+      seen.any((t) => t.startsWith('Last month:')),
       isFalse,
       reason: 'a zero previous period must not be reported as a comparison',
     );
+    expect(
+      seen.contains('vs last month'),
+      isFalse,
+      reason: 'there is nothing to be "vs" yet',
+    );
 
     // A mover with no history reads "New", not "null%".
-    expect(texts, contains('New'));
+    expect(seen, contains('New'));
 
     // savingsRate {current: null} — an em dash, and a sentence saying why.
-    expect(texts, contains('—'));
+    expect(seen, contains('—'));
     expect(
-      texts,
-      contains('No income this month — a savings rate needs income to '
-          'divide by.'),
+      seen,
+      contains(
+        'No income this month — a savings rate needs income to divide by.',
+      ),
     );
 
     // pace.previousToDate == 0 hides the faster/slower line entirely rather
     // than dividing by it.
-    expect(texts.any((t) => t.contains('at this point')), isFalse);
+    expect(seen.any((t) => t.contains('at this point')), isFalse);
 
     // The first period is a designed state, not a degraded one.
     expect(
-      texts.any((t) => t.startsWith('This is your first month with data')),
+      seen.any((t) => t.startsWith('This is your first month with data')),
       isTrue,
     );
+    // …and the highlight leads with the no-baseline sentence.
+    expect(seen, contains("You've spent ₹13,312 this month."));
 
-    expectNoBrokenNumbers(tester);
     expect(tester.takeException(), isNull);
   });
 
@@ -228,15 +265,14 @@ void main() {
     tester,
   ) async {
     await pump(tester, payload: _allZero);
-    await scrollThrough(tester);
+    final seen = await scrollThrough(tester);
 
-    final texts = allText(tester).toList();
-    expect(texts.where((t) => t == 'No change').length, greaterThanOrEqualTo(3));
-    expect(texts, contains('No category changes to show.'));
-    expect(texts, contains('No expenses in this period.'));
-    // daysInPeriod == 0 must not produce a progress bar or a NaN percentage.
-    expect(find.byType(LinearProgressIndicator), findsNothing);
-    expectNoBrokenNumbers(tester);
+    expect(seen.where((t) => t == 'No change').length, 1);
+    expect(seen, contains('No category changes to show.'));
+    expect(seen, contains('No expenses in this period.'));
+    // daysInPeriod == 0 must not produce a progress row or a NaN percentage.
+    expect(seen.any((t) => t.startsWith('Day ')), isFalse);
+    expect(seen, contains('₹0'));
     expect(tester.takeException(), isNull);
   });
 
@@ -245,7 +281,7 @@ void main() {
   testWidgets('empty — hasData:false keeps the header and pager', (
     tester,
   ) async {
-    await pump(tester, payload: _empty);
+    await pump(tester, payload: _empty, kind: PeriodKind.week);
 
     expect(find.text('Not enough data yet'), findsOneWidget);
     expect(
@@ -261,6 +297,8 @@ void main() {
     expect(find.textContaining('Showing'), findsOneWidget);
     // …and none of the body is built.
     expect(find.text('Spending pace'), findsNothing);
+    expect(find.text('Savings rate'), findsNothing);
+    expectNoBrokenNumbers(tester);
     expect(tester.takeException(), isNull);
   });
 
@@ -269,14 +307,18 @@ void main() {
   testWidgets('error — ErrorRetry, with the chrome still usable', (
     tester,
   ) async {
-    await pump(tester, payload: '{"message":"Insights are unavailable"}',
-        status: 500);
+    await pump(
+      tester,
+      payload: '{"error":"Insights are unavailable"}',
+      status: 500,
+    );
 
     expect(find.text('Something went wrong'), findsOneWidget);
     expect(find.text('Insights are unavailable'), findsOneWidget);
     expect(find.text('Retry'), findsOneWidget);
     expect(find.text('Insights'), findsOneWidget);
     expect(find.textContaining('Showing'), findsOneWidget);
+    expect(find.byType(LoadingCard), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -288,10 +330,10 @@ void main() {
       ..devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
-    final gate = Completer<String>();
+    final gate = Completer<void>();
     // Release the request before the test ends so nothing is left hanging.
     addTearDown(() {
-      if (!gate.isCompleted) gate.complete(_real);
+      if (!gate.isCompleted) gate.complete();
     });
 
     late ProviderContainer container;
@@ -320,6 +362,7 @@ void main() {
     expect(find.byType(LoadingCard), findsWidgets);
     expect(find.text('Insights'), findsOneWidget);
     expect(find.text('Not enough data yet'), findsNothing);
+    expect(find.text('Something went wrong'), findsNothing);
     expect(tester.takeException(), isNull);
 
     // Unmount before the test ends so the shimmer's repeating controller is
@@ -329,58 +372,142 @@ void main() {
 
   // ── hostile ──────────────────────────────────────────────────────────────
 
-  testWidgets('hostile — nine figures and 90-character names fit 360dp', (
+  testWidgets('hostile — nine figures and a 90-character name fit 360dp', (
     tester,
   ) async {
     await pump(tester, payload: _hostile);
-    await scrollThrough(tester);
+    final seen = await scrollThrough(tester);
 
-    final texts = allText(tester).toList();
-    // A real baseline exists here, so the comparisons are the percentage form.
-    expect(texts, contains('vs last month'));
-    expect(texts.any((t) => t.startsWith('Last month:')), isTrue);
-    expect(texts.any((t) => t.contains('faster than last month')), isTrue);
+    // A real baseline exists here, so the comparisons take the percentage
+    // form and the "last month" lines appear.
+    expect(seen, contains('vs last month'));
+    expect(seen.any((t) => t.startsWith('Last month:')), isTrue);
+    expect(seen, contains('700%'));
+    expect(seen.any((t) => t.contains('faster than last month')), isTrue);
     // isCurrent:false switches "Projected" to "Total" and drops the progress
-    // bar.
-    expect(texts, contains('Total this month'));
-    expect(find.byType(LinearProgressIndicator), findsNothing);
-    expectNoBrokenNumbers(tester);
+    // row.
+    expect(seen, contains('Total this month'));
+    expect(seen.any((t) => t.startsWith('Day ')), isFalse);
+    // A mover that fell reads with a real minus sign, and the one with no
+    // history still reads "New".
+    expect(seen.any((t) => t.startsWith(Money.minus)), isTrue);
+    expect(seen, contains('New'));
+    // A top expense with no category and no date still renders.
+    expect(seen, contains('Uncategorized'));
+    expect(seen, contains('Expense'));
     expect(tester.takeException(), isNull);
   });
 
   testWidgets('hostile — dark mode', (tester) async {
     await pump(tester, payload: _hostile, theme: AppTheme.dark());
-    await scrollThrough(tester);
+    final seen = await scrollThrough(tester);
     expect(find.text('Insights'), findsOneWidget);
-    expectNoBrokenNumbers(tester);
+    expect(seen, contains('Spending pace'));
     expect(tester.takeException(), isNull);
   });
 
   // ── period control ───────────────────────────────────────────────────────
 
-  testWidgets('period — Week refetches and can land on the empty state', (
+  testWidgets('period — the segmented control switches the period', (
     tester,
   ) async {
-    final container = await pump(
-      tester,
-      byPeriod: {'week': _empty, 'month': _real},
-    );
-    expect(find.text('Spending pace'), findsOneWidget);
+    final container = await pump(tester);
+    expect(container.read(insightsPeriodKindProvider), PeriodKind.month);
 
     await tester.tap(find.text('Week'));
     await tester.pump();
-    await tester.runAsync(() async {
-      try {
-        await container.read(currentInsightsProvider.future);
-      } catch (_) {
-        // Rendered by the screen.
-      }
-    });
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 200));
 
     expect(container.read(insightsPeriodKindProvider), PeriodKind.week);
-    expect(find.text('Not enough data yet'), findsOneWidget);
+    // Stale-while-revalidate: the previous payload stays on screen instead of
+    // being replaced by a skeleton under the control the user just tapped.
+    expect(find.byType(LoadingCard), findsNothing);
+    expect(find.text('Insights'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  // ── drill-through ────────────────────────────────────────────────────────
+
+  testWidgets('mover row opens the ledger filtered by that category', (
+    tester,
+  ) async {
+    tester.view
+      ..physicalSize = phone
+      ..devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    late ProviderContainer container;
+    await tester.runAsync(() async {
+      final api = await ApiClient.create();
+      api.dio.httpClientAdapter = _Adapter(payload: _real);
+      container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWithValue(api)],
+      );
+      container.listen<Object?>(currentInsightsProvider, (a, b) {});
+      await container.read(currentInsightsProvider.future);
+    });
+    addTearDown(container.dispose);
+
+    // A stub ledger: this test is about what the tap sets and where it goes,
+    // not about the real Transactions screen.
+    final router = GoRouter(
+      initialLocation: '/insights',
+      routes: [
+        GoRoute(
+          path: '/insights',
+          builder: (_, _) => const Scaffold(body: InsightsScreen()),
+        ),
+        GoRoute(
+          path: '/transactions',
+          builder: (_, _) => const Scaffold(body: Text('ledger')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(
+          theme: AppTheme.light(),
+          routerConfig: router,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    // Bring the mover row fully into view before tapping it.
+    final position = verticalList(tester).position;
+    for (var offset = 0.0; ; offset += 120) {
+      position.jumpTo(offset.clamp(0.0, position.maxScrollExtent));
+      await tester.pump();
+      // Not the category name: "Groceries" is also the fallback title of
+      // both top-expense rows. The signed delta belongs to the mover row
+      // alone.
+      final finder = find.text('+₹13,312');
+      if (finder.evaluate().isNotEmpty) {
+        final rect = tester.getRect(finder.first);
+        if (rect.top > 60 && rect.bottom < 700) break;
+      }
+      if (offset >= position.maxScrollExtent) {
+        fail('the mover row never came into view');
+      }
+    }
+
+    await tester.tap(find.text('+₹13,312'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('ledger'), findsOneWidget);
+    final query = container.read(transactionQueryProvider);
+    expect(query.categoryId, '6a4669f861d974fd74ab427f');
+    expect(query.type, TransactionType.expense);
+    // The window is the server's own `current`, not a client-side guess.
+    expect(query.from, DateTime.parse('2026-08-01T00:00:00.000Z').toLocal());
+    expect(query.to, DateTime.parse('2026-09-01T00:00:00.000Z').toLocal());
+    // …and the ledger's month is stamped so it opens on that period.
+    expect(container.read(transactionsMonthProvider).month, 8);
     expect(tester.takeException(), isNull);
   });
 
@@ -390,34 +517,38 @@ void main() {
     final container = await pump(tester);
     final before = container.read(insightsAnchorProvider);
 
-    await tester.tap(find.bySemanticsLabel('Previous period'));
+    await tester.tap(find.byIcon(LucideIcons.chevronLeft));
+    // The duration matters: moving the anchor starts a fresh request, and Dio
+    // arms a zero-duration timer to do it. A bare `pump()` never fires that
+    // timer, and the test then fails on a pending one at teardown.
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
     final back = container.read(insightsAnchorProvider);
     expect(back.isBefore(before), isTrue);
+    expect(back.month, before.addMonthsForTest(-1).month);
 
-    await tester.tap(find.bySemanticsLabel('Next period'));
+    await tester.tap(find.byIcon(LucideIcons.chevronRight));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
     expect(container.read(insightsAnchorProvider).isAfter(back), isTrue);
+    expect(find.text('Insights'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
 
-class _Swallowed implements Exception {}
+extension on DateTime {
+  DateTime addMonthsForTest(int months) =>
+      DateTime(year, month + months, 1, hour, minute);
+}
 
 class _Adapter implements HttpClientAdapter {
-  _Adapter({
-    required this.payload,
-    this.byPeriod = const {},
-    this.status = 200,
-    this.gate,
-  });
+  _Adapter({required this.payload, this.status = 200, this.gate});
 
   final String payload;
-  final Map<String, String> byPeriod;
   final int status;
 
   /// When set, every request waits on it — the loading-state test's handle.
-  final Completer<String>? gate;
+  final Completer<void>? gate;
 
   @override
   Future<ResponseBody> fetch(
@@ -426,9 +557,8 @@ class _Adapter implements HttpClientAdapter {
     Future<void>? cancelFuture,
   ) async {
     if (gate != null) await gate!.future;
-    final period = options.uri.queryParameters['period'] ?? 'month';
     return ResponseBody.fromString(
-      byPeriod[period] ?? payload,
+      payload,
       status,
       headers: {
         Headers.contentTypeHeader: [Headers.jsonContentType],

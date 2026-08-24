@@ -10,6 +10,8 @@ import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'features/auth/presentation/auth_providers.dart';
+import 'features/settings/data/settings_repository.dart';
+import 'features/settings/domain/app_settings.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,6 +55,29 @@ class _CoinCompassAppState extends ConsumerState<CoinCompassApp> {
     final themeMode = ref.watch(themeControllerProvider);
     final locale = ref.watch(localeControllerProvider);
     final auth = ref.watch(authControllerProvider);
+
+    // The account's own `settings.theme`, adopted on a device that has never
+    // made a local choice of its own — otherwise a signed-in user whose
+    // account says "dark" would still get the system theme on a fresh
+    // install, and the Settings screen's Light/Dark/System row would show a
+    // state the server disagrees with. `adoptFromServer` no-ops the moment a
+    // local choice exists, so this can never fight the user.
+    //
+    // Guarded on `isSignedIn` on purpose: `settingsProvider` is session-cached
+    // with no autoDispose, so subscribing while signed out would park a 401 in
+    // it that every later screen (currency symbol, week start) would then read
+    // as its fallback. `ref.listen` re-subscribes on each build, so a
+    // conditional listen is safe here — see ConsumerStatefulElement.build.
+    if (auth.isSignedIn) {
+      ref.listen<AsyncValue<AppSettings>>(settingsProvider, (_, next) {
+        final serverTheme = next.valueOrNull?.theme;
+        if (serverTheme != null) {
+          ref
+              .read(themeControllerProvider.notifier)
+              .adoptFromServer(serverTheme);
+        }
+      });
+    }
 
     final light = AppTheme.light();
     final dark = AppTheme.dark();

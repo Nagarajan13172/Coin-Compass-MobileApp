@@ -104,16 +104,24 @@ oneoffIncome,oneoffExpense,consumption,nonConsumption,netWorth,byCurrency,range{
 `GET /reports/by-account`; `GET /reports/trend` → `[{bucket,income,expense,net}]`;
 `GET /reports/insights` → `{period,current,previous,expense{current,previous,delta,pct},
 income{...},net{...},savingsRate,pace{isCurrent,daysElapsed,daysInPeriod,avgPerDay,projected,
-previousToDate},movers[],topExpenses...}`; `GET /reports/email-now?kind=`
+previousToDate},movers[],topExpenses...}` — takes `period` + `ref` (an ISO instant), **not**
+from/to; `GET /reports/trend` takes `granularity` (`bucket` is only the response key);
+`POST /reports/email-now?kind=` — a **POST** with the kind in the query string (SPEC said GET),
+and on the never-call list: it emails the account holder.
 
-**notifications** — `GET /notifications` → `{items[],unread}`; `PATCH /notifications/:id/read`;
-`POST /notifications/read-all`; `DELETE /notifications/:id`.
+**notifications** — `GET /notifications` → `{items[],unread}`; `POST /notifications/:id/read`
+(**POST**, not PATCH — corrected against the deployed bundle in Phase 5);
+`POST /notifications/read-all`; `DELETE /notifications/:id`; `DELETE /notifications`
+("Clear all", omitted here until Phase 5).
 Item: `{_id,type,link,params{},read,readAt,dedupeKey,createdAt}`; type e.g. `recurring.posted`.
 
-**settings** — `GET|PATCH /settings` → `{name,description,baseCurrency,theme,locale,language,
+**settings** — `GET|PUT /settings` → `{name,description,baseCurrency,theme,locale,language,
 firstDayOfWeek,monthStartDay,pinEnabled,emailReports,wealthLockEnabled,currencies[
-{code,symbol,name,rateToBase}]}`; `POST /settings/pin`, `POST /settings/pin/verify`,
-`POST /settings/wealth-passcode`
+{code,symbol,name,rateToBase}]}` — the verb is **PUT**: `patch("/settings` appears zero times
+in the deployed bundle, and PATCH has never been tried against this deployment (do not probe
+it on a live account). One concern per body, never the whole document — see
+`docs/WRITE_SCHEMAS.md`; `POST /settings/pin`, `POST /settings/pin/verify`,
+`DELETE /settings/pin`, `POST /settings/wealth-passcode`, `DELETE /settings/wealth-passcode`
 
 **export** — `GET /export/csv`
 

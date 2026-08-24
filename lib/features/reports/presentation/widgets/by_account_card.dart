@@ -57,8 +57,13 @@ class ByAccountCard extends ConsumerWidget {
                     padding: EdgeInsets.only(top: 4),
                     child: EmptyState(
                       icon: LucideIcons.wallet,
-                      title: 'No data',
-                      message: 'No transactions in this period.',
+                      // The owner has zero accounts, so this is the normal
+                      // case, not an edge case — it says what to do about it
+                      // rather than reporting "No data".
+                      title: 'No account activity yet',
+                      message:
+                          'Money moves through an account once you have one '
+                          'set up.',
                       compact: true,
                     ),
                   )

@@ -400,12 +400,16 @@ class _Body extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (rows.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.only(top: 8),
+      // House voice, and it names the side of the ledger being shown: with the
+      // Income toggle selected, "No spending this period" would be a lie.
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
         child: EmptyState(
           icon: LucideIcons.chartPie,
-          title: 'No data',
-          message: 'No transactions in this period.',
+          title: type == 'income'
+              ? 'No income this period'
+              : 'No spending this period',
+          message: 'Nothing to break down for the window you are on.',
           compact: true,
         ),
       );

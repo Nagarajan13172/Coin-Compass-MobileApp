@@ -96,6 +96,26 @@ class Money {
     return '$sign$symbol$body';
   }
 
+  /// The dense-row convention, in one place: state the amount in **full**
+  /// until it stops fitting, then compact it.
+  ///
+  /// `dense(13278)` -> `₹13,278`, `dense(123456789)` -> `₹12.35Cr`.
+  ///
+  /// Hero figures (a StatCard, an Insights headline) are never compacted at
+  /// all; chart axes always are. This is for everything in between — a tile
+  /// caption, a "Last month: …" line, a mover row — where a nine-figure value
+  /// would push its own label off the row but ₹13,278 must stay exact. It is
+  /// the string form of [MoneyText]'s `compactAbove: Money.crore`; two Phase-5
+  /// screens had each written their own copy of it.
+  static String dense(
+    num amount, {
+    num threshold = crore,
+    String symbol = rupee,
+    bool signed = false,
+  }) => amount.abs() >= threshold
+      ? compact(amount, symbol: symbol, signed: signed)
+      : format(amount, symbol: symbol, signed: signed);
+
   /// Same as [compact] without the currency symbol — for chart axis labels,
   /// which the web renders with one decimal (`13.3K`).
   static String compactPlain(num amount, {int? decimals}) =>

@@ -230,7 +230,9 @@ void main() {
     await pump(tester);
     await reveal(tester, 'By account');
     expect(find.text('Money in vs out per account'), findsOneWidget);
-    expect(find.text('No transactions in this period.'), findsWidgets);
+    // House voice, shared with every other empty state in the app: it says
+    // what is missing and why, never a bare "No data".
+    expect(find.text('No account activity yet'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -302,8 +304,12 @@ void main() {
     );
 
     expect(find.text('Reports'), findsOneWidget);
-    await reveal(tester, 'No data');
-    expect(find.text('No transactions in this period.'), findsWidgets);
+    // The donut is on `expense`, so the empty state names that side.
+    await reveal(tester, 'No spending this period');
+    expect(find.text('No spending this period'), findsOneWidget);
+    await reveal(tester, 'No account activity yet');
+    expect(find.text('No account activity yet'), findsOneWidget);
+    // The chart placeholder keeps the web's own wording.
     await reveal(tester, 'No data for this period');
     // The charts render the placeholder at their full height. Only the ones
     // currently in the viewport are built, so this is `findsWidgets`.

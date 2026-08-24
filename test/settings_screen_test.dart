@@ -320,22 +320,23 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('a settings failure offers a retry and keeps the escape hatches', (
-    tester,
-  ) async {
-    await pump(tester, payloads: {'/settings': _boom});
+  testWidgets(
+    'a settings failure offers a retry and keeps the escape hatches',
+    (tester) async {
+      await pump(tester, payloads: {'/settings': _boom});
 
-    expect(find.text('Retry'), findsOneWidget);
-    // The profile, the theme picker and Sign out do not depend on /settings —
-    // losing them would strand the user on a screen with no way out.
-    expect(find.text('Hari'), findsOneWidget);
-    expect(find.text('Appearance'), findsOneWidget);
-    await expectVisible(tester, 'Sign out');
-    // App info degrades to an em dash rather than inventing a region.
-    await expectVisible(tester, 'App info');
-    expect(find.text('—'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+      expect(find.text('Retry'), findsOneWidget);
+      // The profile, the theme picker and Sign out do not depend on /settings —
+      // losing them would strand the user on a screen with no way out.
+      expect(find.text('Hari'), findsOneWidget);
+      expect(find.text('Appearance'), findsOneWidget);
+      await expectVisible(tester, 'Sign out');
+      // App info degrades to an em dash rather than inventing a region.
+      await expectVisible(tester, 'App info');
+      expect(find.text('—'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('an empty currency table renders its own empty state', (
     tester,
@@ -460,7 +461,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('picking a currency sends exactly {baseCurrency}', (tester) async {
+  testWidgets('picking a currency sends exactly {baseCurrency}', (
+    tester,
+  ) async {
     final harness = await pump(tester);
 
     await revealAndTap(tester, find.text('USD — US Dollar'));
@@ -551,10 +554,7 @@ void main() {
     await revealAndTap(tester, find.text('Set a PIN'));
 
     final field = find
-        .descendant(
-          of: find.byType(PinSheet),
-          matching: find.byType(TextField),
-        )
+        .descendant(of: find.byType(PinSheet), matching: find.byType(TextField))
         .first;
     await tester.enterText(field, '12ab34!!5678999');
     await tester.pump();

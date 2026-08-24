@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Launcher label. A string resource rather than a literal so phase 7.1
+         can add values-ta/ without touching the manifest. -->
+    <string name="app_name">CoinCompass</string>
+</resources>

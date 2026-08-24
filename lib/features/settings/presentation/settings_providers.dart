@@ -94,14 +94,14 @@ class SettingsWriteController extends StateNotifier<SettingsWrite?> {
       _run(SettingsWrite.disablePin, _repo.disablePin);
 
   /// `POST /settings/wealth-passcode {passcode}` — 4–32 characters.
-  Future<String?> setWealthPasscode(String passcode) =>
-      _run(SettingsWrite.wealthPasscode, () => _repo.setWealthPasscode(passcode));
+  Future<String?> setWealthPasscode(String passcode) => _run(
+    SettingsWrite.wealthPasscode,
+    () => _repo.setWealthPasscode(passcode),
+  );
 
   /// `DELETE /settings/wealth-passcode` — no body.
-  Future<String?> disableWealthPasscode() => _run(
-    SettingsWrite.disableWealthPasscode,
-    _repo.disableWealthPasscode,
-  );
+  Future<String?> disableWealthPasscode() =>
+      _run(SettingsWrite.disableWealthPasscode, _repo.disableWealthPasscode);
 
   /// `POST /auth/logout` (no body) **and** a cookie-jar wipe.
   ///

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand tokens, matching docs/SPEC.md. The icon background is the web
+         manifest's theme_color; the splash background is the app's own
+         `background` token so the launch window hands off to the first frame
+         without a flash. -->
+    <color name="ic_launcher_background">#0F172A</color>
+    <color name="splash_background">#F8FAFC</color>
+</resources>
