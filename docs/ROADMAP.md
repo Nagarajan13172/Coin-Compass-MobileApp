@@ -151,16 +151,91 @@ the rule, and confirm both land in the web app.
 
 | # | Task | Status |
 |---|---|---|
-| 6.1 | Biometric + PIN app lock on resume (`local_auth`) | [ ] blocked on 5.9 |
-| 6.2 | Wealth-lock blur/mask on sensitive amounts | [ ] blocked on 5.9 |
-| 6.3 | Offline read cache + request retry; graceful no-connection banner | [ ] |
-| 6.4 | Optimistic updates for create/edit/delete | [ ] |
-| 6.5 | Audit every screen for loading / empty / error+retry states | [ ] blocked on phase 5 |
-| 6.6 | Dark mode audit across all 17 screens | [ ] blocked on phase 5 |
+| 6.1 | Biometric + PIN app lock on resume (`local_auth`) | [ ] unblocked — 5.9 landed; `local_auth` is a dependency but unused |
+| 6.2 | Wealth-lock blur/mask on sensitive amounts | [ ] unblocked — `wealthLockEnabled` is read, nothing masks yet |
+| 6.3 | Offline read cache + request retry; graceful no-connection banner | [ ] partial — `NO_CONNECTION` already becomes "No connection" + Retry; no cache, no retry |
+| 6.4 | Optimistic updates for create/edit/delete | [~] transactions only (delete/undo, insert, edit); every other feature awaits then invalidates |
+| 6.5 | Audit every screen for loading / empty / error+retry states | [x] |
+| 6.6 | Dark mode audit across all 17 screens | [x] |
 | 6.7 | App icon, adaptive icon, splash screen, app label | [x] built · not yet seen on a device |
-| 6.8 | Widget tests for Money/DateX, model round-trips, auth flow | [ ] |
-| 6.9 | Release signing keystore, `--release` APK + AAB, size check | [ ] |
+| 6.8 | Widget tests for Money/DateX, model round-trips, auth flow | [~] Money/DateX and model round-trips done; auth flow only via restore/401/sign-out |
+| 6.9 | Release signing keystore, `--release` APK + AAB, size check | [x] signed with a real upload key — see `RELEASE.md` |
 | 6.10 | On-device pass over all 17 screens with real data | [ ] |
+
+### 6.9 — release signing
+
+Full detail in `RELEASE.md`. In short: a PKCS12 upload keystore (RSA 4096,
+valid to 2054) lives at `~/.android-keystores/coincompass-upload.jks`, outside
+the working tree — a gitignored keystore *inside* the repo is still destroyed by
+`git clean -xfd`, and losing it ends the ability to update the listing. Its
+password was generated at creation, written only into the gitignored
+`android/key.properties`, and printed nowhere.
+
+`build.gradle.kts` signs with that key when `key.properties` is present and falls
+back to the debug key when it is not, so a checkout without the signing material
+still builds. Both artifacts were verified to carry `CN=CoinCompass`, not
+`CN=Android Debug`: the APK via `apksigner` (SHA-1 `4c3a…1dba`, matching the
+keystore) and the AAB via `jarsigner` ("jar verified"). v2-only signing is
+correct here — `minSdk` is 24, and v1 is only needed below that.
+
+| Artifact | Size |
+|---|---|
+| `app-release.aab` | 59.2 MiB |
+| fat APK (3 ABIs) | 61.6 MiB |
+| arm64-v8a APK | 22.7 MiB |
+| armeabi-v7a APK | 20.6 MiB |
+
+Nearly all of it is the Flutter engine (~18–21 MiB per ABI). The one avoidable
+chunk: **2.62 MiB of unused `LucideVariable-w*.ttf`**, declared as package assets
+by `lucide_icons_flutter` and bundled whole — icon tree-shaking only reaches
+`lucide.ttf` (858 KiB → 43 KiB), not plain asset fonts. Removing it means
+vendoring the package.
+
+Two things to do before any upload: bump `version:` in `pubspec.yaml` (Play
+rejects a repeated `versionCode`, still `+1`), and settle `local_auth` — it is
+already injecting `USE_BIOMETRIC` and `USE_FINGERPRINT` into the manifest while
+6.1 leaves it unused.
+
+### 6.5 + 6.6 — the audit
+
+`test/state_audit_test.dart` drives all 20 in-app screens (the 17 destinations
+plus Holdings, People and Splits) through four states at 360 × 800dp — 80 tests.
+The whole stack is real; only Dio's adapter is swapped.
+
+| state | transport | what is asserted |
+|---|---|---|
+| loading | never answers | a loading affordance, and no ErrorRetry |
+| error | 500s every call | an ErrorRetry **you can tap**, and **zero skeletons** |
+| empty | answers with nothing | an empty state, never a bare ₹0 |
+| dark | replays the real account | lays out, and paints no light-theme surface |
+
+Three real defects, all fixed:
+
+| Sev | What | Where |
+|---|---|---|
+| major | A failed `/credits/summary` was read through `valueOrNull`, so the Net-position card **shimmered for ever** behind the list's own error — it read as "still loading" when the request was dead. Now an em dash. | `credits_screen.dart` |
+| minor | The transactions header printed **"0 transactions · August 2026" on a failed load** — `total` is 0 there because nothing arrived. It already dropped the count while loading; a failure now does the same. | `transactions_screen.dart` |
+| minor | `budget_tile` pinned `Color(0xFFF59E0B)` for the near-limit amber with a comment saying no token existed. One does (`c.warning`), added later for insights/notifications/reports — and the literal was the **dark** value, so light mode drew amber-500 where the palette says amber-600. | `budget_tile.dart` |
+
+The `error` assertion of **zero skeletons** is the one that earns its keep: an
+errored provider read as `valueOrNull` is indistinguishable from a slow one, and
+renders as a skeleton that never resolves. That is now pinned on every screen.
+
+Two things that looked like gaps and are not — checked, deliberately left:
+
+- **Calendar has no skeleton.** The grid is structurally known before the data
+  lands, so it draws the month and dims the amounts to 0.4 (`MonthGrid.loading`).
+  Better than a skeleton, and the audit encodes it as the calendar's own proof.
+- **Dashboard, Reports and Settings have no EmptyState.** They are aggregates,
+  not lists. With nothing recorded the dashboard says `₹0`, *"No income this
+  period"*, *"Biggest category —"* — it states zero honestly rather than
+  pretending there is nothing to show.
+
+Dark mode came out clean: no screen paints `AppColors.light`'s card, background
+or secondary under `AppTheme.dark()`, and the only literal colours outside the
+theme layer are white-on-brand-blue (logo, FAB, selected chip) plus the fixed
+category hues, which match the web. `AppCard`'s `Colors.black` shadow is a no-op
+on a dark surface — cosmetic, left alone.
 
 ### 6.7 — what shipped
 

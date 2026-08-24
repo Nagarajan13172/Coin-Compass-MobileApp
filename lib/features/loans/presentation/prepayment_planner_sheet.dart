@@ -124,7 +124,7 @@ class _PrepaymentPlannerSheetState extends State<PrepaymentPlannerSheet> {
           controller: _charge,
           hint: '0',
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: [AmountInputFormatter()],
+          inputFormatters: [AmountInputFormatter(decimals: 3)],
           onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 6),

@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:intl/intl.dart';
 
 /// INR formatting with Indian digit grouping (1,23,456 — not 123,456).
@@ -83,17 +84,34 @@ class Money {
     String scaled(num value) =>
         decimals == null ? _trim(value) : _round(value, decimals);
 
+    // Pick the bucket from the value as it will RENDER, not as it arrives.
+    // Choosing first meant 99,99,999 fell in the lakh bucket and then rounded
+    // to "100L" — a unit this scale does not use, where the web says "1Cr".
+    // The same slip produced "100K" for 99,999 and "1000" for 999.6.
+    bool fits(num unit) => abs >= unit || _roundsUpTo(abs, unit, decimals);
+
     String body;
-    if (abs >= 10000000) {
+    if (fits(10000000)) {
       body = '${scaled(abs / 10000000)}Cr';
-    } else if (abs >= 100000) {
+    } else if (fits(100000)) {
       body = '${scaled(abs / 100000)}L';
-    } else if (abs >= 1000) {
+    } else if (fits(1000)) {
       body = '${scaled(abs / 1000)}K';
     } else {
       body = abs % 1 == 0 ? abs.toStringAsFixed(0) : scaled(abs);
     }
     return '$sign$symbol$body';
+  }
+
+  /// Whether [abs] sits just below [unit] but rounds up to a full unit at the
+  /// precision it will be printed with — 99,99,999 shown to 2 dp is "100.00"
+  /// lakh, which means it belongs in the crore bucket instead.
+  static bool _roundsUpTo(num abs, num unit, int? decimals) {
+    final below = unit / 100;
+    if (abs < below) return false;
+    final places = decimals ?? 2;
+    final epsilon = 0.5 / math.pow(10, places);
+    return abs / below >= 100 - epsilon;
   }
 
   /// The dense-row convention, in one place: state the amount in **full**

@@ -134,4 +134,39 @@ void _weekdayHeaderTests() {
       expect(Money.compact(150000), '\u20b91.5L');
     });
   });
+
+  group('compact picks its bucket after rounding', () {
+    test('a hair under a crore reads as a crore, like the web', () {
+      expect(Money.compact(9999999), '\u20b91Cr');
+    });
+
+    test('a hair under a lakh reads as a lakh', () {
+      expect(Money.compact(99999), '\u20b91L');
+    });
+
+    test('the buckets themselves are unchanged', () {
+      expect(Money.compact(10000000), '\u20b91Cr');
+      expect(Money.compact(12500000), '\u20b91.25Cr');
+      expect(Money.compact(150000), '\u20b91.5L');
+      expect(Money.compact(14000), '\u20b914K');
+      expect(Money.compact(999), '\u20b9999');
+    });
+
+    test('a value that does not round up stays in its own bucket', () {
+      expect(Money.compact(9900000), '\u20b999L');
+      expect(Money.compact(99000), '\u20b999K');
+    });
+
+    test('the rounding boundary follows the requested precision', () {
+      // At 0 decimals "99.6L" prints as "100L", so it belongs in Cr.
+      expect(Money.compact(9960000, decimals: 0), '\u20b91Cr');
+      // At 2 decimals it does not round up, so it stays in lakhs.
+      expect(Money.compact(9960000), '\u20b999.6L');
+    });
+
+    test('negatives follow the same rule', () {
+      // U+2212 minus, then the symbol: '\u2212\u20b91Cr'.
+      expect(Money.compact(-9999999), '\u2212\u20b91Cr');
+    });
+  });
 }

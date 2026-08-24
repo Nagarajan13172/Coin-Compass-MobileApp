@@ -15,6 +15,10 @@ class AmountInputFormatter extends TextInputFormatter {
 
   static final RegExp _shape = RegExp(r'^\d*\.?\d*$');
 
+  /// Grouping separators, spaces and the rupee sign — what a figure copied out
+  /// of the web app carries with it.
+  static final RegExp _noise = RegExp(r'[,\s\u20B9]');
+
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
@@ -22,11 +26,28 @@ class AmountInputFormatter extends TextInputFormatter {
   ) {
     final text = newValue.text;
     if (text.isEmpty) return newValue;
+
+    // Sanitise before judging. This used to test the raw text, so pasting
+    // "₹50,00,000" copied out of the web app failed on the first comma and the
+    // whole paste was dropped — the field simply refused to change, with no
+    // hint why. The web's own box accepts it.
+    final cleaned = text.replaceAll(_noise, '');
+    if (cleaned.isEmpty) return oldValue;
     // Rejecting by returning the old value keeps the caret where it was.
-    if (!_shape.hasMatch(text)) return oldValue;
-    final point = text.indexOf('.');
-    if (point >= 0 && text.length - point - 1 > decimals) return oldValue;
-    return newValue;
+    if (!_shape.hasMatch(cleaned)) return oldValue;
+    final point = cleaned.indexOf('.');
+    if (point >= 0 && cleaned.length - point - 1 > decimals) return oldValue;
+    if (cleaned == text) return newValue;
+
+    // Something was stripped, so the text shrank. Hold the caret the same
+    // distance from the END — after a paste that lands it at the end, which is
+    // where the user expects it.
+    final fromEnd = text.length - newValue.selection.baseOffset;
+    final offset = (cleaned.length - fromEnd).clamp(0, cleaned.length);
+    return TextEditingValue(
+      text: cleaned,
+      selection: TextSelection.collapsed(offset: offset),
+    );
   }
 }
 

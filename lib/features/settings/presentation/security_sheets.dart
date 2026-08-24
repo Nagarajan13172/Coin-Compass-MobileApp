@@ -84,13 +84,17 @@ class _PinSheetState extends ConsumerState<PinSheet> {
       submitting: busy,
       onSubmit: _submit,
       formError: _error,
+      // Honest copy. The PIN is stored server-side and currently gates the
+      // CoinCompass *web* app; this app has no lock screen yet, so promising
+      // "you will be asked every time the app starts" would be false on the
+      // device the owner is reading it on. The gate ships in Phase 6 — when it
+      // does, this wording changes with it.
       footnote:
-          'The PIN only gates the app on this device. Your data stays '
-          'exactly as it is, and it is not a password.',
+          'Your data stays exactly as it is, and this is not your password.',
       children: [
         Text(
-          'Choose 4 to 8 digits. You will be asked for it every time the app '
-          'starts.',
+          'Choose 4 to 8 digits. This PIN protects CoinCompass on the web '
+          'today — this app does not lock yet, so it will not ask you for it.',
           style: TextStyle(fontSize: 13.5, color: c.mutedForeground),
         ),
         const SizedBox(height: 16),

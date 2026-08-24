@@ -11,11 +11,6 @@ import '../../../../core/widgets/money_text.dart';
 import '../../../categories/domain/category.dart';
 import '../../domain/budget.dart';
 
-/// Amber has no token of its own — the palette carries only income green and
-/// expense red — so the near-limit warning colour is pinned here, matching the
-/// web app's `amber-500`.
-const Color _warning = Color(0xFFF59E0B);
-
 /// One budget: what it caps, how much of it is gone, and how much is left.
 ///
 /// A budget has no name server-side, so the row is titled by the category it
@@ -54,7 +49,7 @@ class BudgetTile extends StatelessWidget {
     final percent = budget.percentUsed(used);
     final over = budget.isOver(used);
     final nearLimit = budget.isNearLimit(used);
-    final accent = over ? c.expense : (nearLimit ? _warning : c.income);
+    final accent = over ? c.expense : (nearLimit ? c.warning : c.income);
 
     return AppCard(
       onTap: onTap,

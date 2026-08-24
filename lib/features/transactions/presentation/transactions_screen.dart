@@ -454,7 +454,9 @@ class _TransactionsHeader extends StatelessWidget {
 /// "12 transactions · August 2026" — but only once the count belongs to the
 /// month beside it. While a window is loading the count is either stale or
 /// zero, so the label drops it rather than pairing a new month with an old
-/// total.
+/// total. A failed window drops it for the same reason and a stronger one:
+/// `total` is 0 there because nothing arrived, and "0 transactions" over an
+/// ErrorRetry states as fact something the app does not know.
 class _HeaderSubtitle extends ConsumerWidget {
   const _HeaderSubtitle();
 
@@ -462,13 +464,15 @@ class _HeaderSubtitle extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
     final month = ref.watch(transactionsMonthProvider);
-    final (loading, count) = ref.watch(
-      transactionsListProvider.select((state) => (state.loading, state.total)),
+    final (loading, failed, count) = ref.watch(
+      transactionsListProvider.select(
+        (state) => (state.loading, state.hasError, state.total),
+      ),
     );
 
     final label = DateX.monthLabel(month);
     return Text(
-      loading
+      loading || failed
           ? label
           : '$count transaction${count == 1 ? '' : 's'} · $label',
       style: TextStyle(fontSize: 15, color: c.mutedForeground),

@@ -102,7 +102,7 @@ class _LoanPrecloseSheetState extends ConsumerState<LoanPrecloseSheet> {
           hint: '0',
           enabled: !_saving,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: [AmountInputFormatter()],
+          inputFormatters: [AmountInputFormatter(decimals: 3)],
           onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 6),

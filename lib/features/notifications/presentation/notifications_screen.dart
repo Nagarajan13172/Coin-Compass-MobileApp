@@ -142,12 +142,19 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
   Future<void> _markRead(String id) async {
     if (_busyIds.contains(id)) return;
+    // Resolve the container BEFORE the await. A row tap marks read and
+    // navigates in the same frame, so by the time the POST returns this widget
+    // may be gone — and `ref.invalidate` on a disposed ConsumerState does
+    // nothing, leaving the top-bar bell showing a stale unread count for the
+    // rest of the session and the row still unread on the way back.
+    final container = ProviderScope.containerOf(context, listen: false);
+    final repository = container.read(notificationsRepositoryProvider);
     setState(() => _busyIds.add(id));
     try {
-      await ref.read(notificationsRepositoryProvider).markRead(id);
-      ref.invalidate(notificationFeedProvider);
+      await repository.markRead(id);
+      container.invalidate(notificationFeedProvider);
     } catch (error) {
-      _toast(error);
+      if (mounted) _toast(error);
     } finally {
       if (mounted) setState(() => _busyIds.remove(id));
     }

@@ -159,7 +159,11 @@ class _SummaryCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
-    final summary = ref.watch(creditsSummaryProvider).valueOrNull;
+    final async = ref.watch(creditsSummaryProvider);
+    final summary = async.valueOrNull;
+    // A failed summary is not a slow one. Without this the card shimmers for
+    // ever behind the list's own ErrorRetry, which reads as "still loading".
+    final failed = summary == null && async.hasError;
     final net = summary?.net ?? 0;
 
     return AppCard(
@@ -171,7 +175,16 @@ class _SummaryCard extends ConsumerWidget {
             style: TextStyle(fontSize: 13, color: c.mutedForeground),
           ),
           const SizedBox(height: 4),
-          if (summary == null)
+          if (failed)
+            Text(
+              '—',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w700,
+                color: c.mutedForeground,
+              ),
+            )
+          else if (summary == null)
             const LoadingShimmer(width: 140, height: 28)
           else
             MoneyText(
@@ -188,6 +201,7 @@ class _SummaryCard extends ConsumerWidget {
                 child: _Split(
                   label: 'Owed to you',
                   amount: summary?.owedToYou,
+                  failed: failed,
                   accent: c.income,
                   icon: LucideIcons.handCoins,
                   tone: MoneyTone.income,
@@ -198,6 +212,7 @@ class _SummaryCard extends ConsumerWidget {
                 child: _Split(
                   label: 'You owe',
                   amount: summary?.youOwe,
+                  failed: failed,
                   accent: c.expense,
                   icon: LucideIcons.wallet,
                   tone: MoneyTone.expense,
@@ -227,12 +242,18 @@ class _Split extends StatelessWidget {
     required this.accent,
     required this.icon,
     required this.tone,
+    this.failed = false,
   });
 
   final String label;
 
-  /// Null while the summary is still loading.
+  /// Null while the summary is still loading, or when it failed — [failed]
+  /// tells the two apart.
   final num? amount;
+
+  /// The summary request failed. Show the same em dash the rest of the app
+  /// uses for a figure it does not know, not a skeleton.
+  final bool failed;
   final Color accent;
   final IconData icon;
   final MoneyTone tone;
@@ -262,7 +283,16 @@ class _Split extends StatelessWidget {
                   label,
                   style: TextStyle(fontSize: 11.5, color: c.mutedForeground),
                 ),
-                if (amount == null)
+                if (failed && amount == null)
+                  Text(
+                    '—',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: c.mutedForeground,
+                    ),
+                  )
+                else if (amount == null)
                   const Padding(
                     padding: EdgeInsets.only(top: 3),
                     child: LoadingShimmer(width: 60, height: 13),

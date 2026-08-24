@@ -39,9 +39,13 @@ class SettingsSecurityCard extends ConsumerWidget {
             icon: LucideIcons.lockKeyhole,
             enabled: settings.pinEnabled,
             title: 'PIN lock',
+            // Same honesty rule as the Net Worth lock below: the PIN is
+            // enforced by the web client, not by this app. Phase 6 adds the
+            // lock screen here; until it does, do not claim one exists.
             description: settings.pinEnabled
-                ? 'A 4–8 digit PIN is asked for every time the app starts.'
-                : 'Ask for a short PIN before the app opens.',
+                ? 'A 4–8 digit PIN is asked for on the web. This app does not '
+                      'ask for it yet.'
+                : 'Ask for a short PIN before CoinCompass opens on the web.',
             busy:
                 pending == SettingsWrite.pin ||
                 pending == SettingsWrite.disablePin,
@@ -76,10 +80,13 @@ class SettingsSecurityCard extends ConsumerWidget {
             icon: LucideIcons.shieldCheck,
             enabled: settings.wealthLockEnabled,
             title: 'Net Worth lock',
+            // This app does not gate Net Worth or Stocks yet — the passcode
+            // arms the web client. Say which surface it protects rather than
+            // implying this phone is locked when it is not.
             description: settings.wealthLockEnabled
-                ? 'Net Worth and Stocks stay hidden until the passcode is '
-                      'entered.'
-                : 'Hide Net Worth and Stocks behind a passcode.',
+                ? 'Net Worth and Stocks are hidden on the web until the '
+                      'passcode is entered. This app does not lock them yet.'
+                : 'Hide Net Worth and Stocks behind a passcode on the web.',
             busy:
                 pending == SettingsWrite.wealthPasscode ||
                 pending == SettingsWrite.disableWealthPasscode,
@@ -118,8 +125,12 @@ class SettingsSecurityCard extends ConsumerWidget {
 
           const SizedBox(height: 12),
           Text(
-            'These locks only gate the app on your devices. Your data stays '
-            'exactly as it is, and neither one is your account password.',
+            // Phase 6 adds the lock screen here; until then these flags are
+            // enforced by the web client only, and the card must not imply
+            // otherwise. See PinSheet for the same correction.
+            'These locks gate CoinCompass on the web. This app does not lock '
+            'yet. Your data stays exactly as it is, and neither one is your '
+            'account password.',
             style: TextStyle(fontSize: 12, color: c.mutedForeground),
           ),
         ],

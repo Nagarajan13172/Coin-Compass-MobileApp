@@ -253,6 +253,7 @@ class _Body extends StatelessWidget {
             metric: insights.expense,
             noun: noun,
             noBaselineNote: 'nothing spent last $noun',
+            hasBaseline: _hasBaseline(insights),
             goodWhenUp: false,
           ),
         ),
@@ -262,6 +263,7 @@ class _Body extends StatelessWidget {
             metric: insights.income,
             noun: noun,
             noBaselineNote: 'nothing earned last $noun',
+            hasBaseline: _hasBaseline(insights),
             goodWhenUp: true,
           ),
         ),
@@ -271,6 +273,7 @@ class _Body extends StatelessWidget {
             metric: insights.net,
             noun: noun,
             noBaselineNote: 'nothing recorded last $noun',
+            hasBaseline: _hasBaseline(insights),
             goodWhenUp: true,
           ),
         ),
@@ -467,6 +470,7 @@ class _CompareCard extends StatelessWidget {
     required this.metric,
     required this.noun,
     required this.noBaselineNote,
+    required this.hasBaseline,
     required this.goodWhenUp,
   });
 
@@ -477,12 +481,20 @@ class _CompareCard extends StatelessWidget {
   /// What the line beside the pill says when there is nothing to compare
   /// against — "nothing spent last month" instead of a dead "Last month: ₹0".
   final String noBaselineNote;
+
+  /// Whether the PERIOD had any activity — not whether this one metric did.
+  /// A month that earned and spent Rs 50,000 nets exactly 0, and judging the
+  /// baseline from `metric.previous` alone made the Net card claim nothing was
+  /// recorded last month when in fact Rs 1,00,000 moved through it.
+  final bool hasBaseline;
   final bool goodWhenUp;
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final hasBaseline = metric.previous != 0;
+    // A zero delta against a real baseline is "no change", not "no history";
+    // only a period with no activity at all suppresses the comparison.
+    final showComparison = hasBaseline && metric.previous != 0;
 
     return AppCard(
       child: Column(
@@ -508,7 +520,11 @@ class _CompareCard extends StatelessWidget {
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
-                  hasBaseline ? 'vs last $noun' : noBaselineNote,
+                  showComparison
+                      ? 'vs last $noun'
+                      : (hasBaseline
+                            ? 'no change vs last $noun'
+                            : noBaselineNote),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 12, color: c.mutedForeground),
@@ -516,7 +532,7 @@ class _CompareCard extends StatelessWidget {
               ),
             ],
           ),
-          if (hasBaseline) ...[
+          if (showComparison) ...[
             const SizedBox(height: 6),
             Row(
               children: [
@@ -768,22 +784,33 @@ class _PaceStat extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
+            flex: 3,
             child: Text(
               label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(fontSize: 13, color: c.mutedForeground),
             ),
           ),
           const SizedBox(width: 10),
-          Flexible(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
+          // Expanded, not Flexible. A Flexible shrink-wraps to the scaled text,
+          // so `centerRight` had nothing to align within and the three values
+          // ended at three different x positions instead of on the card edge
+          // the progress bar below them defines.
+          Expanded(
+            flex: 2,
+            child: Align(
               alignment: Alignment.centerRight,
-              child: MoneyText(
-                value,
-                tone: tone,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: MoneyText(
+                  value,
+                  tone: tone,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),

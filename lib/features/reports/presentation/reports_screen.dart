@@ -377,6 +377,8 @@ class _Summary extends ConsumerWidget {
                 ? null
                 : '${Money.format(top.total)} · '
                       '${Money.percent(top.percent, alreadyScaled: true)}',
+            // A name, not an amount: let it ellipsise at full size.
+            scaleValue: false,
             value: top == null
                 ? _Dash(style: _valueStyle)
                 : Text(
@@ -451,10 +453,19 @@ class _MetricTile extends StatelessWidget {
     this.hint,
     this.trailing,
     this.onTap,
+    this.scaleValue = true,
   });
 
   final String label;
   final Widget value;
+
+  /// Whether to shrink [value] to fit rather than let it handle its own
+  /// overflow. True for amounts — a small ₹12,34,56,789 beats a clipped one.
+  /// FALSE for anything that ellipsises: [FittedBox] hands its child unbounded
+  /// width, so a `maxLines: 1` Text never truncates, it just lays out at full
+  /// intrinsic width and gets scaled into illegibility. A 60-character category
+  /// name rendered at 3.7sp is not a readable tile.
+  final bool scaleValue;
   final String? subtitle;
 
   /// The web shows this in a hover tooltip; on a phone it is tap-to-reveal.
@@ -513,12 +524,16 @@ class _MetricTile extends StatelessWidget {
           ),
           const SizedBox(height: 7),
           // Scale down rather than clip: ₹12,34,56,789 at 20sp is wider than
-          // the tile, and a truncated amount is worse than a small one.
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: value,
-          ),
+          // the tile, and a truncated amount is worse than a small one. A value
+          // that ellipsises opts out — see [scaleValue].
+          if (scaleValue)
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: value,
+            )
+          else
+            Align(alignment: Alignment.centerLeft, child: value),
           if (subtitle != null) ...[
             const SizedBox(height: 4),
             Text(
