@@ -272,7 +272,7 @@ launcher, the themed icon with Material You on, and the splash in both themes.
 
 | # | Task | Note |
 |---|---|---|
-| 7.1 | Tamil localisation | ~5,200 strings extractable from the web bundle; needs Noto Sans Tamil (Inter has no Tamil glyphs) |
+| 7.1 | Tamil localisation | [~] 7.1a toggle + fallback done; 7.1c font done and device-verified (no tofu). 7.1b — ~1,240 hardcoded strings to extract — not started. See `PHASE7_1_REPORT.md` |
 | 7.2 | Google OAuth sign-in | Web uses a browser redirect via `/api/auth/oauth/:provider` |
 | 7.3 | CSV import | Web has `/import` with an example xlsx |
 | 7.4 | Push notifications | Backend currently has in-app notifications only; would need FCM + a backend change |
