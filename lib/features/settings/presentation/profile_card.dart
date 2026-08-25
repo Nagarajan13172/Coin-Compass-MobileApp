@@ -13,6 +13,7 @@ import '../../auth/presentation/auth_providers.dart';
 import '../../categories/data/categories_repository.dart';
 import '../../goals/data/goals_repository.dart';
 import '../../loans/data/loans_repository.dart';
+import '../../../l10n/app_localizations.dart';
 
 /// Who is signed in, plus the four counts the web puts in the same card.
 ///
@@ -29,12 +30,12 @@ class SettingsProfileCard extends ConsumerWidget {
 
     if (user == null) {
       return auth.isResolved
-          ? const AppCard(
+          ? AppCard(
               child: EmptyState(
                 compact: true,
                 icon: LucideIcons.userRound,
-                title: 'Not signed in',
-                message: 'Sign in again to see your account details.',
+                title: L.of(context).settingsProfileSigned,
+                message: L.of(context).settingsProfileSignAgainSeeAccount,
               ),
             )
           : const LoadingCard(lines: 4);
@@ -66,7 +67,7 @@ class SettingsProfileCard extends ConsumerWidget {
                   children: [
                     Text(
                       user.displayName.isEmpty
-                          ? 'Your account'
+                          ? L.of(context).settingsProfileAccount
                           : user.displayName,
                       style: const TextStyle(
                         fontSize: 18,
@@ -111,7 +112,7 @@ class SettingsProfileCard extends ConsumerWidget {
             runSpacing: 8,
             children: [
               _Badge(
-                label: user.emailVerified ? 'Verified' : 'Unverified',
+                label: user.emailVerified ? L.of(context).settingsProfileVerified : L.of(context).settingsProfileUnverified,
                 icon: user.emailVerified
                     ? LucideIcons.badgeCheck
                     : LucideIcons.circleAlert,
@@ -119,7 +120,7 @@ class SettingsProfileCard extends ConsumerWidget {
               ),
               if (user.mode == 'superadmin')
                 _Badge(
-                  label: 'Wealth view',
+                  label: L.of(context).settingsProfileWealthView,
                   icon: LucideIcons.eye,
                   tone: c.primary,
                 ),
@@ -127,7 +128,7 @@ class SettingsProfileCard extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            _memberLine(user),
+            _memberLine(L.of(context), user),
             style: TextStyle(fontSize: 12.5, color: c.mutedForeground),
           ),
           const SizedBox(height: 14),
@@ -139,11 +140,15 @@ class SettingsProfileCard extends ConsumerWidget {
     );
   }
 
-  static String _memberLine(AppUser user) {
-    final method = user.hasPassword ? 'Email & password' : 'Google account';
+  // Takes the locale rather than reaching for a context it does not have:
+  // this is static, so there is none in scope (7.1b).
+  static String _memberLine(L l, AppUser user) {
+    final method = user.hasPassword
+        ? l.settingsProfileEmailPassword
+        : l.settingsProfileGoogleAccount;
     final created = user.createdAt;
     if (created == null) return method;
-    return '$method · Member since ${DateX.monthLabel(created)}';
+    return l.settingsProfileMemberSince(method, DateX.monthLabel(created));
   }
 }
 
@@ -224,22 +229,22 @@ class _CountGrid extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tiles = <_CountTile>[
       _CountTile(
-        label: 'Accounts',
+        label: L.of(context).navAccounts,
         icon: LucideIcons.wallet,
         value: _count(ref.watch(accountsProvider)),
       ),
       _CountTile(
-        label: 'Categories',
+        label: L.of(context).navCategories,
         icon: LucideIcons.tags,
         value: _count(ref.watch(categoriesProvider)),
       ),
       _CountTile(
-        label: 'Goals',
+        label: L.of(context).navGoals,
         icon: LucideIcons.target,
         value: _count(ref.watch(goalsProvider)),
       ),
       _CountTile(
-        label: 'Loans',
+        label: L.of(context).navLoans,
         icon: LucideIcons.landmark,
         value: _count(ref.watch(loansProvider)),
       ),

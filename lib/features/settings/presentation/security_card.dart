@@ -16,6 +16,7 @@ import '../../wealth_lock/presentation/wealth_unlock_sheet.dart';
 import '../domain/app_settings.dart';
 import 'security_sheets.dart';
 import 'settings_providers.dart';
+import '../../../l10n/app_localizations.dart';
 
 /// App lock (this phone), PIN lock (browser) and Net Worth lock (the account),
 /// plus two-factor status.
@@ -52,7 +53,7 @@ class SettingsSecurityCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SectionHeader(title: 'Security'),
+          SectionHeader(title: L.of(context).settingsSecuritySecurity),
           const SizedBox(height: 12),
 
           if (lock.failedOpen) ...[
@@ -67,46 +68,40 @@ class SettingsSecurityCard extends ConsumerWidget {
           _SecurityRow(
             icon: LucideIcons.smartphoneNfc,
             enabled: lock.enabled,
-            title: 'App lock (this phone)',
+            title: L.of(context).settingsSecurityAppLockPhone,
             // Only promise the fingerprint when it is actually armed. The
             // setup sheet's biometric toggle is opt-in and defaults to off, so
             // a PIN-only setup was being described as accepting a fingerprint
             // that would never be offered.
             description: lock.enabled
                 ? (lock.biometricEnabled
-                      ? 'CoinCompass asks for your fingerprint — or your PIN — '
-                            'when you open it, and again after 30 seconds '
-                            'away. Checked on this phone, so it works with no '
-                            'signal.'
-                      : 'CoinCompass asks for your PIN when you open it, and '
-                            'again after 30 seconds away. It is checked on '
-                            'this phone, so it works with no signal.')
-                : 'Ask for a PIN before CoinCompass opens on this phone. '
-                      'Checked on the device, so it works offline.',
+                      ? L.of(context).settingsSecurityCoincompassAsksFingerprintPin
+                      : L.of(context).settingsSecurityCoincompassAsksPinWhen)
+                : L.of(context).settingsSecurityAskPinBeforeCoincompass,
             actions: lock.enabled
                 ? [
                     _SmallButton(
-                      label: 'Change PIN',
+                      label: L.of(context).settingsSecChangePinAction,
                       onPressed: () => AppLockSetupSheet.show(
                         context,
                         mode: AppLockSetupMode.change,
                       ),
                     ),
                     _SmallButton(
-                      label: 'Lock now',
+                      label: L.of(context).settingsSecurityLockNow,
                       onPressed: () => ref
                           .read(appLockControllerProvider.notifier)
                           .lockNow(),
                     ),
                     _SmallButton(
-                      label: 'Turn off',
+                      label: L.of(context).settingsSecurityTurnOff,
                       destructive: true,
                       onPressed: () => _disableAppLock(context, ref),
                     ),
                   ]
                 : [
                     _SmallButton(
-                      label: 'Set up app lock',
+                      label: L.of(context).settingsSecuritySetUpAppLock,
                       onPressed: () => AppLockSetupSheet.show(
                         context,
                         mode: AppLockSetupMode.enable,
@@ -123,9 +118,9 @@ class SettingsSecurityCard extends ConsumerWidget {
               // in between, which Flutter flags as a real error in debug.
               child: Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Unlock with fingerprint',
+                      L.of(context).settingsSecurityUnlockFingerprint,
                       style: TextStyle(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w600,
@@ -146,28 +141,27 @@ class SettingsSecurityCard extends ConsumerWidget {
           _SecurityRow(
             icon: LucideIcons.lockKeyhole,
             enabled: settings.pinEnabled,
-            title: 'PIN lock (web)',
+            title: L.of(context).settingsSecurityPinLockWeb,
             // Still the web client's lock, and still not this app's. The app
             // lock above has its own PIN, chosen and checked on the device;
             // these two are deliberately independent, so the copy must not let
             // either one borrow the other's credit.
             description: settings.pinEnabled
-                ? 'A 4–8 digit PIN is asked for when you open CoinCompass in a '
-                      'browser. The lock on this phone is the row above.'
-                : 'Ask for a short PIN when you open CoinCompass in a browser.',
+                ? L.of(context).settingsSecurityDigitPinAskedWhen
+                : L.of(context).settingsSecurityAskShortPinWhen,
             busy:
                 pending == SettingsWrite.pin ||
                 pending == SettingsWrite.disablePin,
             actions: settings.pinEnabled
                 ? [
                     _SmallButton(
-                      label: 'Change PIN',
+                      label: L.of(context).settingsSecChangePinAction,
                       onPressed: blocked
                           ? null
                           : () => PinSheet.show(context, change: true),
                     ),
                     _SmallButton(
-                      label: 'Turn off',
+                      label: L.of(context).settingsSecurityTurnOff,
                       destructive: true,
                       onPressed: blocked
                           ? null
@@ -176,7 +170,7 @@ class SettingsSecurityCard extends ConsumerWidget {
                   ]
                 : [
                     _SmallButton(
-                      label: 'Set a PIN',
+                      label: L.of(context).settingsSecSetPin,
                       onPressed: blocked
                           ? null
                           : () => PinSheet.show(context, change: false),
@@ -194,11 +188,7 @@ class SettingsSecurityCard extends ConsumerWidget {
           Text(
             // Four locks, four scopes, one sentence each. A reader must be
             // able to tell which covers what without guessing.
-            'The app lock covers this phone and is checked on the device, so '
-            'it works with no signal. The PIN lock covers CoinCompass in a '
-            'browser. The Net Worth passcode is saved on your account, but '
-            'each place you sign in asks for it separately. None of them is '
-            'your account password, and none of them changes your data.',
+            L.of(context).settingsSecurityAppLockCoversPhone,
             style: TextStyle(fontSize: 12, color: c.mutedForeground),
           ),
         ],
@@ -211,10 +201,11 @@ class SettingsSecurityCard extends ConsumerWidget {
   /// not a lock. Checked locally — no network.
   Future<void> _disableAppLock(BuildContext context, WidgetRef ref) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l = L.of(context);
     final confirmed = await AppLockConfirmSheet.show(
       context,
-      title: 'Turn off the app lock?',
-      action: 'Turn off',
+      title: l.settingsSecurityTurnOffAppLock,
+      action: l.settingsSecurityTurnOff,
     );
     if (!confirmed) return;
 
@@ -222,10 +213,9 @@ class SettingsSecurityCard extends ConsumerWidget {
     messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'App lock turned off. Screenshots and the app-switcher preview '
-            'work normally again.',
+            l.settingsSecurityAppLockTurnedOff,
           ),
         ),
       );
@@ -233,19 +223,18 @@ class SettingsSecurityCard extends ConsumerWidget {
 
   Future<void> _disablePin(BuildContext context, WidgetRef ref) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l = L.of(context);
     final confirmed = await ConfirmSheet.show(
       context,
-      title: 'Turn off the web PIN?',
+      title: l.settingsSecurityTurnOffWebPin,
       // This row is the SERVER PIN — the one CoinCompass asks for in a browser.
       // The old copy said "the app will open without asking for a PIN", which
       // is false whenever the app lock (the row above) is on: turning this off
       // changes nothing about this phone. Two separate locks, two separate
       // sentences.
       message:
-          'CoinCompass will stop asking for a PIN when you open it in a '
-          'browser. The app lock on this phone is separate and stays as it '
-          'is. You can set a new web PIN at any time.',
-      confirmLabel: 'Turn off',
+          l.settingsSecurityCoincompassStopAskingPin,
+      confirmLabel: l.settingsSecurityTurnOff,
     );
     if (!confirmed) return;
 
@@ -254,7 +243,7 @@ class SettingsSecurityCard extends ConsumerWidget {
         .disablePin();
     messenger
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(failure ?? 'PIN lock turned off')));
+      ..showSnackBar(SnackBar(content: Text(failure ?? l.settingsSecurityPinLockTurnedOff)));
   }
 }
 
@@ -287,6 +276,7 @@ class _WealthLockRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = L.of(context);
     final c = context.colors;
     final pending = ref.watch(settingsWriteControllerProvider);
     final blocked = pending != null;
@@ -309,16 +299,10 @@ class _WealthLockRow extends ConsumerWidget {
     // Earlier copy claimed both. Promising protection the app cannot deliver is
     // worse than promising none.
     final description = locked
-        ? 'Net Worth, Savings & Investments and Stocks are hidden until you '
-              'enter the passcode. Unlocking here unlocks them in this app '
-              'only — each place you sign in unlocks separately.'
+        ? l.settingsSecurityWealthLockedDescription
         : hasPasscode
-        ? 'Net Worth, Savings & Investments and Stocks are showing in this '
-              'app. Locking hides them here again; anywhere else you are '
-              'signed in keeps its own state.'
-        : 'Hide Net Worth, Savings & Investments and Stocks behind a '
-              'passcode. The passcode is saved on your account, and each place '
-              'you sign in asks for it separately.';
+        ? l.settingsSecurityWealthShowingDescription
+        : l.settingsSecurityHideNetWorthSavings;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -330,13 +314,13 @@ class _WealthLockRow extends ConsumerWidget {
           // "Unlocked" would be a lie about the account. Say the lock is on
           // and let the line below explain why they can still see it.
           statusLabel: locked
-              ? 'Locked'
+              ? l.settingsSecurityLocked
               : superadmin && settings.wealthLockEnabled
-              ? 'On'
+              ? l.settingsSecurityOn
               : hasPasscode
-              ? 'Unlocked'
-              : 'Off',
-          title: 'Net Worth lock',
+              ? l.settingsSecurityUnlocked
+              : l.settingsSecurityOff,
+          title: l.settingsSecurityNetWorthLock,
           description: description,
           busy:
               wealthBusy ||
@@ -347,7 +331,7 @@ class _WealthLockRow extends ConsumerWidget {
               // "Unlock to manage" here.
               ? [
                   _SmallButton(
-                    label: 'Unlock',
+                    label: l.settingsSecurityUnlock,
                     onPressed: wealthBusy
                         ? null
                         : () => unlockWealthFlow(context),
@@ -356,20 +340,20 @@ class _WealthLockRow extends ConsumerWidget {
               : hasPasscode
               ? [
                   _SmallButton(
-                    label: 'Change passcode',
+                    label: l.settingsSecChangePasscodeAction,
                     onPressed: blocked
                         ? null
                         : () => WealthPasscodeSheet.show(context, change: true),
                   ),
                   if (canLockAgain)
                     _SmallButton(
-                      label: 'Lock now',
+                      label: l.settingsSecurityLockNow,
                       onPressed: blocked || wealthBusy
                           ? null
                           : () => _lockNow(context, ref),
                     ),
                   _SmallButton(
-                    label: 'Turn off',
+                    label: l.settingsSecurityTurnOff,
                     destructive: true,
                     onPressed: blocked
                         ? null
@@ -378,7 +362,7 @@ class _WealthLockRow extends ConsumerWidget {
                 ]
               : [
                   _SmallButton(
-                    label: 'Set a passcode',
+                    label: l.settingsSecSetPasscode,
                     onPressed: blocked
                         ? null
                         : () =>
@@ -395,8 +379,7 @@ class _WealthLockRow extends ConsumerWidget {
               // session as elevated, not the account as an admin one. Calling
               // it "superadmin mode" alarmed the owner about a role they do
               // not have, in what is the normal post-unlock case.
-              'Unlocked for this sign-in. Net Worth stays visible here until '
-              'you lock it again or sign out.',
+              l.settingsSecurityUnlockedSignNetWorth,
               style: TextStyle(fontSize: 12, color: c.mutedForeground),
             ),
           ),
@@ -411,14 +394,13 @@ class _WealthLockRow extends ConsumerWidget {
   /// same thing again and refuses if it does not hold.
   Future<void> _lockNow(BuildContext context, WidgetRef ref) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l = L.of(context);
     final confirmed = await ConfirmSheet.show(
       context,
-      title: 'Lock Net Worth again?',
+      title: l.settingsSecurityLockNetWorthAgain,
       message:
-          'Net Worth, Savings & Investments and Stocks will be hidden until '
-          'the passcode is entered again in this app. Your '
-          'data is not changed.',
-      confirmLabel: 'Lock',
+          l.settingsSecurityWealthRelockWarning,
+      confirmLabel: l.settingsSecurityLock,
       destructive: false,
     );
     if (!confirmed) return;
@@ -431,7 +413,7 @@ class _WealthLockRow extends ConsumerWidget {
       ..showSnackBar(
         SnackBar(
           content: Text(
-            failure ?? 'Net Worth locked in this app.',
+            failure ?? l.settingsSecurityNetWorthLockedApp,
           ),
         ),
       );
@@ -439,14 +421,13 @@ class _WealthLockRow extends ConsumerWidget {
 
   Future<void> _disableWealthLock(BuildContext context, WidgetRef ref) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l = L.of(context);
     final confirmed = await ConfirmSheet.show(
       context,
-      title: 'Turn off the Net Worth lock?',
+      title: l.settingsSecurityTurnOffNetWorth,
       message:
-          'Net Worth, Savings & Investments and Stocks will be visible '
-          'without a passcode, in every place you sign in. The passcode is '
-          'discarded and cannot be recovered.',
-      confirmLabel: 'Turn off',
+          l.settingsSecurityWealthTurnOffWarning,
+      confirmLabel: l.settingsSecurityTurnOff,
     );
     if (!confirmed) return;
 
@@ -456,7 +437,7 @@ class _WealthLockRow extends ConsumerWidget {
     messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(content: Text(failure ?? 'Net Worth lock turned off.')),
+        SnackBar(content: Text(failure ?? l.settingsSecurityNetWorthLockTurned)),
       );
   }
 }
@@ -482,6 +463,7 @@ class _SecurityRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final c = context.colors;
     final tone = enabled ? c.income : c.mutedForeground;
 
@@ -531,7 +513,11 @@ class _SecurityRow extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       _StatusPill(
-                        label: statusLabel ?? (enabled ? 'On' : 'Off'),
+                        label:
+                            statusLabel ??
+                            (enabled
+                                ? l.settingsSecurityOn
+                                : l.settingsSecurityOff),
                         tone: tone,
                       ),
                     ],
@@ -621,40 +607,42 @@ class _TwoFactorRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = L.of(context);
     final status = ref.watch(twoFactorStatusProvider);
 
     return switch (status) {
       AsyncData(:final value) => _SecurityRow(
         icon: LucideIcons.smartphone,
         enabled: value.enabled,
-        title: 'Two-factor authentication',
+        title: l.authTwoFactorTitle,
         description: value.enabled
-            ? 'Authenticator app is on. '
-                  '${value.emailFallback ? 'Email fallback is on. ' : ''}'
-                  '${value.backupCodesRemaining} backup '
-                  '${value.backupCodesRemaining == 1 ? 'code' : 'codes'} left.'
-            : 'Not set up. Turn it on from the web app — enrolling needs a QR '
-                  'scan.',
+            ? l.settingsSecurityTwoFactorOn(
+                value.emailFallback
+                    ? l.settingsSecurityEmailFallbackOn
+                    : '',
+                value.backupCodesRemaining,
+              )
+            : l.settingsSecuritySetUpTurnFrom,
       ),
       AsyncError() => _SecurityRow(
         icon: LucideIcons.smartphone,
         enabled: false,
-        statusLabel: 'Unknown',
-        title: 'Two-factor authentication',
-        description: "Couldn't check the status just now.",
+        statusLabel: l.settingsSecurityUnknown,
+        title: l.authTwoFactorTitle,
+        description: l.settingsSecurityCouldntCheckStatusJust,
         actions: [
           _SmallButton(
-            label: 'Retry',
+            label: l.actionRetry,
             onPressed: () => ref.invalidate(twoFactorStatusProvider),
           ),
         ],
       ),
-      _ => const _SecurityRow(
+      _ => _SecurityRow(
         icon: LucideIcons.smartphone,
         enabled: false,
         statusLabel: '…',
-        title: 'Two-factor authentication',
-        description: 'Checking…',
+        title: l.authTwoFactorTitle,
+        description: l.settingsSecurityChecking,
         busy: true,
       ),
     };
@@ -691,8 +679,7 @@ class _FailOpenBanner extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'The app lock turned itself off: the saved PIN check was '
-              'missing. Set it up again.',
+              L.of(context).settingsSecurityAppLockTurnedItself,
               style: TextStyle(fontSize: 12.5, color: c.foreground),
             ),
           ),

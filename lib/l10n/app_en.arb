@@ -442,5 +442,503 @@
   "authResetSubtitle": "We'll email you a reset link",
   "@authResetSubtitle": {
     "description": "migrated from auth.resetSubtitle"
+  },
+  "settingsSecPinMustDigits": "The PIN must be 4 to 8 digits.",
+  "@settingsSecPinMustDigits": {
+    "description": "security_sheets.dart (7.1b)"
+  },
+  "settingsSecTwoPinsDontMatch": "The two PINs don't match.",
+  "@settingsSecTwoPinsDontMatch": {
+    "description": "security_sheets.dart (7.1b)"
+  },
+  "settingsSecChangePin": "Change your PIN",
+  "@settingsSecChangePin": {
+    "description": "security_sheets.dart (7.1b)"
+  },
+  "settingsSecSetPin": "Set a PIN",
+  "@settingsSecSetPin": {
+    "description": "security_sheets.dart (7.1b)"
+  },
+  "settingsSecChangePinAction": "Change PIN",
+  "@settingsSecChangePinAction": {
+    "description": "security_sheets.dart (7.1b)"
+  },
+  "settingsSecTurnPinLock": "Turn on PIN lock",
+  "@settingsSecTurnPinLock": {
+    "description": "security_sheets.dart (7.1b)"
+  },
+  "settingsSecDataStaysExactlyAs": "Your data stays exactly as it is, and this is not your password.",
+  "@settingsSecDataStaysExactlyAs": {
+    "description": "security_sheets.dart (7.1b)"
+  },
+  "settingsSecChooseDigitsPinProtects": "Choose 4 to 8 digits. This PIN protects CoinCompass in a browser. To lock this phone, use App lock at the top of the Security card.",
+  "@settingsSecChooseDigitsPinProtects": {
+    "description": "security_sheets.dart (7.1b)"
+  },
+  "settingsSecNewPin": "New PIN",
+  "@settingsSecNewPin": {
+    "description": "security_sheets.dart (7.1b)"
+  },
+  "settingsSecConfirmPin": "Confirm PIN",
+  "@settingsSecConfirmPin": {
+    "description": "security_sheets.dart (7.1b)"
+  },
+  "settingsSecPasscodeMustCharacters": "The passcode must be 4 to 32 characters.",
+  "@settingsSecPasscodeMustCharacters": {
+    "description": "security_sheets.dart (7.1b)"
+  },
+  "settingsSecTwoPasscodesDontMatch": "The two passcodes don't match.",
+  "@settingsSecTwoPasscodesDontMatch": {
+    "description": "security_sheets.dart (7.1b)"
+  },
+  "settingsSecChangePasscode": "Change the passcode",
+  "@settingsSecChangePasscode": {
+    "description": "security_sheets.dart (7.1b)"
+  },
+  "settingsSecSetPasscode": "Set a passcode",
+  "@settingsSecSetPasscode": {
+    "description": "security_sheets.dart (7.1b)"
+  },
+  "settingsSecChangePasscodeAction": "Change passcode",
+  "@settingsSecChangePasscodeAction": {
+    "description": "security_sheets.dart (7.1b)"
+  },
+  "settingsSecLockNetWorth": "Lock Net Worth",
+  "@settingsSecLockNetWorth": {
+    "description": "security_sheets.dart (7.1b)"
+  },
+  "settingsSecNetWorthSavingsInvestments": "Net Worth, Savings & Investments and Stocks stay hidden until this passcode is entered. Each place you sign in asks for it separately. Keep it somewhere safe — this app cannot clear a passcode you have forgotten; you would have to remove it from CoinCompass in a browser.",
+  "@settingsSecNetWorthSavingsInvestments": {
+    "description": "security_sheets.dart (7.1b)"
+  },
+  "settingsSecBetweenCharactersLettersDigits": "Between 4 and 32 characters. Letters, digits and symbols all count. It hides the totals: your accounts, balances, loans and transactions stay visible, and so do income, expenses and cash flow.",
+  "@settingsSecBetweenCharactersLettersDigits": {
+    "description": "security_sheets.dart (7.1b)"
+  },
+  "settingsSecWealthPasscode": "Wealth passcode",
+  "@settingsSecWealthPasscode": {
+    "description": "security_sheets.dart (7.1b)"
+  },
+  "settingsSecHide": "Hide",
+  "@settingsSecHide": {
+    "description": "security_sheets.dart (7.1b)"
+  },
+  "settingsSecShow": "Show",
+  "@settingsSecShow": {
+    "description": "security_sheets.dart (7.1b)"
+  },
+  "settingsSecConfirmPasscode": "Confirm passcode",
+  "@settingsSecConfirmPasscode": {
+    "description": "security_sheets.dart (7.1b)"
+  },
+  "settingsProfileSigned": "Not signed in",
+  "@settingsProfileSigned": {
+    "description": "profile_card.dart (7.1b)"
+  },
+  "settingsProfileSignAgainSeeAccount": "Sign in again to see your account details.",
+  "@settingsProfileSignAgainSeeAccount": {
+    "description": "profile_card.dart (7.1b)"
+  },
+  "settingsProfileAccount": "Your account",
+  "@settingsProfileAccount": {
+    "description": "profile_card.dart (7.1b)"
+  },
+  "settingsProfileVerified": "Verified",
+  "@settingsProfileVerified": {
+    "description": "profile_card.dart (7.1b)"
+  },
+  "settingsProfileUnverified": "Unverified",
+  "@settingsProfileUnverified": {
+    "description": "profile_card.dart (7.1b)"
+  },
+  "settingsProfileWealthView": "Wealth view",
+  "@settingsProfileWealthView": {
+    "description": "profile_card.dart (7.1b)"
+  },
+  "settingsProfileEmailPassword": "Email & password",
+  "@settingsProfileEmailPassword": {
+    "description": "profile_card.dart (7.1b)"
+  },
+  "settingsProfileGoogleAccount": "Google account",
+  "@settingsProfileGoogleAccount": {
+    "description": "profile_card.dart (7.1b)"
+  },
+  "settingsPreferencesData": "Preferences & data",
+  "@settingsPreferencesData": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsAppearance": "Appearance",
+  "@settingsAppearance": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsAppliesInstantlySavedAccount": "Applies instantly, and is saved to your account.",
+  "@settingsAppliesInstantlySavedAccount": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsSystem": "System",
+  "@settingsSystem": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsLight": "Light",
+  "@settingsLight": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsDark": "Dark",
+  "@settingsDark": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsWebAppKeepsTheme": "The web app keeps the theme on the device it was picked on. This app also stores it on your account so a reinstall remembers it.",
+  "@settingsWebAppKeepsTheme": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsWalletUpdated": "Wallet updated",
+  "@settingsWalletUpdated": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsWallet": "Wallet",
+  "@settingsWallet": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsWhatWalletCalledInside": "What this wallet is called inside the app.",
+  "@settingsWhatWalletCalledInside": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsWalletName": "Wallet name",
+  "@settingsWalletName": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsMyWallet": "My Wallet",
+  "@settingsMyWallet": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsLabel": "Label",
+  "@settingsLabel": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsEGPersonalFinances": "e.g. Personal finances",
+  "@settingsEGPersonalFinances": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsOptionalTagShownAlongside": "An optional tag shown alongside your wallet name.",
+  "@settingsOptionalTagShownAlongside": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsSaveChanges": "Save changes",
+  "@settingsSaveChanges": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsBaseCurrencyUpdated": "Base currency updated",
+  "@settingsBaseCurrencyUpdated": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsCurrency": "Currency",
+  "@settingsCurrency": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsEveryAmountAppShown": "Every amount in the app is shown in this currency.",
+  "@settingsEveryAmountAppShown": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsNoCurrencies": "No currencies",
+  "@settingsNoCurrencies": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsServerHasntSentCurrency": "The server hasn't sent a currency table for this wallet, so amounts stay in the current base currency.",
+  "@settingsServerHasntSentCurrency": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsRatesSeededServerCannot": "Rates are seeded on the server and cannot be edited here — the web app has no editor for them either, and multi-currency conversion isn't enabled yet.",
+  "@settingsRatesSeededServerCannot": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsBaseCurrency": "Base currency",
+  "@settingsBaseCurrency": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsEmailReports": "Email reports",
+  "@settingsEmailReports": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsMonthlyMidMonthSummary": "Monthly & mid-month summary",
+  "@settingsMonthlyMidMonthSummary": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsEmailedStLastMonth": "Emailed on the 1st (last month) and the 15th (this month so far).",
+  "@settingsEmailedStLastMonth": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsSigningOut": "Signing out…",
+  "@settingsSigningOut": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsSignsOutDeviceOnly": "Signs you out on this device only. Your data stays on the server.",
+  "@settingsSignsOutDeviceOnly": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsSignOut": "Sign out?",
+  "@settingsSignOut": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsYoullNeedEmailPassword": "You'll need your email and password to get back in.",
+  "@settingsYoullNeedEmailPassword": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsAppInfo": "App info",
+  "@settingsAppInfo": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsApp": "App",
+  "@settingsApp": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsVersion": "Version",
+  "@settingsVersion": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsBuild": "Build",
+  "@settingsBuild": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsLocalBuildSingleUser": "Local build · Single user",
+  "@settingsLocalBuildSingleUser": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsRegion": "Region",
+  "@settingsRegion": {
+    "description": "settings_screen.dart (7.1b)"
+  },
+  "settingsSecuritySecurity": "Security",
+  "@settingsSecuritySecurity": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityAppLockPhone": "App lock (this phone)",
+  "@settingsSecurityAppLockPhone": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityCoincompassAsksFingerprintPin": "CoinCompass asks for your fingerprint — or your PIN — when you open it, and again after 30 seconds away. Checked on this phone, so it works with no signal.",
+  "@settingsSecurityCoincompassAsksFingerprintPin": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityCoincompassAsksPinWhen": "CoinCompass asks for your PIN when you open it, and again after 30 seconds away. It is checked on this phone, so it works with no signal.",
+  "@settingsSecurityCoincompassAsksPinWhen": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityAskPinBeforeCoincompass": "Ask for a PIN before CoinCompass opens on this phone. Checked on the device, so it works offline.",
+  "@settingsSecurityAskPinBeforeCoincompass": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityLockNow": "Lock now",
+  "@settingsSecurityLockNow": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityTurnOff": "Turn off",
+  "@settingsSecurityTurnOff": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecuritySetUpAppLock": "Set up app lock",
+  "@settingsSecuritySetUpAppLock": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityUnlockFingerprint": "Unlock with fingerprint",
+  "@settingsSecurityUnlockFingerprint": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityPinLockWeb": "PIN lock (web)",
+  "@settingsSecurityPinLockWeb": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityDigitPinAskedWhen": "A 4–8 digit PIN is asked for when you open CoinCompass in a browser. The lock on this phone is the row above.",
+  "@settingsSecurityDigitPinAskedWhen": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityAskShortPinWhen": "Ask for a short PIN when you open CoinCompass in a browser.",
+  "@settingsSecurityAskShortPinWhen": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityAppLockCoversPhone": "The app lock covers this phone and is checked on the device, so it works with no signal. The PIN lock covers CoinCompass in a browser. The Net Worth passcode is saved on your account, but each place you sign in asks for it separately. None of them is your account password, and none of them changes your data.",
+  "@settingsSecurityAppLockCoversPhone": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityTurnOffAppLock": "Turn off the app lock?",
+  "@settingsSecurityTurnOffAppLock": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityAppLockTurnedOff": "App lock turned off. Screenshots and the app-switcher preview work normally again.",
+  "@settingsSecurityAppLockTurnedOff": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityTurnOffWebPin": "Turn off the web PIN?",
+  "@settingsSecurityTurnOffWebPin": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityCoincompassStopAskingPin": "CoinCompass will stop asking for a PIN when you open it in a browser. The app lock on this phone is separate and stays as it is. You can set a new web PIN at any time.",
+  "@settingsSecurityCoincompassStopAskingPin": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityPinLockTurnedOff": "PIN lock turned off",
+  "@settingsSecurityPinLockTurnedOff": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityWealthLockedDescription": "Net Worth, Savings & Investments and Stocks are hidden until you enter the passcode. Unlocking here unlocks them in this app only — each place you sign in unlocks separately.",
+  "@settingsSecurityWealthLockedDescription": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityWealthShowingDescription": "Net Worth, Savings & Investments and Stocks are showing in this app. Locking hides them here again; anywhere else you are signed in keeps its own state.",
+  "@settingsSecurityWealthShowingDescription": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityHideNetWorthSavings": "Hide Net Worth, Savings & Investments and Stocks behind a passcode. The passcode is saved on your account, and each place you sign in asks for it separately.",
+  "@settingsSecurityHideNetWorthSavings": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityLocked": "Locked",
+  "@settingsSecurityLocked": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityUnlocked": "Unlocked",
+  "@settingsSecurityUnlocked": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityOff": "Off",
+  "@settingsSecurityOff": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityNetWorthLock": "Net Worth lock",
+  "@settingsSecurityNetWorthLock": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityUnlock": "Unlock",
+  "@settingsSecurityUnlock": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityUnlockedSignNetWorth": "Unlocked for this sign-in. Net Worth stays visible here until you lock it again or sign out.",
+  "@settingsSecurityUnlockedSignNetWorth": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityLockNetWorthAgain": "Lock Net Worth again?",
+  "@settingsSecurityLockNetWorthAgain": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityWealthRelockWarning": "Net Worth, Savings & Investments and Stocks will be hidden until the passcode is entered again in this app. Your data is not changed.",
+  "@settingsSecurityWealthRelockWarning": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityLock": "Lock",
+  "@settingsSecurityLock": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityNetWorthLockedApp": "Net Worth locked in this app.",
+  "@settingsSecurityNetWorthLockedApp": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityTurnOffNetWorth": "Turn off the Net Worth lock?",
+  "@settingsSecurityTurnOffNetWorth": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityWealthTurnOffWarning": "Net Worth, Savings & Investments and Stocks will be visible without a passcode, in every place you sign in. The passcode is discarded and cannot be recovered.",
+  "@settingsSecurityWealthTurnOffWarning": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityNetWorthLockTurned": "Net Worth lock turned off.",
+  "@settingsSecurityNetWorthLockTurned": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecuritySetUpTurnFrom": "Not set up. Turn it on from the web app — enrolling needs a QR scan.",
+  "@settingsSecuritySetUpTurnFrom": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityUnknown": "Unknown",
+  "@settingsSecurityUnknown": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityCouldntCheckStatusJust": "Couldn't check the status just now.",
+  "@settingsSecurityCouldntCheckStatusJust": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityChecking": "Checking…",
+  "@settingsSecurityChecking": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsSecurityAppLockTurnedItself": "The app lock turned itself off: the saved PIN check was missing. Set it up again.",
+  "@settingsSecurityAppLockTurnedItself": {
+    "description": "security_card.dart (7.1b)"
+  },
+  "settingsProfileMemberSince": "{method} · Member since {month}",
+  "@settingsProfileMemberSince": {
+    "description": "profile_card.dart (7.1b) — sign-in method and the month the account was created",
+    "placeholders": {
+      "method": {
+        "type": "String"
+      },
+      "month": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsThemeNotSaved": "Theme applied here, but not saved: {failure}",
+  "@settingsThemeNotSaved": {
+    "description": "settings_screen.dart (7.1b) — the server refused the theme write",
+    "placeholders": {
+      "failure": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsCurrencyRate": "1 {code} = {amount}",
+  "@settingsCurrencyRate": {
+    "description": "settings_screen.dart (7.1b) — one unit of a currency in the base currency",
+    "placeholders": {
+      "code": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsCurrencyCodeAndName": "{code} — {name}",
+  "@settingsCurrencyCodeAndName": {
+    "description": "settings_screen.dart (7.1b) — a currency row: INR — Indian Rupee",
+    "placeholders": {
+      "code": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsRegionSummary": "{currency} · {locale}",
+  "@settingsRegionSummary": {
+    "description": "settings_screen.dart (7.1b) — App info region line",
+    "placeholders": {
+      "currency": {
+        "type": "String"
+      },
+      "locale": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsSecurityTwoFactorOn": "Authenticator app is on. {fallback}{count, plural, =1{1 backup code left.} other{{count} backup codes left.}}",
+  "@settingsSecurityTwoFactorOn": {
+    "description": "security_card.dart (7.1b) — 2FA status. `fallback` is empty or the email-fallback sentence.",
+    "placeholders": {
+      "fallback": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsSecurityEmailFallbackOn": "Email fallback is on. ",
+  "@settingsSecurityEmailFallbackOn": {
+    "description": "security_card.dart (7.1b) — prepended to the 2FA status when the emailed-code fallback is on",
+    "placeholders": {}
+  },
+  "settingsSecurityOn": "On",
+  "@settingsSecurityOn": {
+    "description": "security_card.dart (7.1b) — status pill, the pair of settingsSecurityOff"
   }
 }

@@ -738,6 +738,684 @@ abstract class L {
   /// In en, this message translates to:
   /// **'We\'ll email you a reset link'**
   String get authResetSubtitle;
+
+  /// security_sheets.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'The PIN must be 4 to 8 digits.'**
+  String get settingsSecPinMustDigits;
+
+  /// security_sheets.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'The two PINs don\'t match.'**
+  String get settingsSecTwoPinsDontMatch;
+
+  /// security_sheets.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Change your PIN'**
+  String get settingsSecChangePin;
+
+  /// security_sheets.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Set a PIN'**
+  String get settingsSecSetPin;
+
+  /// security_sheets.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Change PIN'**
+  String get settingsSecChangePinAction;
+
+  /// security_sheets.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on PIN lock'**
+  String get settingsSecTurnPinLock;
+
+  /// security_sheets.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Your data stays exactly as it is, and this is not your password.'**
+  String get settingsSecDataStaysExactlyAs;
+
+  /// security_sheets.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Choose 4 to 8 digits. This PIN protects CoinCompass in a browser. To lock this phone, use App lock at the top of the Security card.'**
+  String get settingsSecChooseDigitsPinProtects;
+
+  /// security_sheets.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'New PIN'**
+  String get settingsSecNewPin;
+
+  /// security_sheets.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm PIN'**
+  String get settingsSecConfirmPin;
+
+  /// security_sheets.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'The passcode must be 4 to 32 characters.'**
+  String get settingsSecPasscodeMustCharacters;
+
+  /// security_sheets.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'The two passcodes don\'t match.'**
+  String get settingsSecTwoPasscodesDontMatch;
+
+  /// security_sheets.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Change the passcode'**
+  String get settingsSecChangePasscode;
+
+  /// security_sheets.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Set a passcode'**
+  String get settingsSecSetPasscode;
+
+  /// security_sheets.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Change passcode'**
+  String get settingsSecChangePasscodeAction;
+
+  /// security_sheets.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Lock Net Worth'**
+  String get settingsSecLockNetWorth;
+
+  /// security_sheets.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Net Worth, Savings & Investments and Stocks stay hidden until this passcode is entered. Each place you sign in asks for it separately. Keep it somewhere safe — this app cannot clear a passcode you have forgotten; you would have to remove it from CoinCompass in a browser.'**
+  String get settingsSecNetWorthSavingsInvestments;
+
+  /// security_sheets.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Between 4 and 32 characters. Letters, digits and symbols all count. It hides the totals: your accounts, balances, loans and transactions stay visible, and so do income, expenses and cash flow.'**
+  String get settingsSecBetweenCharactersLettersDigits;
+
+  /// security_sheets.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Wealth passcode'**
+  String get settingsSecWealthPasscode;
+
+  /// security_sheets.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Hide'**
+  String get settingsSecHide;
+
+  /// security_sheets.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Show'**
+  String get settingsSecShow;
+
+  /// security_sheets.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm passcode'**
+  String get settingsSecConfirmPasscode;
+
+  /// profile_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Not signed in'**
+  String get settingsProfileSigned;
+
+  /// profile_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in again to see your account details.'**
+  String get settingsProfileSignAgainSeeAccount;
+
+  /// profile_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Your account'**
+  String get settingsProfileAccount;
+
+  /// profile_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Verified'**
+  String get settingsProfileVerified;
+
+  /// profile_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Unverified'**
+  String get settingsProfileUnverified;
+
+  /// profile_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Wealth view'**
+  String get settingsProfileWealthView;
+
+  /// profile_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Email & password'**
+  String get settingsProfileEmailPassword;
+
+  /// profile_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Google account'**
+  String get settingsProfileGoogleAccount;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Preferences & data'**
+  String get settingsPreferencesData;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get settingsAppearance;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Applies instantly, and is saved to your account.'**
+  String get settingsAppliesInstantlySavedAccount;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get settingsSystem;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get settingsLight;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get settingsDark;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'The web app keeps the theme on the device it was picked on. This app also stores it on your account so a reinstall remembers it.'**
+  String get settingsWebAppKeepsTheme;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet updated'**
+  String get settingsWalletUpdated;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet'**
+  String get settingsWallet;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'What this wallet is called inside the app.'**
+  String get settingsWhatWalletCalledInside;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet name'**
+  String get settingsWalletName;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'My Wallet'**
+  String get settingsMyWallet;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Label'**
+  String get settingsLabel;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Personal finances'**
+  String get settingsEGPersonalFinances;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'An optional tag shown alongside your wallet name.'**
+  String get settingsOptionalTagShownAlongside;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Save changes'**
+  String get settingsSaveChanges;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Base currency updated'**
+  String get settingsBaseCurrencyUpdated;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Currency'**
+  String get settingsCurrency;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Every amount in the app is shown in this currency.'**
+  String get settingsEveryAmountAppShown;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'No currencies'**
+  String get settingsNoCurrencies;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'The server hasn\'t sent a currency table for this wallet, so amounts stay in the current base currency.'**
+  String get settingsServerHasntSentCurrency;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Rates are seeded on the server and cannot be edited here — the web app has no editor for them either, and multi-currency conversion isn\'t enabled yet.'**
+  String get settingsRatesSeededServerCannot;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Base currency'**
+  String get settingsBaseCurrency;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Email reports'**
+  String get settingsEmailReports;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly & mid-month summary'**
+  String get settingsMonthlyMidMonthSummary;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Emailed on the 1st (last month) and the 15th (this month so far).'**
+  String get settingsEmailedStLastMonth;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Signing out…'**
+  String get settingsSigningOut;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Signs you out on this device only. Your data stays on the server.'**
+  String get settingsSignsOutDeviceOnly;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out?'**
+  String get settingsSignOut;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ll need your email and password to get back in.'**
+  String get settingsYoullNeedEmailPassword;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'App info'**
+  String get settingsAppInfo;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'App'**
+  String get settingsApp;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Version'**
+  String get settingsVersion;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Build'**
+  String get settingsBuild;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Local build · Single user'**
+  String get settingsLocalBuildSingleUser;
+
+  /// settings_screen.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Region'**
+  String get settingsRegion;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Security'**
+  String get settingsSecuritySecurity;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'App lock (this phone)'**
+  String get settingsSecurityAppLockPhone;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'CoinCompass asks for your fingerprint — or your PIN — when you open it, and again after 30 seconds away. Checked on this phone, so it works with no signal.'**
+  String get settingsSecurityCoincompassAsksFingerprintPin;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'CoinCompass asks for your PIN when you open it, and again after 30 seconds away. It is checked on this phone, so it works with no signal.'**
+  String get settingsSecurityCoincompassAsksPinWhen;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Ask for a PIN before CoinCompass opens on this phone. Checked on the device, so it works offline.'**
+  String get settingsSecurityAskPinBeforeCoincompass;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Lock now'**
+  String get settingsSecurityLockNow;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Turn off'**
+  String get settingsSecurityTurnOff;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Set up app lock'**
+  String get settingsSecuritySetUpAppLock;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock with fingerprint'**
+  String get settingsSecurityUnlockFingerprint;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'PIN lock (web)'**
+  String get settingsSecurityPinLockWeb;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'A 4–8 digit PIN is asked for when you open CoinCompass in a browser. The lock on this phone is the row above.'**
+  String get settingsSecurityDigitPinAskedWhen;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Ask for a short PIN when you open CoinCompass in a browser.'**
+  String get settingsSecurityAskShortPinWhen;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'The app lock covers this phone and is checked on the device, so it works with no signal. The PIN lock covers CoinCompass in a browser. The Net Worth passcode is saved on your account, but each place you sign in asks for it separately. None of them is your account password, and none of them changes your data.'**
+  String get settingsSecurityAppLockCoversPhone;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Turn off the app lock?'**
+  String get settingsSecurityTurnOffAppLock;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'App lock turned off. Screenshots and the app-switcher preview work normally again.'**
+  String get settingsSecurityAppLockTurnedOff;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Turn off the web PIN?'**
+  String get settingsSecurityTurnOffWebPin;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'CoinCompass will stop asking for a PIN when you open it in a browser. The app lock on this phone is separate and stays as it is. You can set a new web PIN at any time.'**
+  String get settingsSecurityCoincompassStopAskingPin;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'PIN lock turned off'**
+  String get settingsSecurityPinLockTurnedOff;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Net Worth, Savings & Investments and Stocks are hidden until you enter the passcode. Unlocking here unlocks them in this app only — each place you sign in unlocks separately.'**
+  String get settingsSecurityWealthLockedDescription;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Net Worth, Savings & Investments and Stocks are showing in this app. Locking hides them here again; anywhere else you are signed in keeps its own state.'**
+  String get settingsSecurityWealthShowingDescription;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Hide Net Worth, Savings & Investments and Stocks behind a passcode. The passcode is saved on your account, and each place you sign in asks for it separately.'**
+  String get settingsSecurityHideNetWorthSavings;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Locked'**
+  String get settingsSecurityLocked;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Unlocked'**
+  String get settingsSecurityUnlocked;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get settingsSecurityOff;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Net Worth lock'**
+  String get settingsSecurityNetWorthLock;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock'**
+  String get settingsSecurityUnlock;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Unlocked for this sign-in. Net Worth stays visible here until you lock it again or sign out.'**
+  String get settingsSecurityUnlockedSignNetWorth;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Lock Net Worth again?'**
+  String get settingsSecurityLockNetWorthAgain;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Net Worth, Savings & Investments and Stocks will be hidden until the passcode is entered again in this app. Your data is not changed.'**
+  String get settingsSecurityWealthRelockWarning;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Lock'**
+  String get settingsSecurityLock;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Net Worth locked in this app.'**
+  String get settingsSecurityNetWorthLockedApp;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Turn off the Net Worth lock?'**
+  String get settingsSecurityTurnOffNetWorth;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Net Worth, Savings & Investments and Stocks will be visible without a passcode, in every place you sign in. The passcode is discarded and cannot be recovered.'**
+  String get settingsSecurityWealthTurnOffWarning;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Net Worth lock turned off.'**
+  String get settingsSecurityNetWorthLockTurned;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Not set up. Turn it on from the web app — enrolling needs a QR scan.'**
+  String get settingsSecuritySetUpTurnFrom;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get settingsSecurityUnknown;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t check the status just now.'**
+  String get settingsSecurityCouldntCheckStatusJust;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'Checking…'**
+  String get settingsSecurityChecking;
+
+  /// security_card.dart (7.1b)
+  ///
+  /// In en, this message translates to:
+  /// **'The app lock turned itself off: the saved PIN check was missing. Set it up again.'**
+  String get settingsSecurityAppLockTurnedItself;
+
+  /// profile_card.dart (7.1b) — sign-in method and the month the account was created
+  ///
+  /// In en, this message translates to:
+  /// **'{method} · Member since {month}'**
+  String settingsProfileMemberSince(String method, String month);
+
+  /// settings_screen.dart (7.1b) — the server refused the theme write
+  ///
+  /// In en, this message translates to:
+  /// **'Theme applied here, but not saved: {failure}'**
+  String settingsThemeNotSaved(String failure);
+
+  /// settings_screen.dart (7.1b) — one unit of a currency in the base currency
+  ///
+  /// In en, this message translates to:
+  /// **'1 {code} = {amount}'**
+  String settingsCurrencyRate(String code, String amount);
+
+  /// settings_screen.dart (7.1b) — a currency row: INR — Indian Rupee
+  ///
+  /// In en, this message translates to:
+  /// **'{code} — {name}'**
+  String settingsCurrencyCodeAndName(String code, String name);
+
+  /// settings_screen.dart (7.1b) — App info region line
+  ///
+  /// In en, this message translates to:
+  /// **'{currency} · {locale}'**
+  String settingsRegionSummary(String currency, String locale);
+
+  /// security_card.dart (7.1b) — 2FA status. `fallback` is empty or the email-fallback sentence.
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticator app is on. {fallback}{count, plural, =1{1 backup code left.} other{{count} backup codes left.}}'**
+  String settingsSecurityTwoFactorOn(String fallback, int count);
+
+  /// security_card.dart (7.1b) — prepended to the 2FA status when the emailed-code fallback is on
+  ///
+  /// In en, this message translates to:
+  /// **'Email fallback is on. '**
+  String get settingsSecurityEmailFallbackOn;
+
+  /// security_card.dart (7.1b) — status pill, the pair of settingsSecurityOff
+  ///
+  /// In en, this message translates to:
+  /// **'On'**
+  String get settingsSecurityOn;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

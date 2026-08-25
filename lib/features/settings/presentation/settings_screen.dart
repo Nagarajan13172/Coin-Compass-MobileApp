@@ -22,6 +22,7 @@ import 'profile_card.dart';
 import 'security_card.dart';
 import 'settings_providers.dart';
 import '../../../core/router/route_refresh.dart';
+import '../../../l10n/app_localizations.dart';
 
 /// `/settings` — who is signed in, how the app looks, what the wallet is
 /// called, which currency it counts in, and the two locks that guard it.
@@ -62,7 +63,7 @@ class SettingsScreen extends ConsumerWidget {
         // bar and the raised FAB — `shellBottomInset`, not a hardcoded 110.
         padding: EdgeInsets.only(bottom: shellBottomInset(context)),
         children: [
-          const ScreenHeader(title: 'Settings', subtitle: 'Preferences & data'),
+          ScreenHeader(title: L.of(context).navSettings, subtitle: L.of(context).settingsPreferencesData),
 
           // Independent of /settings on purpose: a settings failure should not
           // blank out who you are signed in as, or strand you without a way to
@@ -146,17 +147,17 @@ class _AppearanceCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SectionHeader(
-            title: 'Appearance',
-            subtitle: 'Applies instantly, and is saved to your account.',
+          SectionHeader(
+            title: L.of(context).settingsAppearance,
+            subtitle: L.of(context).settingsAppliesInstantlySavedAccount,
           ),
           const SizedBox(height: 14),
           Row(
             children: [
-              for (final option in const [
-                (ThemeMode.system, 'System', LucideIcons.monitor),
-                (ThemeMode.light, 'Light', LucideIcons.sun),
-                (ThemeMode.dark, 'Dark', LucideIcons.moon),
+              for (final option in [
+                (ThemeMode.system, L.of(context).settingsSystem, LucideIcons.monitor),
+                (ThemeMode.light, L.of(context).settingsLight, LucideIcons.sun),
+                (ThemeMode.dark, L.of(context).settingsDark, LucideIcons.moon),
               ]) ...[
                 if (option.$1 != ThemeMode.system) const SizedBox(width: 8),
                 Expanded(
@@ -175,8 +176,7 @@ class _AppearanceCard extends ConsumerWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'The web app keeps the theme on the device it was picked on. This '
-            'app also stores it on your account so a reinstall remembers it.',
+            L.of(context).settingsWebAppKeepsTheme,
             style: TextStyle(fontSize: 12, color: c.mutedForeground),
           ),
         ],
@@ -190,6 +190,7 @@ class _AppearanceCard extends ConsumerWidget {
     ThemeMode mode,
   ) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l = L.of(context);
     final failure = await ref
         .read(settingsWriteControllerProvider.notifier)
         .setTheme(mode);
@@ -197,7 +198,9 @@ class _AppearanceCard extends ConsumerWidget {
     messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(content: Text('Theme applied here, but not saved: $failure')),
+        SnackBar(
+          content: Text(l.settingsThemeNotSaved(failure)),
+        ),
       );
   }
 }
@@ -315,16 +318,18 @@ class _WalletCardState extends ConsumerState<_WalletCard> {
 
   Future<void> _save() async {
     final messenger = ScaffoldMessenger.of(context);
+    final l = L.of(context);
     final failure = await ref
         .read(settingsWriteControllerProvider.notifier)
         .saveWallet(name: _name.text, description: _description.text);
     messenger
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(failure ?? 'Wallet updated')));
+      ..showSnackBar(SnackBar(content: Text(failure ?? l.settingsWalletUpdated)));
   }
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final c = context.colors;
     final busy =
         ref.watch(settingsWriteControllerProvider) == SettingsWrite.wallet;
@@ -334,14 +339,14 @@ class _WalletCardState extends ConsumerState<_WalletCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SectionHeader(
-            title: 'Wallet',
-            subtitle: 'What this wallet is called inside the app.',
+          SectionHeader(
+            title: l.settingsWallet,
+            subtitle: l.settingsWhatWalletCalledInside,
           ),
           const SizedBox(height: 14),
           AppTextField(
-            label: 'Wallet name',
-            hint: 'My Wallet',
+            label: l.settingsWalletName,
+            hint: l.settingsMyWallet,
             controller: _name,
             enabled: !blocked,
             textInputAction: TextInputAction.next,
@@ -350,8 +355,8 @@ class _WalletCardState extends ConsumerState<_WalletCard> {
           ),
           const SizedBox(height: 14),
           AppTextField(
-            label: 'Label',
-            hint: 'e.g. Personal finances',
+            label: l.settingsLabel,
+            hint: l.settingsEGPersonalFinances,
             controller: _description,
             enabled: !blocked,
             textInputAction: TextInputAction.done,
@@ -361,14 +366,14 @@ class _WalletCardState extends ConsumerState<_WalletCard> {
           ),
           const SizedBox(height: 8),
           Text(
-            'An optional tag shown alongside your wallet name.',
+            l.settingsOptionalTagShownAlongside,
             style: TextStyle(fontSize: 12, color: c.mutedForeground),
           ),
           const SizedBox(height: 14),
           Align(
             alignment: Alignment.centerRight,
             child: AppButton(
-              label: 'Save changes',
+              label: l.settingsSaveChanges,
               expand: false,
               busy: busy,
               // Empty names are refused before the request is built — the web
@@ -403,6 +408,7 @@ class _CurrencyCardState extends ConsumerState<_CurrencyCard> {
 
   Future<void> _select(String code) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l = L.of(context);
     setState(() => _pendingCode = code);
     final failure = await ref
         .read(settingsWriteControllerProvider.notifier)
@@ -411,12 +417,13 @@ class _CurrencyCardState extends ConsumerState<_CurrencyCard> {
     messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(content: Text(failure ?? 'Base currency updated')),
+        SnackBar(content: Text(failure ?? l.settingsBaseCurrencyUpdated)),
       );
   }
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final c = context.colors;
     final settings = widget.settings;
     final currencies = settings.currencies;
@@ -426,19 +433,18 @@ class _CurrencyCardState extends ConsumerState<_CurrencyCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SectionHeader(
-            title: 'Currency',
-            subtitle: 'Every amount in the app is shown in this currency.',
+          SectionHeader(
+            title: l.settingsCurrency,
+            subtitle: l.settingsEveryAmountAppShown,
           ),
           const SizedBox(height: 6),
           if (currencies.isEmpty)
-            const EmptyState(
+            EmptyState(
               compact: true,
               icon: LucideIcons.coins,
-              title: 'No currencies',
+              title: l.settingsNoCurrencies,
               message:
-                  "The server hasn't sent a currency table for this wallet, so "
-                  'amounts stay in the current base currency.',
+                  l.settingsServerHasntSentCurrency,
             )
           else
             for (var i = 0; i < currencies.length; i++) ...[
@@ -455,9 +461,7 @@ class _CurrencyCardState extends ConsumerState<_CurrencyCard> {
             ],
           const SizedBox(height: 10),
           Text(
-            'Rates are seeded on the server and cannot be edited here — the web '
-            "app has no editor for them either, and multi-currency conversion "
-            "isn't enabled yet.",
+            l.settingsRatesSeededServerCannot,
             style: TextStyle(fontSize: 12, color: c.mutedForeground),
           ),
         ],
@@ -483,11 +487,15 @@ class _CurrencyRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final c = context.colors;
     final selected = currency.code == base;
     final rate = selected
-        ? 'Base currency'
-        : '1 ${currency.code} = ${Money.format(currency.rateToBase, symbol: baseSymbol)}';
+        ? l.settingsBaseCurrency
+        : l.settingsCurrencyRate(
+            currency.code,
+            Money.format(currency.rateToBase, symbol: baseSymbol),
+          );
 
     return Material(
       color: Colors.transparent,
@@ -523,7 +531,9 @@ class _CurrencyRow extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${currency.code} — ${currency.name}',
+                      L.of(
+                        context,
+                      ).settingsCurrencyCodeAndName(currency.code, currency.name),
                       maxLines: 2,
                       style: const TextStyle(
                         fontSize: 14.5,
@@ -597,7 +607,7 @@ class _EmailReportsCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SectionHeader(title: 'Email reports'),
+          SectionHeader(title: L.of(context).settingsEmailReports),
           const SizedBox(height: 12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -606,8 +616,8 @@ class _EmailReportsCard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Monthly & mid-month summary',
+                    Text(
+                      L.of(context).settingsMonthlyMidMonthSummary,
                       style: TextStyle(
                         fontSize: 14.5,
                         fontWeight: FontWeight.w600,
@@ -615,8 +625,7 @@ class _EmailReportsCard extends ConsumerWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      'Emailed on the 1st (last month) and the 15th (this '
-                      'month so far).',
+                      L.of(context).settingsEmailedStLastMonth,
                       style: TextStyle(
                         fontSize: 12.5,
                         color: c.mutedForeground,
@@ -681,7 +690,7 @@ class _SignOutCard extends ConsumerWidget {
                     ),
                   )
                 : const Icon(LucideIcons.logOut, size: 18),
-            label: Text(busy ? 'Signing out…' : 'Sign out'),
+            label: Text(busy ? L.of(context).settingsSigningOut : L.of(context).authSignOut),
             style: OutlinedButton.styleFrom(
               foregroundColor: c.destructive,
               side: BorderSide(color: c.destructive.withValues(alpha: 0.4)),
@@ -690,7 +699,7 @@ class _SignOutCard extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Signs you out on this device only. Your data stays on the server.',
+            L.of(context).settingsSignsOutDeviceOnly,
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 12, color: c.mutedForeground),
           ),
@@ -701,11 +710,12 @@ class _SignOutCard extends ConsumerWidget {
 
   Future<void> _confirm(BuildContext context, WidgetRef ref) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l = L.of(context);
     final confirmed = await ConfirmSheet.show(
       context,
-      title: 'Sign out?',
-      message: "You'll need your email and password to get back in.",
-      confirmLabel: 'Sign out',
+      title: l.settingsSignOut,
+      message: l.settingsYoullNeedEmailPassword,
+      confirmLabel: l.authSignOut,
     );
     if (!confirmed) return;
 
@@ -730,22 +740,25 @@ class _AppInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final c = context.colors;
     final region = settings == null
         ? '—'
-        : '${settings!.baseCurrency} · ${settings!.locale}';
+        : L.of(
+            context,
+          ).settingsRegionSummary(settings!.baseCurrency, settings!.locale);
 
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SectionHeader(title: 'App info'),
+          SectionHeader(title: l.settingsAppInfo),
           const SizedBox(height: 10),
           for (final row in [
-            ('App', 'CoinCompass'),
-            ('Version', _version),
-            ('Build', 'Local build · Single user'),
-            ('Region', region),
+            (l.settingsApp, l.appName),
+            (l.settingsVersion, _version),
+            (l.settingsBuild, l.settingsLocalBuildSingleUser),
+            (l.settingsRegion, region),
           ])
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 5),

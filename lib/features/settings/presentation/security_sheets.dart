@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../../../core/widgets/form_sheet_scaffold.dart';
 import 'settings_providers.dart';
+import '../../../l10n/app_localizations.dart';
 
 /// Set or change the **web** client's PIN lock.
 ///
@@ -56,11 +57,11 @@ class _PinSheetState extends ConsumerState<PinSheet> {
   Future<void> _submit() async {
     final pin = _pin.text;
     if (!_digits.hasMatch(pin)) {
-      setState(() => _error = 'The PIN must be 4 to 8 digits.');
+      setState(() => _error = L.of(context).settingsSecPinMustDigits);
       return;
     }
     if (pin != _confirm.text) {
-      setState(() => _error = "The two PINs don't match.");
+      setState(() => _error = L.of(context).settingsSecTwoPinsDontMatch);
       return;
     }
     setState(() => _error = null);
@@ -83,8 +84,8 @@ class _PinSheetState extends ConsumerState<PinSheet> {
         ref.watch(settingsWriteControllerProvider) == SettingsWrite.pin;
 
     return FormSheetScaffold(
-      title: widget.change ? 'Change your PIN' : 'Set a PIN',
-      submitLabel: widget.change ? 'Change PIN' : 'Turn on PIN lock',
+      title: widget.change ? L.of(context).settingsSecChangePin : L.of(context).settingsSecSetPin,
+      submitLabel: widget.change ? L.of(context).settingsSecChangePinAction : L.of(context).settingsSecTurnPinLock,
       submitting: busy,
       onSubmit: _submit,
       formError: _error,
@@ -92,16 +93,15 @@ class _PinSheetState extends ConsumerState<PinSheet> {
       // *web* client. The phone has its own lock now, with its own PIN — so the
       // copy has to say which surface this one covers, and point at the other.
       footnote:
-          'Your data stays exactly as it is, and this is not your password.',
+          L.of(context).settingsSecDataStaysExactlyAs,
       children: [
         Text(
-          'Choose 4 to 8 digits. This PIN protects CoinCompass in a browser. '
-          'To lock this phone, use App lock at the top of the Security card.',
+          L.of(context).settingsSecChooseDigitsPinProtects,
           style: TextStyle(fontSize: 13.5, color: c.mutedForeground),
         ),
         const SizedBox(height: 16),
         AppTextField(
-          label: 'New PIN',
+          label: L.of(context).settingsSecNewPin,
           controller: _pin,
           obscure: true,
           autofocus: true,
@@ -115,7 +115,7 @@ class _PinSheetState extends ConsumerState<PinSheet> {
         ),
         const SizedBox(height: 14),
         AppTextField(
-          label: 'Confirm PIN',
+          label: L.of(context).settingsSecConfirmPin,
           controller: _confirm,
           obscure: true,
           enabled: !busy,
@@ -175,11 +175,11 @@ class _WealthPasscodeSheetState extends ConsumerState<WealthPasscodeSheet> {
   Future<void> _submit() async {
     final passcode = _passcode.text;
     if (passcode.length < 4 || passcode.length > 32) {
-      setState(() => _error = 'The passcode must be 4 to 32 characters.');
+      setState(() => _error = L.of(context).settingsSecPasscodeMustCharacters);
       return;
     }
     if (passcode != _confirm.text) {
-      setState(() => _error = "The two passcodes don't match.");
+      setState(() => _error = L.of(context).settingsSecTwoPasscodesDontMatch);
       return;
     }
     setState(() => _error = null);
@@ -203,8 +203,8 @@ class _WealthPasscodeSheetState extends ConsumerState<WealthPasscodeSheet> {
         SettingsWrite.wealthPasscode;
 
     return FormSheetScaffold(
-      title: widget.change ? 'Change the passcode' : 'Set a passcode',
-      submitLabel: widget.change ? 'Change passcode' : 'Lock Net Worth',
+      title: widget.change ? L.of(context).settingsSecChangePasscode : L.of(context).settingsSecSetPasscode,
+      submitLabel: widget.change ? L.of(context).settingsSecChangePasscodeAction : L.of(context).settingsSecLockNetWorth,
       submitting: busy,
       onSubmit: _submit,
       formError: _error,
@@ -215,22 +215,15 @@ class _WealthPasscodeSheetState extends ConsumerState<WealthPasscodeSheet> {
       // Settings row offers only "Unlock", so there is no "clear it" to reach.
       // Saying so before they choose one is the whole fix.
       footnote:
-          'Net Worth, Savings & Investments and Stocks stay hidden until this '
-          'passcode is entered. Each place you sign in asks for it separately. '
-          'Keep it somewhere safe — this app cannot clear a passcode you have '
-          'forgotten; you would have to remove it from CoinCompass in a '
-          'browser.',
+          L.of(context).settingsSecNetWorthSavingsInvestments,
       children: [
         Text(
-          'Between 4 and 32 characters. Letters, digits and symbols all '
-          'count. It hides the totals: your accounts, balances, loans and '
-          'transactions stay visible, and so do income, expenses and cash '
-          'flow.',
+          L.of(context).settingsSecBetweenCharactersLettersDigits,
           style: TextStyle(fontSize: 13.5, color: c.mutedForeground),
         ),
         const SizedBox(height: 16),
         AppTextField(
-          label: 'Wealth passcode',
+          label: L.of(context).settingsSecWealthPasscode,
           controller: _passcode,
           obscure: !_reveal,
           autofocus: true,
@@ -244,12 +237,12 @@ class _WealthPasscodeSheetState extends ConsumerState<WealthPasscodeSheet> {
               minimumSize: const Size(0, 30),
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-            child: Text(_reveal ? 'Hide' : 'Show'),
+            child: Text(_reveal ? L.of(context).settingsSecHide : L.of(context).settingsSecShow),
           ),
         ),
         const SizedBox(height: 14),
         AppTextField(
-          label: 'Confirm passcode',
+          label: L.of(context).settingsSecConfirmPasscode,
           controller: _confirm,
           obscure: !_reveal,
           enabled: !busy,
