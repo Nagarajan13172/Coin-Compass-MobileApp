@@ -16,7 +16,7 @@
 /// never `ErrorRetry`. That swap is the entire point of 6.3.
 library;
 
-import 'package:flutter/material.dart';
+import '../ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 

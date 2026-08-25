@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+import '../../../core/ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/api/enums.dart';
@@ -19,6 +20,7 @@ import '../../../core/widgets/stat_card.dart';
 import '../../transactions/presentation/open_transactions.dart';
 import '../domain/report_metrics.dart';
 import '../domain/report_models.dart';
+import '../../import/presentation/import_screen.dart';
 import 'export_csv_sheet.dart';
 import 'period.dart';
 import 'reports_providers.dart';
@@ -77,6 +79,15 @@ class ReportsScreen extends ConsumerWidget {
                 icon: LucideIcons.download,
                 primary: false,
                 onPressed: () => ExportCsvSheet.show(context, range: range),
+              ),
+              // 7.3 — import sits next to export because they are the same
+              // job in two directions, and the export's header is the format
+              // the importer round-trips.
+              ScreenHeaderAction(
+                label: 'Import',
+                icon: LucideIcons.fileUp,
+                primary: false,
+                onPressed: () => context.go(ImportScreen.routePath),
               ),
             ],
           ),

@@ -1,5 +1,5 @@
 import '../../l10n/app_localizations.dart';
-import 'package:flutter/material.dart';
+import '../../core/ui.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/theme/app_colors.dart';

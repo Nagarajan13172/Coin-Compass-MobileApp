@@ -52,7 +52,7 @@ library;
 
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import '../ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_exception.dart';

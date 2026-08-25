@@ -37,6 +37,10 @@ dependencies:
 
   # utils
   intl: ^0.20.2
+  # Phase 7.1 — on-device translation. Tamil is one of ML Kit's ~59 supported
+  # languages. Runs entirely on the phone once the model is downloaded; nothing
+  # about the owner's money leaves the device.
+  google_mlkit_translation: ^0.15.1
 
   # PBKDF2-HMAC-SHA256 for the app lock's local PIN verifier. Already resolved
   # at 3.0.7 transitively (via dio); promoted to a direct dependency because

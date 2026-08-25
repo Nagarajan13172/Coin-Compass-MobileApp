@@ -6,6 +6,7 @@ import 'package:coincompass/core/router/app_router.dart';
 import 'package:coincompass/main.dart';
 import 'package:coincompass/core/router/destinations.dart';
 import 'package:coincompass/core/widgets/more_sheet.dart';
+import 'package:coincompass/features/import/presentation/import_screen.dart';
 import 'package:coincompass/features/_placeholder/placeholder_screen.dart';
 import 'package:coincompass/core/theme/app_theme.dart';
 import 'package:coincompass/core/theme/theme_controller.dart';
@@ -253,6 +254,26 @@ void main() {
             'PlaceholderScreen.',
       );
     }
+  });
+
+  testWidgets('Reports leads to the CSV importer, and back again', (tester) async {
+    // 7.3 mounts the importer at /reports/import rather than giving it a nav
+    // slot, the same arrangement /credits/people uses. That only works if the
+    // route is actually registered under the shell — a screen no route reaches
+    // is a screen that does not exist.
+    final container = await boot(tester);
+    final router = container.read(routerProvider);
+
+    router.go(ImportScreen.routePath);
+    await settle(tester);
+    expect(find.byType(ImportScreen), findsOneWidget);
+    expect(find.byType(PlaceholderScreen), findsNothing);
+    // The importer opens on its explanation, having written nothing.
+    expect(find.text('Import transactions'), findsOneWidget);
+
+    router.go('/reports');
+    await settle(tester);
+    expect(find.byType(ImportScreen), findsNothing);
   });
 
   testWidgets('the bottom nav reaches the real Reports screen', (tester) async {

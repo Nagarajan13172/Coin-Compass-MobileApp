@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
+import '../ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../features/import/presentation/import_screen.dart';
 import '../../features/_placeholder/placeholder_screen.dart';
 import '../../features/accounts/presentation/accounts_screen.dart';
 import '../../features/auth/presentation/auth_providers.dart';
@@ -185,6 +186,15 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/credits/splits',
             builder: (_, _) => const SplitsScreen(),
+          ),
+          // 7.3 — CSV import. Under /reports for the same reason People and
+          // Splits sit under /credits: the bottom nav keeps Reports lit, and
+          // the screen is reached from Reports' own header rather than from
+          // the nav. The web app has a top-level /import; this app has no nav
+          // slot to spare for it.
+          GoRoute(
+            path: ImportScreen.routePath,
+            builder: (_, _) => const ImportScreen(),
           ),
           // Holdings has no nav slot of its own — the sidebar has exactly 17
           // destinations and the web app reaches savings & investments from

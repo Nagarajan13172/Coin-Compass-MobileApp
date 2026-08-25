@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import '../ui.dart';
 
 /// Primary / outlined button with a built-in busy state, so callers don't
 /// re-implement "disable and swap in a spinner" on every form.

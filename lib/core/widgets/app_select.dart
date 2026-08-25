@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import '../ui.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../theme/app_colors.dart';

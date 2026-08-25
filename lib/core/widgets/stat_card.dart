@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import '../ui.dart';
 
 import '../theme/app_colors.dart';
 import 'app_card.dart';
