@@ -54,6 +54,9 @@ flutter:
   uses-material-design: true
   assets:
     - assets/i18n/
+    # The OFL requires the licence to travel with the font it covers, so it is
+    # a bundled asset rather than a repo-only file.
+    - assets/fonts/OFL-NotoSansTamil.txt
   fonts:
     - family: Inter
       fonts:
@@ -64,4 +67,17 @@ flutter:
         - asset: assets/fonts/Inter-SemiBold.ttf
           weight: 600
         - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700
+    # Fallback only — see AppTheme.fontFamilyFallback. Inter has no Tamil
+    # glyphs, so without this every Tamil string renders as tofu. Latin text
+    # never reaches it, so English metrics are untouched.
+    - family: NotoSansTamil
+      fonts:
+        - asset: assets/fonts/NotoSansTamil-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/NotoSansTamil-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/NotoSansTamil-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/NotoSansTamil-Bold.ttf
           weight: 700

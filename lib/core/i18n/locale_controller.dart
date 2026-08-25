@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../theme/theme_controller.dart';
+import 'en.dart';
 import 'ta.dart';
 
 /// The web app ships English + Tamil. The mobile app carries the same toggle —
@@ -17,9 +18,11 @@ import 'ta.dart';
 /// went on claiming to be in Tamil.
 ///
 /// So availability is derived from the data instead of asserted by a flag:
-/// [hasTamil] is `taStrings.isNotEmpty`. Populate `ta.dart` and the toggle
-/// reappears on the next build; empty it and it goes away again. There is no
-/// separate switch anyone can forget to flip, in either direction.
+/// [hasTamil] is "Tamil covers every English key" ([tamilGaps] is empty).
+/// Finish `ta.dart` and the toggle reappears on the next build; let a key slip
+/// and it goes away again. There is no separate switch anyone can forget to
+/// flip, in either direction — and because 7.1b keeps *adding* English keys,
+/// the bar rises with the work rather than being passed once and forgotten.
 class SupportedLocales {
   const SupportedLocales._();
 
@@ -29,14 +32,37 @@ class SupportedLocales {
   /// Every locale the app knows how to *name* — what `MaterialApp` advertises.
   static const List<Locale> all = [english, tamil];
 
-  /// True once the Tamil dictionary carries at least one string.
-  static bool get hasTamil => taStrings.isNotEmpty;
+  /// English keys with no usable Tamil string — the work 7.1 has left.
+  ///
+  /// A blank counts as a gap, not a translation: an empty string renders as
+  /// English via `Strings.t`'s fallback, so treating it as "done" would let the
+  /// toggle go live over English text.
+  static List<String> get tamilGaps => <String>[
+    for (final key in enStrings.keys)
+      if ((taStrings[key] ?? '').isEmpty) key,
+  ];
+
+  /// True once Tamil covers **every** English key.
+  ///
+  /// Coverage, not "is it non-empty" — and that distinction is the whole
+  /// safeguard. Offering Tamil on a partial dictionary would recreate exactly
+  /// the bug this file exists to fix: a `த` label over mostly-English text,
+  /// only now with a handful of Tamil words scattered through it, which reads
+  /// as broken rather than as pending.
+  ///
+  /// It is also self-correcting in the direction that matters. Phase 7.1b will
+  /// add hundreds of keys to `en.dart` as it extracts hardcoded strings; each
+  /// one re-opens a gap until Tamil catches up, so the toggle cannot go live
+  /// half-way through by accident.
+  ///
+  /// Computed once — both maps are `const`, so the answer cannot change within
+  /// a run, and this is read on every app-bar build.
+  static bool get hasTamil =>
+      _hasTamil ??= enStrings.isNotEmpty && tamilGaps.isEmpty;
+  static bool? _hasTamil;
 
   /// The locales a person can actually choose right now.
-  static List<Locale> get available => <Locale>[
-    english,
-    if (hasTamil) tamil,
-  ];
+  static List<Locale> get available => <Locale>[english, if (hasTamil) tamil];
 
   /// True when there is a real choice to offer — the app bar's language pill
   /// renders on this and nothing else.

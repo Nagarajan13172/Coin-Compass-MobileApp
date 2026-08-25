@@ -45,18 +45,33 @@ void main() {
   });
 
   group('availability is read off the dictionary', () {
-    test('hasTamil is exactly "the Tamil map has something in it"', () {
-      // The whole point: no separate flag. Fill `ta.dart` and the toggle comes
-      // back on the next build; empty it and it goes away. This assertion is
-      // what makes that true rather than merely intended, and it keeps passing
-      // in BOTH states — it is not asserting that Tamil is missing today.
-      expect(SupportedLocales.hasTamil, taStrings.isNotEmpty);
-      expect(SupportedLocales.canChoose, taStrings.isNotEmpty);
+    test('hasTamil is exactly "Tamil covers every English key"', () {
+      // The whole point: no separate flag, and the bar is COVERAGE rather than
+      // "is it non-empty". Offering Tamil on a partial dictionary would put a
+      // `த` label over mostly-English text — the same lie, with a few Tamil
+      // words sprinkled in. Written to keep passing in both states, so it does
+      // not rot the day the dictionary is finished.
+      final covered = enStrings.isNotEmpty && SupportedLocales.tamilGaps.isEmpty;
+      expect(SupportedLocales.hasTamil, covered);
+      expect(SupportedLocales.canChoose, covered);
       expect(
         SupportedLocales.available.length,
-        taStrings.isEmpty ? 1 : 2,
-        reason: 'English is always available; Tamil only with a dictionary',
+        covered ? 2 : 1,
+        reason: 'English is always available; Tamil only at full coverage',
       );
+    });
+
+    test('a partial dictionary does not count as coverage', () {
+      // The state 7.1 lives in for its whole duration. Every English key that
+      // has no Tamil string is a gap, and one gap is enough to keep the toggle
+      // hidden.
+      expect(
+        SupportedLocales.tamilGaps.length,
+        enStrings.keys.where((k) => (taStrings[k] ?? '').isEmpty).length,
+      );
+      if (SupportedLocales.tamilGaps.isNotEmpty) {
+        expect(SupportedLocales.hasTamil, isFalse);
+      }
     });
 
     test('English is always offered', () {

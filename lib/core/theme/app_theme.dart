@@ -10,6 +10,23 @@ class AppTheme {
   static const double radius = 12;
   static const String fontFamily = 'Inter';
 
+  /// Phase 7.1c. **Inter carries no Tamil glyphs** — 2,849 codepoints, zero in
+  /// the Tamil block — so every Tamil string would render as tofu (□□□) without
+  /// this. Noto Sans Tamil covers the full 72-codepoint repertoire plus ZWNJ and
+  /// ZWJ, which Tamil shaping needs.
+  ///
+  /// A *fallback*, never the primary: Latin text keeps Inter's metrics
+  /// unchanged, and the engine only reaches for Noto on a glyph Inter cannot
+  /// draw. That is what makes this safe to land before the translations — it
+  /// cannot move a single pixel of the English UI.
+  ///
+  /// Shipped as four static instances cut from the variable font at wdth=100,
+  /// mirroring Inter's four weights so weight matching is a plain lookup rather
+  /// than a variable-axis negotiation. Licensed OFL; the licence ships beside
+  /// them in `assets/fonts/OFL-NotoSansTamil.txt`, which the OFL requires.
+  static const String tamilFontFamily = 'NotoSansTamil';
+  static const List<String> fontFamilyFallback = <String>[tamilFontFamily];
+
   static ThemeData light() => _build(AppColors.light, Brightness.light);
   static ThemeData dark() => _build(AppColors.dark, Brightness.dark);
 
@@ -50,6 +67,7 @@ class AppTheme {
         centerTitle: false,
         titleTextStyle: TextStyle(
           fontFamily: fontFamily,
+          fontFamilyFallback: fontFamilyFallback,
           fontSize: 18,
           fontWeight: FontWeight.w700,
           color: c.foreground,
@@ -91,6 +109,7 @@ class AppTheme {
           elevation: 0,
           textStyle: const TextStyle(
             fontFamily: fontFamily,
+            fontFamilyFallback: fontFamilyFallback,
             fontSize: 15.5,
             fontWeight: FontWeight.w600,
           ),
@@ -107,6 +126,7 @@ class AppTheme {
           side: BorderSide(color: c.border),
           textStyle: const TextStyle(
             fontFamily: fontFamily,
+            fontFamilyFallback: fontFamilyFallback,
             fontSize: 15.5,
             fontWeight: FontWeight.w600,
           ),
@@ -120,6 +140,7 @@ class AppTheme {
           foregroundColor: c.primary,
           textStyle: const TextStyle(
             fontFamily: fontFamily,
+            fontFamilyFallback: fontFamilyFallback,
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
@@ -152,6 +173,7 @@ class AppTheme {
         side: BorderSide(color: c.border),
         labelStyle: TextStyle(
           fontFamily: fontFamily,
+          fontFamilyFallback: fontFamilyFallback,
           fontSize: 13,
           fontWeight: FontWeight.w500,
           color: c.foreground,
@@ -171,6 +193,7 @@ class AppTheme {
         backgroundColor: c.foreground,
         contentTextStyle: TextStyle(
           fontFamily: fontFamily,
+          fontFamilyFallback: fontFamilyFallback,
           color: c.background,
           fontSize: 14,
         ),
@@ -216,6 +239,7 @@ class AppTheme {
     }) {
       return TextStyle(
         fontFamily: fontFamily,
+        fontFamilyFallback: fontFamilyFallback,
         fontSize: size,
         fontWeight: weight,
         color: color ?? c.foreground,
@@ -241,6 +265,6 @@ class AppTheme {
           labelMedium: s(12.5, FontWeight.w500, color: c.mutedForeground),
           labelSmall: s(11, FontWeight.w500, color: c.mutedForeground),
         )
-        .apply(fontFamily: fontFamily);
+        .apply(fontFamily: fontFamily, fontFamilyFallback: fontFamilyFallback);
   }
 }

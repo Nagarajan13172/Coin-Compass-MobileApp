@@ -25,22 +25,40 @@ import 'package:flutter_test/flutter_test.dart';
 Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  final loader = FontLoader(AppTheme.fontFamily);
-  for (final path in const [
-    'assets/fonts/Inter-Regular.ttf',
-    'assets/fonts/Inter-Medium.ttf',
-    'assets/fonts/Inter-SemiBold.ttf',
-    'assets/fonts/Inter-Bold.ttf',
-  ]) {
-    final file = File(path);
-    // Never fail the whole suite over a missing font — a checkout without the
-    // asset should still run, just back on the fallback metrics.
-    if (!file.existsSync()) continue;
-    loader.addFont(
-      Future<ByteData>.value(file.readAsBytesSync().buffer.asByteData()),
-    );
+  // Phase 7.1c adds the second family. Tamil glyphs come from Noto Sans Tamil
+  // because Inter has none, and a layout test that measured Tamil in the
+  // stand-in font would be measuring nothing real — the same trap this file was
+  // written to close for Latin.
+  const families = <String, List<String>>{
+    AppTheme.fontFamily: [
+      'assets/fonts/Inter-Regular.ttf',
+      'assets/fonts/Inter-Medium.ttf',
+      'assets/fonts/Inter-SemiBold.ttf',
+      'assets/fonts/Inter-Bold.ttf',
+    ],
+    AppTheme.tamilFontFamily: [
+      'assets/fonts/NotoSansTamil-Regular.ttf',
+      'assets/fonts/NotoSansTamil-Medium.ttf',
+      'assets/fonts/NotoSansTamil-SemiBold.ttf',
+      'assets/fonts/NotoSansTamil-Bold.ttf',
+    ],
+  };
+
+  for (final entry in families.entries) {
+    final loader = FontLoader(entry.key);
+    var any = false;
+    for (final path in entry.value) {
+      final file = File(path);
+      // Never fail the whole suite over a missing font — a checkout without the
+      // asset should still run, just back on the fallback metrics.
+      if (!file.existsSync()) continue;
+      any = true;
+      loader.addFont(
+        Future<ByteData>.value(file.readAsBytesSync().buffer.asByteData()),
+      );
+    }
+    if (any) await loader.load();
   }
-  await loader.load();
 
   await testMain();
 }
