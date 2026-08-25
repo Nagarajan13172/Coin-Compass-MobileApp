@@ -1,3 +1,4 @@
+import '../../l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -14,13 +15,15 @@ class PlaceholderScreen extends StatelessWidget {
     this.phase,
   });
 
-  final String title;
+  /// Resolved against the active locale — see `Destination.label` (7.1b).
+  final String Function(L) title;
   final IconData icon;
   final String? phase;
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final label = title(L.of(context));
     return Column(
       children: [
         Padding(
@@ -28,7 +31,7 @@ class PlaceholderScreen extends StatelessWidget {
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              title,
+              label,
               style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
             ),
           ),
@@ -38,8 +41,8 @@ class PlaceholderScreen extends StatelessWidget {
             icon: icon,
             title: 'Coming next',
             message: phase == null
-                ? '$title is being built.'
-                : '$title arrives in $phase.',
+                ? '$label is being built.'
+                : '$label arrives in $phase.',
           ),
         ),
         Padding(

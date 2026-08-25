@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -8,6 +7,7 @@ import 'core/api/api_client.dart';
 import 'core/api/stale_ledger.dart';
 import 'core/i18n/locale_controller.dart';
 import 'core/router/app_router.dart';
+import 'l10n/app_localizations.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'features/auth/presentation/auth_providers.dart';
@@ -156,11 +156,7 @@ class _CoinCompassAppState extends ConsumerState<CoinCompassApp> {
       themeMode: themeMode,
       locale: locale,
       supportedLocales: SupportedLocales.all,
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
+      localizationsDelegates: L.localizationsDelegates,
     );
   }
 }

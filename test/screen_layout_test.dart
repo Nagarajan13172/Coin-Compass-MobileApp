@@ -35,6 +35,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:coincompass/l10n/app_localizations.dart';
 
 /// Renders the phase-2 screens on the narrowest device we ship to
 /// (360 × 800dp) and fails on any RenderFlex overflow — the class of bug that
@@ -161,6 +162,7 @@ void main() {
       UncontrolledProviderScope(
         container: container,
         child: MaterialApp(
+          localizationsDelegates: L.localizationsDelegates,
           theme: AppTheme.light(),
           home: Scaffold(body: screen),
         ),

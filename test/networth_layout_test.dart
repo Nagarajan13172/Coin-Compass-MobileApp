@@ -21,6 +21,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:coincompass/l10n/app_localizations.dart';
 
 void main() {
   const Size phone = Size(360, 800);
@@ -90,6 +91,7 @@ void main() {
       UncontrolledProviderScope(
         container: container,
         child: MaterialApp(
+          localizationsDelegates: L.localizationsDelegates,
           theme: AppTheme.light(),
           home: Scaffold(body: screen),
         ),
@@ -278,6 +280,7 @@ void main() {
   );
 
   Widget host(Widget child) => MaterialApp(
+          localizationsDelegates: L.localizationsDelegates,
     theme: AppTheme.light(),
     home: Scaffold(body: SizedBox(width: 360, child: child)),
   );

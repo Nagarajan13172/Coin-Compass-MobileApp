@@ -1,0 +1,446 @@
+{
+  "@@locale": "en",
+  "appName": "CoinCompass",
+  "@appName": {
+    "description": "migrated from app.name"
+  },
+  "appTagline": "Personal Finance Manager",
+  "@appTagline": {
+    "description": "migrated from app.tagline"
+  },
+  "navDashboard": "Dashboard",
+  "@navDashboard": {
+    "description": "migrated from nav.dashboard"
+  },
+  "navTransactions": "Transactions",
+  "@navTransactions": {
+    "description": "migrated from nav.transactions"
+  },
+  "navReports": "Reports",
+  "@navReports": {
+    "description": "migrated from nav.reports"
+  },
+  "navCalendar": "Calendar",
+  "@navCalendar": {
+    "description": "migrated from nav.calendar"
+  },
+  "navBudgets": "Budgets",
+  "@navBudgets": {
+    "description": "migrated from nav.budgets"
+  },
+  "navGoals": "Goals",
+  "@navGoals": {
+    "description": "migrated from nav.goals"
+  },
+  "navAccounts": "Accounts",
+  "@navAccounts": {
+    "description": "migrated from nav.accounts"
+  },
+  "navCredits": "Credits",
+  "@navCredits": {
+    "description": "migrated from nav.credits"
+  },
+  "navRecurring": "Recurring",
+  "@navRecurring": {
+    "description": "migrated from nav.recurring"
+  },
+  "navCategories": "Categories",
+  "@navCategories": {
+    "description": "migrated from nav.categories"
+  },
+  "navNetWorth": "Net Worth",
+  "@navNetWorth": {
+    "description": "migrated from nav.netWorth"
+  },
+  "navStocks": "Stocks",
+  "@navStocks": {
+    "description": "migrated from nav.stocks"
+  },
+  "navLoans": "Loans",
+  "@navLoans": {
+    "description": "migrated from nav.loans"
+  },
+  "navGold": "Gold & Silver",
+  "@navGold": {
+    "description": "migrated from nav.gold"
+  },
+  "navInsights": "Insights",
+  "@navInsights": {
+    "description": "migrated from nav.insights"
+  },
+  "navNotifications": "Notifications",
+  "@navNotifications": {
+    "description": "migrated from nav.notifications"
+  },
+  "navSettings": "Settings",
+  "@navSettings": {
+    "description": "migrated from nav.settings"
+  },
+  "navMore": "More",
+  "@navMore": {
+    "description": "migrated from nav.more"
+  },
+  "actionAdd": "Add",
+  "@actionAdd": {
+    "description": "migrated from action.add"
+  },
+  "actionSave": "Save",
+  "@actionSave": {
+    "description": "migrated from action.save"
+  },
+  "actionCancel": "Cancel",
+  "@actionCancel": {
+    "description": "migrated from action.cancel"
+  },
+  "actionDelete": "Delete",
+  "@actionDelete": {
+    "description": "migrated from action.delete"
+  },
+  "actionEdit": "Edit",
+  "@actionEdit": {
+    "description": "migrated from action.edit"
+  },
+  "actionRetry": "Retry",
+  "@actionRetry": {
+    "description": "migrated from action.retry"
+  },
+  "actionViewAll": "View all",
+  "@actionViewAll": {
+    "description": "migrated from action.viewAll"
+  },
+  "actionView": "View",
+  "@actionView": {
+    "description": "migrated from action.view"
+  },
+  "actionSearch": "Search",
+  "@actionSearch": {
+    "description": "migrated from action.search"
+  },
+  "actionClose": "Close",
+  "@actionClose": {
+    "description": "migrated from action.close"
+  },
+  "actionConfirm": "Confirm",
+  "@actionConfirm": {
+    "description": "migrated from action.confirm"
+  },
+  "actionUndo": "Undo",
+  "@actionUndo": {
+    "description": "migrated from action.undo"
+  },
+  "actionDone": "Done",
+  "@actionDone": {
+    "description": "migrated from action.done"
+  },
+  "actionRefresh": "Refresh",
+  "@actionRefresh": {
+    "description": "migrated from action.refresh"
+  },
+  "actionBreakdown": "Breakdown",
+  "@actionBreakdown": {
+    "description": "migrated from action.breakdown"
+  },
+  "periodWeek": "Week",
+  "@periodWeek": {
+    "description": "migrated from period.week"
+  },
+  "periodMonth": "Month",
+  "@periodMonth": {
+    "description": "migrated from period.month"
+  },
+  "periodYear": "Year",
+  "@periodYear": {
+    "description": "migrated from period.year"
+  },
+  "periodThisMonth": "This month",
+  "@periodThisMonth": {
+    "description": "migrated from period.thisMonth"
+  },
+  "periodThisWeek": "This week",
+  "@periodThisWeek": {
+    "description": "migrated from period.thisWeek"
+  },
+  "periodThisYear": "This year",
+  "@periodThisYear": {
+    "description": "migrated from period.thisYear"
+  },
+  "moneyIncome": "Income",
+  "@moneyIncome": {
+    "description": "migrated from money.income"
+  },
+  "moneyExpense": "Expense",
+  "@moneyExpense": {
+    "description": "migrated from money.expense"
+  },
+  "moneyNet": "Net",
+  "@moneyNet": {
+    "description": "migrated from money.net"
+  },
+  "moneyBalance": "Balance",
+  "@moneyBalance": {
+    "description": "migrated from money.balance"
+  },
+  "moneyTotal": "Total",
+  "@moneyTotal": {
+    "description": "migrated from money.total"
+  },
+  "moneyNetWorth": "Net worth",
+  "@moneyNetWorth": {
+    "description": "migrated from money.netWorth"
+  },
+  "moneyTransfer": "Transfer",
+  "@moneyTransfer": {
+    "description": "migrated from money.transfer"
+  },
+  "dashGoodMorning": "Good morning, {name}",
+  "@dashGoodMorning": {
+    "description": "migrated from dash.goodMorning",
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "dashGoodAfternoon": "Good afternoon, {name}",
+  "@dashGoodAfternoon": {
+    "description": "migrated from dash.goodAfternoon",
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "dashGoodEvening": "Good evening, {name}",
+  "@dashGoodEvening": {
+    "description": "migrated from dash.goodEvening",
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "dashAvgPerDay": "Avg spend / day",
+  "@dashAvgPerDay": {
+    "description": "migrated from dash.avgPerDay"
+  },
+  "dashBiggestCategory": "Biggest category",
+  "@dashBiggestCategory": {
+    "description": "migrated from dash.biggestCategory"
+  },
+  "dashTransactions": "Transactions",
+  "@dashTransactions": {
+    "description": "migrated from dash.transactions"
+  },
+  "dashNoIncome": "No income this period",
+  "@dashNoIncome": {
+    "description": "migrated from dash.noIncome"
+  },
+  "dashNetWorthCaption": "Everything you own, minus what you owe",
+  "@dashNetWorthCaption": {
+    "description": "migrated from dash.netWorthCaption"
+  },
+  "dashSpendingByCategory": "Spending by category",
+  "@dashSpendingByCategory": {
+    "description": "migrated from dash.spendingByCategory"
+  },
+  "dashRecent": "Recent",
+  "@dashRecent": {
+    "description": "migrated from dash.recent"
+  },
+  "dashNetThisPeriod": "Net this period",
+  "@dashNetThisPeriod": {
+    "description": "migrated from dash.netThisPeriod"
+  },
+  "dashTotalEarned": "Total earned",
+  "@dashTotalEarned": {
+    "description": "migrated from dash.totalEarned"
+  },
+  "dashTotalSpent": "Total spent",
+  "@dashTotalSpent": {
+    "description": "migrated from dash.totalSpent"
+  },
+  "dashGroups": "Groups",
+  "@dashGroups": {
+    "description": "migrated from dash.groups"
+  },
+  "dashAll": "All",
+  "@dashAll": {
+    "description": "migrated from dash.all"
+  },
+  "dashViewInReports": "View in Reports",
+  "@dashViewInReports": {
+    "description": "migrated from dash.viewInReports"
+  },
+  "authWelcomeBack": "Welcome back",
+  "@authWelcomeBack": {
+    "description": "migrated from auth.welcomeBack"
+  },
+  "authSignInSubtitle": "Sign in to your CoinCompass",
+  "@authSignInSubtitle": {
+    "description": "migrated from auth.signInSubtitle"
+  },
+  "authEmail": "Email",
+  "@authEmail": {
+    "description": "migrated from auth.email"
+  },
+  "authPassword": "Password",
+  "@authPassword": {
+    "description": "migrated from auth.password"
+  },
+  "authConfirmPassword": "Confirm password",
+  "@authConfirmPassword": {
+    "description": "migrated from auth.confirmPassword"
+  },
+  "authName": "Name",
+  "@authName": {
+    "description": "migrated from auth.name"
+  },
+  "authForgotPassword": "Forgot password?",
+  "@authForgotPassword": {
+    "description": "migrated from auth.forgotPassword"
+  },
+  "authStaySignedIn": "Stay signed in",
+  "@authStaySignedIn": {
+    "description": "migrated from auth.staySignedIn"
+  },
+  "authSignIn": "Sign in",
+  "@authSignIn": {
+    "description": "migrated from auth.signIn"
+  },
+  "authSignUp": "Sign up",
+  "@authSignUp": {
+    "description": "migrated from auth.signUp"
+  },
+  "authSignOut": "Sign out",
+  "@authSignOut": {
+    "description": "migrated from auth.signOut"
+  },
+  "authOrContinueWith": "or continue with",
+  "@authOrContinueWith": {
+    "description": "migrated from auth.orContinueWith"
+  },
+  "authGoogle": "Google",
+  "@authGoogle": {
+    "description": "migrated from auth.google"
+  },
+  "authHaveAccount": "Already have an account?",
+  "@authHaveAccount": {
+    "description": "migrated from auth.haveAccount"
+  },
+  "authCreateAccount": "Create your account",
+  "@authCreateAccount": {
+    "description": "migrated from auth.createAccount"
+  },
+  "authSignUpSubtitle": "Start tracking your money",
+  "@authSignUpSubtitle": {
+    "description": "migrated from auth.signUpSubtitle"
+  },
+  "authResetTitle": "Reset your password",
+  "@authResetTitle": {
+    "description": "migrated from auth.resetTitle"
+  },
+  "authSendResetLink": "Send reset link",
+  "@authSendResetLink": {
+    "description": "migrated from auth.sendResetLink"
+  },
+  "authResetSent": "Check your inbox for the reset link.",
+  "@authResetSent": {
+    "description": "migrated from auth.resetSent"
+  },
+  "authBackToSignIn": "Back to sign in",
+  "@authBackToSignIn": {
+    "description": "migrated from auth.backToSignIn"
+  },
+  "authTwoFactorTitle": "Two-factor authentication",
+  "@authTwoFactorTitle": {
+    "description": "migrated from auth.twoFactorTitle"
+  },
+  "authTwoFactorSubtitle": "Enter the 6-digit code from your authenticator app",
+  "@authTwoFactorSubtitle": {
+    "description": "migrated from auth.twoFactorSubtitle"
+  },
+  "authTwoFactorCode": "Authentication code",
+  "@authTwoFactorCode": {
+    "description": "migrated from auth.twoFactorCode"
+  },
+  "authUseBackupCode": "Use a backup code instead",
+  "@authUseBackupCode": {
+    "description": "migrated from auth.useBackupCode"
+  },
+  "authUseAuthCode": "Use an authenticator code instead",
+  "@authUseAuthCode": {
+    "description": "migrated from auth.useAuthCode"
+  },
+  "authEmailCode": "Email me a code",
+  "@authEmailCode": {
+    "description": "migrated from auth.emailCode"
+  },
+  "authVerify": "Verify",
+  "@authVerify": {
+    "description": "migrated from auth.verify"
+  },
+  "authOauthComingSoon": "Google sign-in is coming soon on mobile.",
+  "@authOauthComingSoon": {
+    "description": "migrated from auth.oauthComingSoon"
+  },
+  "emptyNoData": "Nothing here yet",
+  "@emptyNoData": {
+    "description": "migrated from empty.noData"
+  },
+  "emptyNoTransactions": "No transactions yet",
+  "@emptyNoTransactions": {
+    "description": "migrated from empty.noTransactions"
+  },
+  "emptyNoAccounts": "No accounts yet",
+  "@emptyNoAccounts": {
+    "description": "migrated from empty.noAccounts"
+  },
+  "emptyComingNext": "Coming next",
+  "@emptyComingNext": {
+    "description": "migrated from empty.comingNext"
+  },
+  "errorTitle": "Something went wrong",
+  "@errorTitle": {
+    "description": "migrated from error.title"
+  },
+  "errorGeneric": "Please try again.",
+  "@errorGeneric": {
+    "description": "migrated from error.generic"
+  },
+  "errorNoConnection": "No connection. Check your internet and try again.",
+  "@errorNoConnection": {
+    "description": "migrated from error.noConnection"
+  },
+  "miscLanguage": "Language",
+  "@miscLanguage": {
+    "description": "migrated from misc.language"
+  },
+  "miscTamilComingSoon": "Tamil is coming soon.",
+  "@miscTamilComingSoon": {
+    "description": "migrated from misc.tamilComingSoon"
+  },
+  "miscLoading": "Loading…",
+  "@miscLoading": {
+    "description": "migrated from misc.loading"
+  },
+  "miscEndOfDay": "End of day",
+  "@miscEndOfDay": {
+    "description": "migrated from misc.endOfDay"
+  },
+  "miscAllAccounts": "All accounts",
+  "@miscAllAccounts": {
+    "description": "migrated from misc.allAccounts"
+  },
+  "miscQuickAdd": "Quick add",
+  "@miscQuickAdd": {
+    "description": "migrated from misc.quickAdd"
+  },
+  "authNoAccount": "Don't have an account?",
+  "@authNoAccount": {
+    "description": "migrated from auth.noAccount"
+  },
+  "authResetSubtitle": "We'll email you a reset link",
+  "@authResetSubtitle": {
+    "description": "migrated from auth.resetSubtitle"
+  }
+}

@@ -18,10 +18,10 @@ import 'package:coincompass/features/wealth_lock/presentation/wealth_lock_provid
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:coincompass/l10n/app_localizations.dart';
 
 /// Phase 6.3 — the honesty surface, end to end.
 ///
@@ -85,6 +85,7 @@ void main() {
         UncontrolledProviderScope(
           container: container,
           child: MaterialApp(
+          localizationsDelegates: L.localizationsDelegates,
             theme: AppTheme.light(),
             home: const Scaffold(body: StaleBanner()),
           ),
@@ -186,6 +187,7 @@ void main() {
         UncontrolledProviderScope(
           container: container,
           child: MaterialApp(
+          localizationsDelegates: L.localizationsDelegates,
             theme: AppTheme.light(),
             home: const Scaffold(
               body: Column(
@@ -257,11 +259,7 @@ void main() {
             container: container,
             child: MaterialApp(
               theme: AppTheme.light(),
-              localizationsDelegates: const [
-                GlobalMaterialLocalizations.delegate,
-                GlobalWidgetsLocalizations.delegate,
-                GlobalCupertinoLocalizations.delegate,
-              ],
+              localizationsDelegates: L.localizationsDelegates,
               home: const AppScaffold(
                 location: '/loans',
                 child: LoansScreen(),
@@ -341,11 +339,7 @@ void main() {
           container: container,
           child: MaterialApp(
             theme: AppTheme.light(),
-            localizationsDelegates: const [
-              GlobalMaterialLocalizations.delegate,
-              GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
-            ],
+            localizationsDelegates: L.localizationsDelegates,
             home: const AppScaffold(location: '/loans', child: LoansScreen()),
           ),
         ),
@@ -465,11 +459,7 @@ void main() {
           container: container,
           child: MaterialApp(
             theme: AppTheme.light(),
-            localizationsDelegates: const [
-              GlobalMaterialLocalizations.delegate,
-              GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
-            ],
+            localizationsDelegates: L.localizationsDelegates,
             home: const AppScaffold(
               location: '/loans',
               child: SizedBox.shrink(),

@@ -1,0 +1,13 @@
+# Flutter's official localisation pipeline (phase 7.1b).
+#
+# Chosen over the hand-written Strings map for one reason that matters at ~1,240
+# keys: a mistyped key becomes a COMPILE ERROR here, where the map silently
+# rendered the raw key at the owner.
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
+output-class: L
+nullable-getter: false
+# Untranslated keys fall back to app_en.arb automatically, and this report is
+# what the Tamil coverage gate reads instead of diffing maps by hand.
+untranslated-messages-file: lib/l10n/untranslated.json

@@ -37,6 +37,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:coincompass/l10n/app_localizations.dart';
 
 /// Phase 6.5 + 6.6 — every in-app screen driven through the four states a user
 /// can actually land on, at 360 × 800dp.
@@ -116,6 +117,7 @@ void main() {
       UncontrolledProviderScope(
         container: container,
         child: MaterialApp(
+          localizationsDelegates: L.localizationsDelegates,
           theme: mode == _Mode.dark ? AppTheme.dark() : AppTheme.light(),
           home: Scaffold(body: screen),
         ),

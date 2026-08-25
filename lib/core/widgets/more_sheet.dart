@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../features/transactions/presentation/transaction_form_sheet.dart';
 import '../../features/transactions/presentation/transactions_providers.dart';
 import '../../features/wealth_lock/domain/wealth_lock.dart';
@@ -104,7 +105,7 @@ class MoreSheet extends ConsumerWidget {
                       child: Icon(d.icon, size: 17, color: c.foreground),
                     ),
                     title: Text(
-                      d.label,
+                      d.label(L.of(context)),
                       style: const TextStyle(
                         fontSize: 15.5,
                         fontWeight: FontWeight.w500,

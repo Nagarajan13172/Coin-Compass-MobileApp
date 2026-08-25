@@ -30,6 +30,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:coincompass/l10n/app_localizations.dart';
 
 import 'lock_fakes.dart';
 import 'wealth_lock_fakes.dart';
@@ -89,6 +90,7 @@ void main() {
       ProviderScope(
         overrides: [wealthVisibilityProvider.overrideWithValue(visibility)],
         child: MaterialApp(
+          localizationsDelegates: L.localizationsDelegates,
           theme: dark ? AppTheme.dark() : AppTheme.light(),
           home: Scaffold(body: child),
         ),
@@ -355,6 +357,7 @@ void main() {
         UncontrolledProviderScope(
           container: container,
           child: MaterialApp(
+          localizationsDelegates: L.localizationsDelegates,
             theme: dark ? AppTheme.dark() : AppTheme.light(),
             home: Scaffold(
               body: Builder(
@@ -566,6 +569,7 @@ void main() {
         UncontrolledProviderScope(
           container: container,
           child: MaterialApp(
+          localizationsDelegates: L.localizationsDelegates,
             theme: dark ? AppTheme.dark() : AppTheme.light(),
             home: Scaffold(
               body: SingleChildScrollView(

@@ -52,6 +52,11 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # Phase 7.1b — turns on `flutter gen-l10n`, which builds `L` from the ARB
+  # files in lib/l10n. This is the flutter tool's own generator, not
+  # build_runner; the project's no-codegen rule was about freezed and
+  # json_serializable, and hand-written fromJson stays exactly as it is.
+  generate: true
   assets:
     - assets/i18n/
     # The OFL requires the licence to travel with the font it covers, so it is

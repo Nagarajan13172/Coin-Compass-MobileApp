@@ -17,6 +17,7 @@ import 'package:coincompass/features/transactions/presentation/transactions_prov
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:coincompass/l10n/app_localizations.dart';
 
 /// `/insights` at 360 × 800dp, against the shapes the live account actually
 /// returns.
@@ -95,6 +96,7 @@ void main() {
       UncontrolledProviderScope(
         container: container,
         child: MaterialApp(
+          localizationsDelegates: L.localizationsDelegates,
           theme: theme ?? AppTheme.light(),
           home: const Scaffold(body: InsightsScreen()),
         ),
@@ -351,6 +353,7 @@ void main() {
       UncontrolledProviderScope(
         container: container,
         child: MaterialApp(
+          localizationsDelegates: L.localizationsDelegates,
           theme: AppTheme.light(),
           home: const Scaffold(body: InsightsScreen()),
         ),
@@ -469,6 +472,7 @@ void main() {
       UncontrolledProviderScope(
         container: container,
         child: MaterialApp.router(
+          localizationsDelegates: L.localizationsDelegates,
           theme: AppTheme.light(),
           routerConfig: router,
         ),

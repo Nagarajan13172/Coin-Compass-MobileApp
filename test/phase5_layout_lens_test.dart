@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:coincompass/l10n/app_localizations.dart';
 
 /// Phase 5 layout lens — two defects that the rest of the suite cannot see.
 ///
@@ -258,6 +259,7 @@ Future<void> _pumpReports(
     UncontrolledProviderScope(
       container: container,
       child: MaterialApp(
+          localizationsDelegates: L.localizationsDelegates,
         theme: AppTheme.light(),
         home: const Scaffold(body: ReportsScreen()),
       ),
@@ -289,6 +291,7 @@ Future<void> _pumpInsights(WidgetTester tester, {required Size phone}) async {
     UncontrolledProviderScope(
       container: container,
       child: MaterialApp(
+          localizationsDelegates: L.localizationsDelegates,
         theme: AppTheme.light(),
         home: const Scaffold(body: InsightsScreen()),
       ),

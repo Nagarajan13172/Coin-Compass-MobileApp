@@ -1,3 +1,4 @@
+import '../../../l10n/app_localizations.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -314,9 +315,9 @@ String? _resolve(List<String> segments) {
 
 /// "Recurring", "Accounts" — what the row promises the tap will open. Null for
 /// a route with no nav label, which is not a case the feed produces today.
-String? _routeLabel(String route) {
+String? _routeLabel(L l, String route) {
   for (final d in appDestinations) {
-    if (d.path == route) return d.label;
+    if (d.path == route) return d.label(l);
   }
   return switch (route) {
     '/credits/people' => 'People',
@@ -593,7 +594,9 @@ class NotificationRow extends ConsumerWidget {
       wealthVisible:
           ref.watch(wealthVisibilityProvider) != WealthVisibility.locked,
     );
-    final destination = route == null ? null : _routeLabel(route);
+    final destination = route == null
+        ? null
+        : _routeLabel(L.of(context), route);
 
     return Material(
       // The unread tint the web paints as `bg-primary/[0.04]`. Composited on

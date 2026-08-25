@@ -8,6 +8,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../features/auth/presentation/auth_providers.dart';
 import '../../features/notifications/data/notifications_repository.dart';
 import '../api/stale_ledger.dart';
+import '../../l10n/app_localizations.dart';
 import '../i18n/locale_controller.dart';
 import '../router/destinations.dart';
 import '../router/route_refresh.dart';
@@ -90,9 +91,7 @@ class _AppScaffoldState extends ConsumerState<AppScaffold> {
           const _UnverifiedSessionStrip(),
           // One slot, seventeen screens, and none of them can invent its own
           // staleness copy.
-          StaleBanner(
-            onRetry: () => refreshCurrentRoute(ref, widget.location),
-          ),
+          StaleBanner(onRetry: () => refreshCurrentRoute(ref, widget.location)),
           Expanded(child: widget.child),
         ],
       ),
@@ -213,9 +212,8 @@ class _AppTopBar extends ConsumerWidget {
                 if (SupportedLocales.canChoose)
                   _LanguagePill(
                     label: SupportedLocales.shortLabel(locale),
-                    onTap: () => ref
-                        .read(localeControllerProvider.notifier)
-                        .toggle(),
+                    onTap: () =>
+                        ref.read(localeControllerProvider.notifier).toggle(),
                   ),
                 const SizedBox(width: 4),
                 GestureDetector(
@@ -411,7 +409,7 @@ class _BottomNav extends ConsumerWidget {
                     child: _NavItem(
                       destination: const Destination(
                         '',
-                        'More',
+                        navMoreLabel,
                         LucideIcons.ellipsis,
                       ),
                       active: _moreActive,
@@ -486,7 +484,7 @@ class _NavItem extends StatelessWidget {
             child: FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(
-                destination.label,
+                destination.label(L.of(context)),
                 maxLines: 1,
                 softWrap: false,
                 style: TextStyle(

@@ -17,6 +17,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:coincompass/l10n/app_localizations.dart';
 
 /// The Notifications screen at 360 × 800dp, plus the two pure functions it
 /// leans on (link mapping and day grouping).
@@ -250,6 +251,7 @@ void main() {
       UncontrolledProviderScope(
         container: container,
         child: MaterialApp.router(
+          localizationsDelegates: L.localizationsDelegates,
           theme: theme ?? AppTheme.light(),
           routerConfig: router,
         ),
@@ -581,6 +583,7 @@ void main() {
         UncontrolledProviderScope(
           container: container,
           child: MaterialApp.router(
+          localizationsDelegates: L.localizationsDelegates,
             theme: AppTheme.light(),
             routerConfig: router,
           ),

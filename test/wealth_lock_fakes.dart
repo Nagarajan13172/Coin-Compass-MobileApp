@@ -11,10 +11,10 @@ import 'package:coincompass/core/api/api_exception.dart';
 import 'package:coincompass/core/router/app_router.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:coincompass/l10n/app_localizations.dart';
 
 /// Shared fakes for the two Phase 6.2 test files.
 ///
@@ -361,11 +361,7 @@ Future<ProviderContainer> bootWealthApp(
       child: MaterialApp.router(
         routerConfig: container.read(routerProvider),
         theme: dark ? AppTheme.dark() : AppTheme.light(),
-        localizationsDelegates: const [
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
+        localizationsDelegates: L.localizationsDelegates,
       ),
     ),
   );

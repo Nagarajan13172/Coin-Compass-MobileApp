@@ -21,6 +21,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:coincompass/l10n/app_localizations.dart';
 
 /// Loans and Stocks at 360 × 800dp — the two phase-4 screens the net-worth
 /// suite does not cover.
@@ -114,6 +115,7 @@ void main() {
       UncontrolledProviderScope(
         container: container,
         child: MaterialApp(
+          localizationsDelegates: L.localizationsDelegates,
           theme: AppTheme.light(),
           home: Scaffold(body: screen),
         ),

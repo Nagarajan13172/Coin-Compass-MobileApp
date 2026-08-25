@@ -34,11 +34,11 @@ import 'package:coincompass/features/transactions/presentation/transactions_scre
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:coincompass/l10n/app_localizations.dart';
 
 /// Boots the real app shell — router, redirects, bottom nav, centre FAB — with
 /// a restored session, and walks the shipped routes the way a user does:
@@ -109,11 +109,7 @@ void main() {
         child: MaterialApp.router(
           routerConfig: container.read(routerProvider),
           theme: AppTheme.light(),
-          localizationsDelegates: const [
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
+          localizationsDelegates: L.localizationsDelegates,
         ),
       ),
     );

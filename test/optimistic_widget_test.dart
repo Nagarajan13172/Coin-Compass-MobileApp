@@ -29,6 +29,7 @@ import 'package:coincompass/features/templates/domain/template.dart';
 import 'package:flutter/material.dart' hide Split;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:coincompass/l10n/app_localizations.dart';
 
 import 'optimistic_fakes.dart';
 
@@ -765,6 +766,7 @@ void main() {
         UncontrolledProviderScope(
           container: container,
           child: MaterialApp(
+          localizationsDelegates: L.localizationsDelegates,
             home: Scaffold(
               body: Consumer(
                 builder: (context, ref, _) {
@@ -903,6 +905,7 @@ Future<_Harness> _mount<T>(
     UncontrolledProviderScope(
       container: container,
       child: MaterialApp(
+          localizationsDelegates: L.localizationsDelegates,
         home: Scaffold(
           body: Consumer(
             builder: (_, ref, _) {
