@@ -203,22 +203,20 @@ class _AppTopBar extends ConsumerWidget {
                   onTap: () => context.go('/transactions'),
                 ),
                 _BellIcon(onTap: () => context.go('/notifications')),
-                _LanguagePill(
-                  label: SupportedLocales.shortLabel(locale),
-                  onTap: () async {
-                    final controller = ref.read(
-                      localeControllerProvider.notifier,
-                    );
-                    await controller.toggle();
-                    if (!context.mounted) return;
-                    if (ref.read(localeControllerProvider).languageCode ==
-                        'ta') {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Tamil is coming soon.')),
-                      );
-                    }
-                  },
-                ),
+                // Phase 7.1. Renders only once there is a second dictionary to
+                // switch to. It used to render always: tapping it relabelled
+                // the bar `த`, persisted a Tamil locale and then went on
+                // painting English, with a "Tamil is coming soon" snackbar
+                // that explained the intent but left the app claiming a
+                // language it was not in. `canChoose` reads the Tamil map
+                // itself, so this comes back on its own when 7.1 fills it.
+                if (SupportedLocales.canChoose)
+                  _LanguagePill(
+                    label: SupportedLocales.shortLabel(locale),
+                    onTap: () => ref
+                        .read(localeControllerProvider.notifier)
+                        .toggle(),
+                  ),
                 const SizedBox(width: 4),
                 GestureDetector(
                   onTap: () => context.go('/settings'),
