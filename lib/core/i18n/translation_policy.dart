@@ -47,6 +47,13 @@ bool isTranslatable(String text) {
   // The product's own name is a proper noun in every language.
   if (trimmed == 'CoinCompass') return false;
 
+  // Already Tamil. Found on the device: the Language row reads
+  // `தமிழ் · Tamil`, and translating it produced `தமிழ் · தமிழ்` — "Tamil ·
+  // Tamil". Anything already carrying Tamil script is either the target
+  // language itself or a mixed label the author wrote deliberately, and in
+  // both cases running it through an English->Tamil model can only damage it.
+  if (_tamilScript.hasMatch(trimmed)) return false;
+
   return true;
 }
 
@@ -82,6 +89,9 @@ const Map<String, String> glossary = <String, String>{
   'Total balance': 'மொத்த இருப்பு',
   // "Returns" as investment gain, not going back.
   'Returns': 'வருவாய்',
+  // "Breakdown" as an itemised split, not a fracture. ML Kit rendered this as
+  // முறிவு — "break" — on the dashboard's net-worth card.
+  'Breakdown': 'விவரப்பட்டியல்',
 
   // ── terms with no everyday Tamil equivalent ─────────────────────────────
   'Preclose': 'முன்கூட்டியே முடித்தல்',
@@ -138,9 +148,22 @@ final RegExp _figure = RegExp(
 /// A rendered date or clock time.
 final RegExp _dateOrTime = RegExp(
   r'\b\d{1,2}:\d{2}\b'
-  r'|\b\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)'
-  r'|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}\b',
+  '|' r'\b\d{1,2}\s+' '$_months'
+  '|$_months' r'\s+\d{4}\b',
 );
+
+/// Both forms of every month name.
+///
+/// Found on the device: only the abbreviations were listed, so
+/// `1 Aug – 1 Sep 2026` was refused while `August 2026` one line above it was
+/// translated to ஆகஸ்ட் 2026 — the same screen showing a date two ways.
+const String _months =
+    r'(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?'
+    r'|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?'
+    r'|Dec(?:ember)?)';
+
+/// Tamil script, U+0B80–U+0BFF.
+final RegExp _tamilScript = RegExp(r'[\u0B80-\u0BFF]');
 
 /// An identifier rather than prose: `INR`, `credit-card`, `mt_session`.
 final RegExp _codeLike = RegExp(r'^[A-Z]{2,5}$|^[a-z0-9]+(?:[-_][a-z0-9]+)+$');

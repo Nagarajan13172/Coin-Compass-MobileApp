@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'locale_controller.dart';
@@ -14,9 +16,18 @@ import 'translator.dart';
 /// Kept alive deliberately: the cache inside it is the only thing between the
 /// owner and re-translating the same forty labels every time they open
 /// Settings.
-final translatorProvider = ChangeNotifierProvider<Translator>(
-  (ref) => Translator(),
-);
+final translatorProvider = ChangeNotifierProvider<Translator>((ref) {
+  final translator = Translator();
+  // Ask the device where the language pack is, once, at startup.
+  //
+  // Found on the phone: this used to happen only in the Settings Language
+  // card's initState, so a cold start knew nothing about an already-downloaded
+  // pack. `ready` stayed false, translation never switched on, and the app came
+  // back in English with no language pill — with a Tamil locale sitting in
+  // SharedPreferences. Visiting Settings fixed it until the next launch.
+  unawaited(translator.refreshModelState());
+  return translator;
+});
 
 /// Where the Tamil language pack is: absent, downloading, ready.
 final translationModelStateProvider = Provider<ModelState>(

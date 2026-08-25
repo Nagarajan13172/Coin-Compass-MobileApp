@@ -850,7 +850,7 @@ class _LanguageCardState extends ConsumerState<_LanguageCard> {
         children: [
           SectionHeader(
             title: 'Language',
-            subtitle: 'Tamil is translated on this phone, by Google ML Kit.',
+            subtitle: 'Translated on this phone by Google ML Kit.',
           ),
           const SizedBox(height: 12),
           Row(

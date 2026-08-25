@@ -114,7 +114,10 @@ class NetWorthCard extends ConsumerWidget {
               Flexible(
                 child: Text(
                   'Everything you own, minus what you owe',
-                  maxLines: 1,
+                  // Two lines since 7.1: Tamil runs up to 173% of the English
+                  // width (measured, docs/PHASE7_1_REPORT.md), and on the
+                  // device this caption ellipsised mid-word.
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 12.5, color: c.mutedForeground),
                 ),

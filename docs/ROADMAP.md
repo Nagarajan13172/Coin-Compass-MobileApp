@@ -261,10 +261,28 @@ Deliberate deviation: the web manifest's `background_color` is `#0F172A`
 unconditionally, so a PWA install always flashes navy. The mobile splash follows
 the OS theme instead — a cold start into the light UI has no navy flash.
 
-**Not yet verified on hardware.** `adb devices` is empty and the OnePlus is not
-answering mDNS, so the icon has only been checked by rendering the shipped
-assets under each launcher mask. Reconnect the phone and confirm the icon in the
-launcher, the themed icon with Material You on, and the splash in both themes.
+**Verified on hardware (25 Aug 2026)** — CPH2569, Android 15, 360x804dp, over
+wireless adb.
+
+- **Launcher icon** — the navy ringed compass renders correctly under the
+  OnePlus launcher's mask, labelled **CoinCompass**.
+- **Splash, dark** — ringed compass on `#0F172A`, via the Android 12+
+  `windowSplashScreenAnimatedIcon` path.
+- **Splash, light** — `#F8FAFC` with dark status-bar icons, so
+  `windowLightStatusBar` is resolving. **No navy flash on a cold start into the
+  light UI**, which was the point of deviating from the web manifest.
+- **Themed icon** — `ic_launcher_monochrome.png` ships at all five densities and
+  `<monochrome>` is wired in `mipmap-anydpi-v26/ic_launcher.xml`. Still checked
+  by resource rather than by eye: rendering it needs "Themed icons" switched on
+  in the launcher's own settings, which is the owner's home-screen preference to
+  change, not the app's.
+
+One thing the icon decision costs, visible only on a device that has both: the
+owner's phone carries the **web PWA** (a Chrome WebAPK) alongside the native
+app, and because 6.7 deliberately reuses the web manifest's installed-app icon,
+the two are **indistinguishable in the launcher** — same mark, same label. That
+is the price of matching the web, and it is only payable by someone who installed
+both.
 
 ---
 

@@ -25,6 +25,9 @@ void main() {
       '5:30 AM',
       '04 Aug 2026',
       'Aug 2026',
+      'August 2026',
+      'Showing August 2026 · Month view',
+      '1 Aug – 1 Sep 2026',
       '1 INR = ₹1.00',
     ];
 
@@ -56,6 +59,26 @@ void main() {
     }
   });
 
+  group('text already in Tamil is left alone', () {
+    // Found on the device: the Language row reads `தமிழ் · Tamil` and came out
+    // as `தமிழ் · தமிழ்` — "Tamil · Tamil". Running Tamil through an
+    // English->Tamil model can only damage it.
+    for (final text in const [
+      'தமிழ் · Tamil',
+      'வணக்கம்',
+      'நிலுவைத் தொகை',
+    ]) {
+      test('refuses $text', () => expect(isTranslatable(text), isFalse));
+    }
+
+    test('every glossary value would itself be refused', () {
+      // The glossary's own output must never be re-translated on a later pass.
+      for (final tamil in glossary.values) {
+        expect(isTranslatable(tamil), isFalse, reason: '$tamil is already Tamil');
+      }
+    });
+  });
+
   group('codes and names are left alone', () {
     for (final text in const ['INR', 'GBP', 'CoinCompass', 'credit-card', 'mt_session']) {
       test('refuses $text', () => expect(isTranslatable(text), isFalse));
@@ -76,6 +99,13 @@ void main() {
       for (final value in glossary.values) {
         expect(value, isNot('வலை'));
       }
+    });
+
+    test('Breakdown is an itemised split, not a fracture', () {
+      // Found on the device: ML Kit rendered the dashboard's "Breakdown" link
+      // as முறிவு — "break".
+      expect(glossary['Breakdown'], isNotNull);
+      expect(glossary['Breakdown'], isNot('முறிவு'));
     });
 
     test('every term that can misdescribe money has an entry', () {

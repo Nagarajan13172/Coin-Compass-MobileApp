@@ -208,6 +208,37 @@ parser test need a widget binding. Each issue therefore carries
 any language — with the English rendering as a fallback. Callers match on `code`,
 never on `message`, and a test pins that contract.
 
+## Verified on hardware
+
+Walked on the owner's phone (CPH2569, Android 15, 360x804dp) on 25 Aug 2026,
+against the live account, with a five-row test CSV pushed to `/sdcard/Download`.
+
+- **The file picker opens and filters.** This is the piece `flutter test` could
+  not reach — `file_picker` is a method channel with no implementation under the
+  test binding. The Android SAF picker appears and lists only the CSV.
+- **`/reports/import` is reachable** from the Reports header, and the bottom nav
+  keeps **Reports** lit, which is why it is mounted there.
+- **Import sits beside Export CSV** and both fit on one 360dp row.
+- **The date-ambiguity card fires.** Every row of the test file used `DD/MM`
+  values under 13, and the preview asked *"03/04 could be 3 April or 4 March"*
+  rather than silently choosing.
+- **Typed category matching holds.** `Food` reported "No **expense** category
+  with this name" and `Salary` "No **income** category", and the category's third
+  button read **"Leave blank"** where the account's read "Skip these rows" — the
+  asymmetry that exists because the API requires an account and does not require
+  a category.
+- **The stacked decision buttons render without overflow**, which is the fix for
+  the 5.4px `RenderFlex` the widget test caught.
+- **Blocked rows name the spreadsheet line.** L2-L6, with L4 correctly reporting
+  *both* the source and destination account of the transfer row, and L5 reporting
+  `"oops" is not an amount this app can read.`
+- **The run button stayed shut** — *"5 names need a decision"*, disabled.
+
+**The import itself was not run.** The device is signed into the owner's real
+account, and every remaining step writes real transactions to it. Everything up
+to the write boundary is verified; the boundary itself is where a person has to
+say yes.
+
 ## Not done
 
 - **XLSX.** The web's example file is an xlsx; this reads CSV only. Parsing xlsx
@@ -217,7 +248,4 @@ never on `message`, and a test pins that contract.
   transaction. The backend has no idempotency key, so catching this means
   fetching the file's date range and matching on (date, amount, type, account).
   It is the highest-value thing left in this area and is not built.
-- **Not exercised on a device.** All 1,015 tests pass and the route is walked
-  through the real router in `app_navigation_test.dart`, but the file picker is
-  a method channel that does not exist under `flutter test`, so choosing a real
-  file on a real phone is unverified.
+- **A real import against a real account.** See above.
