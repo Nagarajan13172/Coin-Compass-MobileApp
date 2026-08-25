@@ -142,7 +142,7 @@ class PinKeypad extends StatelessWidget {
             if (onBiometric != null)
               _PinKey(
                 icon: LucideIcons.fingerprint,
-                semanticLabel: 'Unlock with fingerprint',
+                semanticLabel: tr(context, 'Unlock with fingerprint'),
                 // Live even during a PIN cooldown: the OS counts fingerprint
                 // failures separately, and the owner must not be punished for a
                 // stranger's guesses at the keypad.
@@ -153,7 +153,7 @@ class PinKeypad extends StatelessWidget {
             _PinKey(label: '0', onTap: enabled ? () => onDigit(0) : null),
             _PinKey(
               icon: LucideIcons.delete,
-              semanticLabel: 'Delete',
+              semanticLabel: tr(context, 'Delete'),
               onTap: enabled ? onBackspace : null,
             ),
           ],

@@ -10,6 +10,7 @@ import '../../features/notifications/data/notifications_repository.dart';
 import '../api/stale_ledger.dart';
 import '../../l10n/app_localizations.dart';
 import '../i18n/locale_controller.dart';
+import '../i18n/translation_providers.dart';
 import '../router/destinations.dart';
 import '../router/route_refresh.dart';
 import '../theme/app_colors.dart';
@@ -156,6 +157,9 @@ class _AppTopBar extends ConsumerWidget {
     final c = context.colors;
     final user = ref.watch(currentUserProvider);
     final locale = ref.watch(localeControllerProvider);
+    final tamilAvailable = ref.watch(tamilAvailableProvider);
+    final translator = ref.watch(translatorProvider);
+    final translating = translator.enabled && translator.ready;
 
     return Container(
       decoration: BoxDecoration(
@@ -202,16 +206,23 @@ class _AppTopBar extends ConsumerWidget {
                   onTap: () => context.go('/transactions'),
                 ),
                 _BellIcon(onTap: () => context.go('/notifications')),
-                // Phase 7.1. Renders only once there is a second dictionary to
-                // switch to. It used to render always: tapping it relabelled
-                // the bar `த`, persisted a Tamil locale and then went on
-                // painting English, with a "Tamil is coming soon" snackbar
-                // that explained the intent but left the app claiming a
-                // language it was not in. `canChoose` reads the Tamil map
-                // itself, so this comes back on its own when 7.1 fills it.
-                if (SupportedLocales.canChoose)
+                // Phase 7.1. Two conditions, and they are different questions.
+                //
+                // RENDERS only while ML Kit's Tamil pack is on the device, so
+                // tapping it always does something. Before 7.1a it rendered
+                // always, relabelled the bar `த`, persisted a Tamil locale and
+                // then went on painting English.
+                //
+                // LABELLED by what is actually on screen, not by what is
+                // stored — `translating` is enabled AND ready. Runtime
+                // translation can be mid-download or switched off with the
+                // locale still set to `ta`, and in that state the text really
+                // is English, so the pill has to say EN.
+                if (tamilAvailable)
                   _LanguagePill(
-                    label: SupportedLocales.shortLabel(locale),
+                    label: translating
+                        ? SupportedLocales.shortLabel(SupportedLocales.tamil)
+                        : SupportedLocales.shortLabel(SupportedLocales.english),
                     onTap: () =>
                         ref.read(localeControllerProvider.notifier).toggle(),
                   ),

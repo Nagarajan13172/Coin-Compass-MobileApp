@@ -1,4 +1,7 @@
+import 'dart:async';
 import '../../../core/ui.dart';
+import '../../../core/i18n/translation_providers.dart';
+import '../../../core/i18n/translator.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -107,6 +110,11 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ),
           },
+
+          // Below the settings-dependent cards on purpose: a rarely-touched
+          // preference should not sit above the wallet and currency ones, and
+          // it must not push a /settings failure's Retry off the first screen.
+          const _Section(child: _LanguageCard()),
 
           const _Section(child: _SignOutCard()),
           _Section(child: _AppInfoCard(settings: settings.valueOrNull)),
@@ -792,4 +800,114 @@ class _AppInfoCard extends StatelessWidget {
 
   /// Hardcoded in the web client too (`const RJ = "1.0.0"`).
   static const String _version = '1.0.0';
+}
+
+/// Phase 7.1 — the Tamil language pack, and the one place it can be asked for.
+///
+/// The download is ~30MB and deliberately never automatic: fetching that on
+/// someone's mobile data because they opened Settings would be taking a
+/// decision that costs them money.
+///
+/// The copy is honest about the two things that surprise people about on-device
+/// translation: it is machine translation, and a string is English the first
+/// time it is ever shown.
+class _LanguageCard extends ConsumerStatefulWidget {
+  const _LanguageCard();
+
+  @override
+  ConsumerState<_LanguageCard> createState() => _LanguageCardState();
+}
+
+class _LanguageCardState extends ConsumerState<_LanguageCard> {
+  @override
+  void initState() {
+    super.initState();
+    // Post-frame: this writes to a provider, and mutating one during the first
+    // build throws.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(ref.read(translatorProvider).refreshModelState());
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final state = ref.watch(translationModelStateProvider);
+    final translator = ref.watch(translatorProvider);
+
+    final (String status, Color tone) = switch (state) {
+      ModelState.downloaded => ('Ready', c.income),
+      ModelState.downloading => ('Downloading…', c.mutedForeground),
+      ModelState.absent => ('Not downloaded', c.mutedForeground),
+      ModelState.unavailable => ('Not supported', c.expense),
+      ModelState.unknown => ('Checking…', c.mutedForeground),
+    };
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(
+            title: 'Language',
+            subtitle: 'Tamil is translated on this phone, by Google ML Kit.',
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(LucideIcons.languages, size: 18, color: c.mutedForeground),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'தமிழ் · Tamil',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Flexible(
+                child: Text(
+                  status,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.end,
+                  style: TextStyle(fontSize: 13, color: tone),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'This is machine translation, not a human one. Amounts, dates and '
+            'currency codes are never translated, and the finance terms are '
+            'fixed by hand — but the rest is a machine reading your screen. A '
+            'word will be English the first time it appears.',
+            style: TextStyle(fontSize: 12.5, color: c.mutedForeground),
+          ),
+          const SizedBox(height: 14),
+          if (state == ModelState.absent || state == ModelState.unknown)
+            AppButton(
+              label: 'Download Tamil · ~30MB',
+              busy: false,
+              onPressed: () => unawaited(translator.downloadModel()),
+            )
+          else if (state == ModelState.downloading)
+            const AppButton(label: 'Downloading…', busy: true, onPressed: null)
+          else if (state == ModelState.downloaded)
+            OutlinedButton.icon(
+              onPressed: () => unawaited(translator.deleteModel()),
+              icon: const Icon(LucideIcons.trash2, size: 17),
+              label: const Text('Remove the language pack'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: c.destructive,
+                minimumSize: const Size.fromHeight(44),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }

@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import '../../../core/ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -463,7 +463,7 @@ class _ClearButton extends StatelessWidget {
       visualDensity: VisualDensity.compact,
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints.tightFor(width: 32, height: 32),
-      tooltip: 'Clear date',
+      tooltip: tr(context, 'Clear date'),
       icon: Icon(LucideIcons.x, size: 17, color: c.mutedForeground),
     );
   }

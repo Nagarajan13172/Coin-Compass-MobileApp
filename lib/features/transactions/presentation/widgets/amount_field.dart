@@ -141,7 +141,10 @@ class AmountField extends StatelessWidget {
                     decoration: InputDecoration(
                       isDense: true,
                       filled: false,
-                      hintText: '0',
+                      // Through `tr` like every other bypass property, even though the
+            // policy will refuse it for having no letters. The guard stays
+            // absolute that way, with no allow-list to fall out of date.
+            hintText: tr(context, '0'),
                       contentPadding: EdgeInsets.zero,
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,

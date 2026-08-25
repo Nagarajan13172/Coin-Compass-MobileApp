@@ -159,7 +159,7 @@ class _MonthBar extends StatelessWidget {
         IconButton(
           onPressed: () => onChanged(month.addMonths(-1)),
           visualDensity: VisualDensity.compact,
-          tooltip: 'Previous month',
+          tooltip: tr(context, 'Previous month'),
           icon: const Icon(LucideIcons.chevronLeft, size: 20),
         ),
         TextButton(
@@ -174,7 +174,7 @@ class _MonthBar extends StatelessWidget {
         IconButton(
           onPressed: () => onChanged(month.addMonths(1)),
           visualDensity: VisualDensity.compact,
-          tooltip: 'Next month',
+          tooltip: tr(context, 'Next month'),
           icon: const Icon(LucideIcons.chevronRight, size: 20),
         ),
       ],
@@ -317,7 +317,7 @@ class _DayCard extends ConsumerWidget {
               const SizedBox(width: 10),
               IconButton(
                 onPressed: () => _openLedger(context, ref),
-                tooltip: 'View in Transactions',
+                tooltip: tr(context, 'View in Transactions'),
                 style: IconButton.styleFrom(
                   minimumSize: const Size(46, 46),
                   side: BorderSide(color: c.border),

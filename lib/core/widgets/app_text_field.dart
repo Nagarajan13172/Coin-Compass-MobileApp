@@ -83,8 +83,11 @@ class AppTextField extends StatelessWidget {
           autofillHints: autofillHints,
           style: TextStyle(fontSize: 15.5, color: c.foreground),
           decoration: InputDecoration(
-            hintText: hint,
-            errorText: errorText,
+            // Phase 7.1 — InputDecoration renders these itself, so the app's
+            // translating `Text` never sees them. Translated explicitly, which
+            // is the whole reason `tr` exists.
+            hintText: tr(context, hint),
+            errorText: errorText == null ? null : tr(context, errorText),
             prefixIcon: prefix,
             suffixIcon: suffix,
           ),

@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:coincompass/core/i18n/locale_controller.dart';
-import 'package:coincompass/core/i18n/tamil_readiness.dart';
 import 'package:coincompass/l10n/app_localizations.dart';
 import 'package:coincompass/l10n/app_localizations_en.dart';
 import 'package:coincompass/l10n/app_localizations_ta.dart';
@@ -13,19 +12,21 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'wealth_lock_fakes.dart';
 
-/// **Phase 7.1 — the language toggle, and why it is still hidden.**
+/// **Phase 7.1 — the language toggle, and what now decides it.**
 ///
 /// Before 7.1a, tapping the app bar's pill relabelled it `த`, **persisted a
 /// Tamil locale**, and then carried on painting English. A "Tamil is coming
 /// soon" snackbar was honest about the intent; the state was not — the app went
 /// on claiming to be in a language it was not in, across restarts.
 ///
-/// 7.1b moved the dictionary to `gen-l10n`. That buys compile-time key safety —
-/// a typo'd key no longer renders `dashNetWorth` at the owner, it fails the
-/// build — at the cost of the runtime coverage check, because Dart cannot
-/// enumerate an abstract class's getters without reflection. So the coverage
-/// gate lives in `tamil_readiness_test.dart` instead, and this file pins
-/// everything around it.
+/// Runtime translation can reach that state a second way: the locale is Tamil
+/// but ML Kit's language pack is absent or still downloading, so every lookup
+/// passes English through. So availability is no longer a constant about
+/// dictionary coverage — it is device state, and the pill both renders and
+/// labels itself from what is actually on screen.
+///
+/// The locale itself is back to being a plain stored preference. See
+/// `translator_test.dart` for the half that decides whether Tamil renders.
 void main() {
   late Directory tempDir;
 
@@ -48,64 +49,34 @@ void main() {
     if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
   });
 
-  group('availability follows the readiness gate', () {
-    test('hasTamil is exactly kTamilReady', () {
-      expect(SupportedLocales.hasTamil, kTamilReady);
-      expect(SupportedLocales.canChoose, kTamilReady);
-      expect(
-        SupportedLocales.available.length,
-        kTamilReady ? 2 : 1,
-        reason: 'English is always available; Tamil only when complete',
-      );
-    });
-
-    test('English is always offered', () {
-      expect(SupportedLocales.available, contains(SupportedLocales.english));
-    });
-
-    test('the generated delegate advertises both locales either way', () {
+  group('the locale is a plain preference', () {
+    test('both locales are advertised to MaterialApp', () {
       // `L.supportedLocales` is what MaterialApp resolves against, and it is
-      // driven by which ARB files exist — deliberately NOT by readiness. The
-      // gate decides what the owner may *choose*, not what the framework can
-      // load, so a `ta` device locale still resolves rather than throwing.
+      // driven by which ARB files exist — deliberately NOT by whether ML Kit's
+      // pack is downloaded, so a `ta` device locale still resolves rather than
+      // throwing. Whether Tamil is *usable* is device state; see
+      // tamilAvailableProvider and translator_test.dart.
       expect(L.supportedLocales.map((l) => l.languageCode), containsAll(['en', 'ta']));
-    });
-  });
-
-  group('a locale that is not ready cannot be adopted', () {
-    test('resolve() clamps an unavailable locale to English', () {
-      expect(
-        SupportedLocales.resolve(SupportedLocales.tamil).languageCode,
-        kTamilReady ? 'ta' : 'en',
-      );
-      expect(
-        SupportedLocales.resolve(SupportedLocales.english).languageCode,
-        'en',
-      );
+      expect(SupportedLocales.available, contains(SupportedLocales.english));
+      expect(SupportedLocales.available, contains(SupportedLocales.tamil));
     });
 
-    test('a phone that already stored "ta" is not stranded', () async {
-      // The real regression. Someone tapped the pill while Tamil was a stub, so
-      // 'ta' is in SharedPreferences. The pill is hidden now, so if the stored
-      // value were honoured they would reopen to a `த`-labelled English app
-      // with no visible control to get out of it.
+    test('a stored locale round-trips', () async {
       SharedPreferences.setMockInitialValues(<String, Object>{'locale': 'ta'});
       final controller = LocaleController(await SharedPreferences.getInstance());
-
-      expect(controller.state.languageCode, kTamilReady ? 'ta' : 'en');
+      expect(controller.state.languageCode, 'ta');
     });
 
-    test('set() ignores a locale it cannot render', () async {
+    test('toggle flips and persists', () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final prefs = await SharedPreferences.getInstance();
       final controller = LocaleController(prefs);
       expect(controller.state.languageCode, 'en');
 
-      await controller.set(SupportedLocales.tamil);
+      await controller.toggle();
 
-      expect(controller.state.languageCode, kTamilReady ? 'ta' : 'en');
-      // And nothing misleading was persisted for the next launch.
-      expect(prefs.getString('locale'), kTamilReady ? 'ta' : null);
+      expect(controller.state.languageCode, 'ta');
+      expect(prefs.getString('locale'), 'ta');
     });
   });
 
@@ -140,15 +111,18 @@ void main() {
   });
 
   group('the app bar', () {
-    testWidgets('shows no language pill while Tamil is not ready', (
+    testWidgets('shows no language pill while the model is absent', (
       tester,
     ) async {
       await bootWealthApp(tester, adapter: WealthFixtureAdapter());
 
+      // No ML Kit model in a test host, so Tamil is not available and the
+      // pill must not render — the same guarantee as before, now resting on
+      // device state rather than dictionary coverage.
       expect(
-        find.text(SupportedLocales.shortLabel(const Locale('en'))),
-        SupportedLocales.canChoose ? findsOneWidget : findsNothing,
-        reason: 'the pill renders on SupportedLocales.canChoose alone',
+        find.text(SupportedLocales.shortLabel(const Locale('ta'))),
+        findsNothing,
+        reason: 'the pill must not offer a language that cannot render',
       );
       // The old copy went with it — nothing in the bar promises Tamil now.
       expect(find.text('Tamil is coming soon.'), findsNothing);

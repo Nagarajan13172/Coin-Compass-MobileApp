@@ -122,7 +122,7 @@ class RecurringTile extends StatelessWidget {
             else
               PopupMenuButton<RecurringAction>(
                 onSelected: onAction,
-                tooltip: 'Rule actions',
+                tooltip: tr(context, 'Rule actions'),
                 color: c.popover,
                 icon: Icon(
                   LucideIcons.ellipsisVertical,

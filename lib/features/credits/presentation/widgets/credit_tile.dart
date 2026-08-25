@@ -109,7 +109,7 @@ class CreditTile extends StatelessWidget {
           else
             PopupMenuButton<CreditAction>(
               onSelected: onAction,
-              tooltip: 'Credit actions',
+              tooltip: tr(context, 'Credit actions'),
               color: c.popover,
               icon: Icon(
                 LucideIcons.ellipsisVertical,

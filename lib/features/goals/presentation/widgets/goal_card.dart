@@ -104,7 +104,7 @@ class GoalCard extends StatelessWidget {
             const SizedBox(width: 6),
             IconButton(
               onPressed: onContribute,
-              tooltip: 'Add to goal',
+              tooltip: tr(context, 'Add to goal'),
               visualDensity: VisualDensity.compact,
               style: IconButton.styleFrom(
                 backgroundColor: accent.withValues(alpha: 0.12),

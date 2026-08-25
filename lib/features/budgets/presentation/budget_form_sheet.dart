@@ -164,7 +164,7 @@ class _BudgetFormSheetState extends ConsumerState<BudgetFormSheet> {
                     width: 32,
                     height: 32,
                   ),
-                  tooltip: 'Clear date',
+                  tooltip: tr(context, 'Clear date'),
                   icon: Icon(LucideIcons.x, size: 17, color: c.mutedForeground),
                 ),
         ),

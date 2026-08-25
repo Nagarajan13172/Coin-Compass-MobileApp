@@ -349,7 +349,7 @@ class _SaleRow extends StatelessWidget {
           ),
           IconButton(
             onPressed: busy ? null : onDelete,
-            tooltip: 'Delete this sale',
+            tooltip: tr(context, 'Delete this sale'),
             visualDensity: VisualDensity.compact,
             icon: busy
                 ? const SizedBox(

@@ -3,23 +3,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../theme/theme_controller.dart';
-import 'tamil_readiness.dart';
 
 /// The web app ships English + Tamil. The mobile app carries the same toggle —
 /// but only once there is something to toggle *to*.
 ///
-/// ## Why the toggle hides itself
+/// ## Why the label follows the renderer, not the preference
 ///
-/// Until phase 7.1 lands a dictionary, `ta` resolved to the English map, so
-/// switching to Tamil relabelled the app bar `த`, **persisted a Tamil locale**,
-/// and then rendered English underneath. A snackbar said "Tamil is coming
-/// soon", which was honest about the intent but did not undo the state: the app
-/// went on claiming to be in Tamil.
+/// Before 7.1a, tapping the pill relabelled the bar `த`, persisted a Tamil
+/// locale, and then carried on painting English. The state claimed a language
+/// the app was not in.
 ///
-/// So availability is gated on Tamil being *complete*, and the gate is held to
-/// the generator's own `untranslated.json` report by a test — see
-/// [kTamilReady]. Nobody can flip it early, and nobody can finish the
-/// translation and forget to flip it, because the test fails both ways.
+/// Runtime translation can reach that state a second way: the locale is Tamil
+/// but ML Kit's language pack is missing or still downloading, so `lookup`
+/// passes English straight through. So the pill renders only while Tamil is
+/// genuinely available, and `shortLabel` is driven by what is actually on
+/// screen — see `app_scaffold.dart`.
 class SupportedLocales {
   const SupportedLocales._();
 
@@ -29,33 +27,11 @@ class SupportedLocales {
   /// Every locale the app knows how to *name* — what `MaterialApp` advertises.
   static const List<Locale> all = [english, tamil];
 
-  /// True once Tamil is complete — see [kTamilReady], which a test holds to
-  /// `lib/l10n/untranslated.json` in both directions.
-  ///
-  /// Coverage, not "are there any Tamil strings at all", and that distinction
-  /// is the whole safeguard. Offering Tamil on a partial dictionary would
-  /// recreate the bug this file exists to fix: a `த` label over
-  /// mostly-English text, now with a handful of Tamil words scattered through
-  /// it, which reads as broken rather than as pending.
-  static bool get hasTamil => kTamilReady;
-
-  /// The locales a person can actually choose right now.
-  static List<Locale> get available => <Locale>[english, if (hasTamil) tamil];
-
-  /// True when there is a real choice to offer — the app bar's language pill
-  /// renders on this and nothing else.
-  static bool get canChoose => available.length > 1;
-
-  /// Clamps [locale] to something that has a dictionary.
-  ///
-  /// Matters for a real phone: someone who tapped the toggle while Tamil was
-  /// a stub has `locale: ta` in SharedPreferences already. Without this they
-  /// would come back to a `த`-labelled English app with no visible control to
-  /// escape it, because the control is now hidden.
-  static Locale resolve(Locale locale) =>
-      available.any((l) => l.languageCode == locale.languageCode)
-      ? locale
-      : english;
+  /// Every locale the app can render. Whether Tamil is *usable* right now is a
+  /// separate question — it needs ML Kit's language pack — and that lives in
+  /// `tamilAvailableProvider`, because it is device state rather than a
+  /// constant.
+  static const List<Locale> available = all;
 
   static String shortLabel(Locale locale) =>
       locale.languageCode == 'ta' ? 'த' : 'EN';
@@ -75,12 +51,11 @@ class LocaleController extends StateNotifier<Locale> {
     final stored = code == 'ta'
         ? SupportedLocales.tamil
         : SupportedLocales.english;
-    return SupportedLocales.resolve(stored);
+    return stored;
   }
 
-  /// Ignores a locale with no dictionary rather than half-applying it.
   Future<void> set(Locale locale) async {
-    final target = SupportedLocales.resolve(locale);
+    final target = locale;
     if (target.languageCode == state.languageCode) return;
     state = target;
     await _prefs.setString(_key, target.languageCode);

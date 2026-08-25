@@ -279,7 +279,7 @@ class _RecurringFormSheetState extends ConsumerState<RecurringFormSheet> {
                     width: 32,
                     height: 32,
                   ),
-                  tooltip: 'Clear end date',
+                  tooltip: tr(context, 'Clear end date'),
                   icon: Icon(LucideIcons.x, size: 17, color: c.mutedForeground),
                 ),
         ),

@@ -633,7 +633,7 @@ class _LotRow extends StatelessWidget {
           ),
           IconButton(
             onPressed: busy ? null : onDelete,
-            tooltip: 'Delete this purchase',
+            tooltip: tr(context, 'Delete this purchase'),
             visualDensity: VisualDensity.compact,
             icon: busy
                 ? const SizedBox(

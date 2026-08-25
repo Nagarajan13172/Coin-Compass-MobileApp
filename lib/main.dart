@@ -6,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'core/api/api_client.dart';
 import 'core/api/stale_ledger.dart';
 import 'core/i18n/locale_controller.dart';
+import 'core/i18n/translation_providers.dart';
+import 'core/i18n/translated_text.dart';
 import 'core/router/app_router.dart';
 import 'l10n/app_localizations.dart';
 import 'core/theme/app_theme.dart';
@@ -57,6 +59,10 @@ class _CoinCompassAppState extends ConsumerState<CoinCompassApp> {
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeControllerProvider);
     final locale = ref.watch(localeControllerProvider);
+    // Phase 7.1 — reading this is what switches ML Kit on and off with the
+    // locale, including a Tamil locale restored from prefs at launch.
+    ref.watch(translationSyncProvider);
+    final translator = ref.watch(translatorProvider);
     final auth = ref.watch(authControllerProvider);
 
     // ── Phase 6.3, kept alive from the root and nowhere else ────────────────
@@ -132,7 +138,14 @@ class _CoinCompassAppState extends ConsumerState<CoinCompassApp> {
         themeMode: themeMode,
         // Same gate as below, so a locked cold start paints the lock instead of
         // the splash rather than flashing one and then the other.
-        builder: (context, child) => AppLockGate(child: child),
+        // TranslationScope sits INSIDE MaterialApp's builder, so it is below
+      // Theme/Directionality but above every screen — which is what lets the
+      // app's `Text` find it, and what makes one notifyListeners repaint only
+      // the widgets currently showing text.
+      builder: (context, child) => TranslationScope(
+        translator: translator,
+        child: AppLockGate(child: child),
+      ),
         home: const SplashScreen(),
       );
     }
@@ -150,7 +163,14 @@ class _CoinCompassAppState extends ConsumerState<CoinCompassApp> {
       // net worth to leak. A go_router redirect or an Overlay could not make
       // that promise — both act a frame late, and a pushed route animates over
       // a visible dashboard. See AppLockGate for the full argument.
-      builder: (context, child) => AppLockGate(child: child),
+      // TranslationScope sits INSIDE MaterialApp's builder, so it is below
+      // Theme/Directionality but above every screen — which is what lets the
+      // app's `Text` find it, and what makes one notifyListeners repaint only
+      // the widgets currently showing text.
+      builder: (context, child) => TranslationScope(
+        translator: translator,
+        child: AppLockGate(child: child),
+      ),
       theme: light,
       darkTheme: dark,
       themeMode: themeMode,

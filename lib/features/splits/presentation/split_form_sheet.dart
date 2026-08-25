@@ -2,7 +2,7 @@ import 'dart:async';
 
 // Flutter's animation library exports a `Split` curve class, which would
 // collide with the domain model of the same name.
-import 'package:flutter/material.dart' hide Split;
+import '../../../core/ui.dart' hide Split;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 

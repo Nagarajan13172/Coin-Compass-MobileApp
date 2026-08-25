@@ -2,55 +2,61 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-/// **Phase 7.1b — what stops a migrated screen quietly growing English again.**
+/// **Phase 7.1 — the strings runtime translation cannot see.**
 ///
-/// Extraction is only half the job. The other half is that a directory, once
-/// migrated, stays migrated: without this, the next feature change adds
-/// `Text('Saved')` and nothing notices until someone reads Tamil and finds an
-/// English word in the middle of it.
+/// The app translates at render time: `core/ui.dart` swaps Flutter's `Text` for
+/// one that runs its content through ML Kit, so nearly every string in the app
+/// is covered by importing one file. That is why there is no dictionary to keep
+/// complete, and why a hardcoded English string in `lib/` is now the normal,
+/// correct thing to write.
 ///
-/// So [migratedDirs] is a ratchet. A directory joins the list when its slice
-/// lands, and from then on any new hardcoded UI string fails this test with the
-/// file and line.
+/// The exceptions are the handful of Flutter properties that take a `String`
+/// and build their own paragraph. Nothing below them is a `Text`, so the
+/// interception never happens and they render English for ever, silently, in
+/// the middle of otherwise-Tamil UI:
 ///
-/// ## Why it lexes rather than pattern-matches
+///   * `InputDecoration.hintText` / `.errorText`
+///   * `tooltip:` — 15 of them across the app
+///   * `semanticLabel:` — what a screen reader announces
 ///
-/// The first version of the scanner used a regex for Dart string literals and
-/// silently mis-read this, from `security_card.dart`:
+/// Each must be wrapped in `tr(context, ...)`. This test is the ratchet that
+/// keeps it that way, because the failure is invisible: the app looks
+/// translated, and one label quietly is not.
 ///
-/// ```dart
-/// '${value.backupCodesRemaining == 1 ? 'code' : 'codes'} left.'
-/// ```
-///
-/// The quotes inside the interpolation closed the literal as far as the regex
-/// was concerned, so it extracted the fragment `} left.` as a UI string, wrote
-/// it into the ARB and broke the ICU parser. A scanner that mis-reads source is
-/// worse than no scanner, because it edits code on a false reading. This walks
-/// the source instead.
-///
-/// `tool/i18n_scan.py` is the same algorithm for use at the command line when
-/// planning a slice; this is the enforcing copy.
+/// (This file previously enforced ARB extraction. That approach was replaced by
+/// ML Kit; the lexer it was built on is kept because the bypass check needs the
+/// same careful reading of Dart string literals.)
 void main() {
-  /// Directories whose slice has landed. Append as each one is migrated.
-  const migratedDirs = <String>[
-    'lib/features/settings/presentation',
+  /// Properties that render their own text, out of reach of the app's `Text`.
+  const bypassProperties = <String>[
+    'hintText',
+    'errorText',
+    'tooltip',
+    'semanticLabel',
+    'helperText',
+    'counterText',
   ];
 
-  test('migrated directories keep no hardcoded UI strings', () {
+  test('every string that bypasses Text is wrapped in tr()', () {
     final offenders = <String>[];
 
-    for (final dir in migratedDirs) {
-      final directory = Directory(dir);
-      expect(
-        directory.existsSync(),
-        isTrue,
-        reason: '$dir is on the migrated list but does not exist',
-      );
+    for (final file in _dartFilesUnder('lib')) {
+      if (file.contains('/l10n/') || file.endsWith('translated_text.dart')) {
+        continue;
+      }
+      final masked = _blankComments(File(file).readAsStringSync());
 
-      for (final entity in directory.listSync(recursive: true)) {
-        if (entity is! File || !entity.path.endsWith('.dart')) continue;
-        for (final hit in _scan(entity.path)) {
-          offenders.add('${hit.file}:${hit.line}  ${hit.text}');
+      for (final property in bypassProperties) {
+        final pattern = RegExp('\\b$property:\\s*');
+        for (final match in pattern.allMatches(masked)) {
+          final at = match.end;
+          if (at >= masked.length) continue;
+          // A literal here means the raw English reaches the renderer.
+          if (masked[at] != "'" && masked[at] != '"') continue;
+          final end = _endOfLiteral(masked, at);
+          final text = masked.substring(at, end);
+          final line = '\n'.allMatches(masked.substring(0, at)).length + 1;
+          offenders.add('$file:$line  $property: $text');
         }
       }
     }
@@ -59,54 +65,50 @@ void main() {
       offenders,
       isEmpty,
       reason:
-          'These directories are already localised, so a hardcoded string here '
-          'would show up as English inside otherwise-Tamil UI. Move each into '
-          'lib/l10n/app_en.arb and read it through L.of(context):\n  '
+          'These render their own paragraph, so the translating Text never sees '
+          'them — they would stay English inside Tamil UI, with nothing to '
+          'notice it. Wrap each in tr(context, ...):\n  '
           '${offenders.join("\n  ")}',
     );
   });
 
-  test('the scanner still reads interpolation correctly', () {
-    // Guards the guard. If the lexer regresses to the naive reading, this
-    // fragment is what it produces — and a broken scanner would otherwise make
-    // the test above pass by finding nothing.
+  test('the lexer still reads interpolation correctly', () {
+    // Guards the guard. A lexer that mis-reads Dart strings would make the
+    // check above pass by finding nothing — which is exactly how an earlier
+    // regex version of this scanner produced a garbage ARB entry.
     final tmp = File(
       '${Directory.systemTemp.createTempSync('cc_i18n').path}/probe.dart',
     )..writeAsStringSync(r"""
       final a = 'Authenticator app is on. '
-          '${value.emailFallback ? 'Email fallback is on. ' : ''}'
           '${n == 1 ? 'code' : 'codes'} left.';
-      final b = 'Plain copy that must be found';
+      final b = 'Plain copy';
       // 'a comment string must be ignored'
-      final c = 'lib/features/thing.dart';
 """);
 
-    final hits = _scan(tmp.path);
-    final texts = hits.map((h) => h.text).toList();
+    final masked = _blankComments(tmp.readAsStringSync());
+    final literals = _literals(masked);
+    final texts = literals.map((l) => l.text).toList();
 
-    expect(
-      texts,
-      contains('Plain copy that must be found'),
-      reason: 'the scanner missed an ordinary hardcoded string',
-    );
     expect(
       texts.any((t) => t.trim() == '} left.'),
       isFalse,
-      reason: 'the scanner split an interpolated literal — the original bug',
+      reason: 'the lexer split an interpolated literal — the original bug',
     );
+    expect(texts, contains('Plain copy'));
     expect(
       texts.any((t) => t.contains('comment string')),
       isFalse,
-      reason: 'comments are not UI copy',
-    );
-    expect(
-      texts.any((t) => t.contains('lib/features/thing.dart')),
-      isFalse,
-      reason: 'paths are not UI copy',
+      reason: 'comments are not code',
     );
 
     tmp.parent.deleteSync(recursive: true);
   });
+}
+
+Iterable<String> _dartFilesUnder(String dir) sync* {
+  for (final entity in Directory(dir).listSync(recursive: true)) {
+    if (entity is File && entity.path.endsWith('.dart')) yield entity.path;
+  }
 }
 
 class _Hit {

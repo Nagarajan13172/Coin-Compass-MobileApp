@@ -86,7 +86,7 @@ class CategoryPickerField extends StatelessWidget {
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints.tightFor(width: 32, height: 32),
-              tooltip: 'Clear category',
+              tooltip: tr(context, 'Clear category'),
               icon: Icon(LucideIcons.x, size: 17, color: c.mutedForeground),
             ),
     );

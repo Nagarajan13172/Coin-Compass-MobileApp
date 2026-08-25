@@ -192,7 +192,18 @@ void main() {
     for (var offset = 0.0; ; offset += 100) {
       position.jumpTo(offset.clamp(0.0, position.maxScrollExtent));
       await tester.pump();
-      if (finder.evaluate().isNotEmpty) {
+      // `evaluate()` THROWS rather than returning empty for a `.first` finder
+      // with no match, and a sliver below the fold has not been built yet — so
+      // "not on screen at this offset" arrived here as a StateError and killed
+      // the search instead of scrolling on. Adding one card to the page was
+      // enough to trigger it.
+      final found = <Element>[];
+      try {
+        found.addAll(finder.evaluate());
+      } on StateError {
+        // no match at this offset; keep scrolling
+      }
+      if (found.isNotEmpty) {
         final rect = tester.getRect(finder.first);
         if (rect.top > 30 && rect.bottom < 740) return;
       }
