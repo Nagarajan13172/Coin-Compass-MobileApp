@@ -60,6 +60,56 @@ class ImportScreen extends ConsumerWidget {
   }
 }
 
+/// User data, rendered exactly as the user's file spelled it.
+///
+/// ## Why this exists
+///
+/// `core/ui.dart` swaps Flutter's `Text` for one that sends its content to ML
+/// Kit, which is right for UI copy and wrong for *data*. On the device walk in
+/// Tamil this screen displayed:
+///
+///   * the chosen file as `சரிபார்க்கவும் 73.csv` — the filename `verify-73.csv`
+///     machine-translated, so it no longer matched anything the user could see
+///     in their file manager;
+///   * `ZZTest Alpha` as `Zztest ஆல்பா`, while `ZZTest Gamma` came back merely
+///     lower-cased — the same column rendered three different ways;
+///   * the account the import was about to create as `இறக்குமதி சோதனை`, when the
+///     record it actually creates is named `Import Test`.
+///
+/// The last one is the dangerous shape: the *data* was always correct — drafts
+/// carry `row.payee` and `ref.name` from the parsed model, never the rendered
+/// string, and the device confirmed the stored payee is `ZZTest Gamma` — but a
+/// preview whose job is "see exactly what will be added" was showing something
+/// other than what would be added.
+///
+/// `Text.rich` is the documented bypass: `TranslatedText` passes a span tree
+/// through untouched, because translating assembled spans separately would
+/// reorder them.
+///
+/// This is a general problem — every screen that renders a payee, account,
+/// category or note has it — and this local widget only fixes this screen.
+class _Verbatim extends StatelessWidget {
+  const _Verbatim(
+    this.text, {
+    this.style,
+    this.maxLines,
+    this.overflow,
+  });
+
+  final String text;
+  final TextStyle? style;
+  final int? maxLines;
+  final TextOverflow? overflow;
+
+  @override
+  Widget build(BuildContext context) => Text.rich(
+    TextSpan(text: text),
+    style: style,
+    maxLines: maxLines,
+    overflow: overflow,
+  );
+}
+
 // ── idle ───────────────────────────────────────────────────────────────────
 
 class _Intro extends ConsumerWidget {
@@ -329,7 +379,7 @@ class _FileBar extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                _Verbatim(
                   file.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -582,8 +632,10 @@ class _RefRow extends ConsumerWidget {
           Row(
             children: [
               Expanded(
-                child: Text(
+                child: _Verbatim(
                   nameRef.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
@@ -730,19 +782,31 @@ class _ReadyPreviewCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          planned.row.payee.isNotEmpty
-                              ? planned.row.payee
-                              : (planned.row.note.isNotEmpty
-                                    ? planned.row.note
-                                    : planned.row.type!.label),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
+                        // The type label is app copy and *is* translated; the
+                        // payee and note are the user's own words and are not.
+                        if (planned.row.payee.isNotEmpty ||
+                            planned.row.note.isNotEmpty)
+                          _Verbatim(
+                            planned.row.payee.isNotEmpty
+                                ? planned.row.payee
+                                : planned.row.note,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          )
+                        else
+                          Text(
+                            planned.row.type!.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                        ),
                         Text(
                           planned.row.date == null
                               ? 'Today'
@@ -948,18 +1012,20 @@ class _Report extends ConsumerWidget {
                 'added from ${state.fileName}.',
                 style: const TextStyle(fontSize: 13),
               ),
+              // The label is app copy; the names are records the user now has
+              // in their account, and must read as they were actually created.
               if (outcome.createdAccounts.isNotEmpty) ...[
                 const SizedBox(height: 6),
-                Text(
-                  'New accounts: ${outcome.createdAccounts.join(', ')}',
-                  style: TextStyle(fontSize: 12.5, color: c.mutedForeground),
+                _CreatedLine(
+                  label: 'New accounts',
+                  names: outcome.createdAccounts,
                 ),
               ],
               if (outcome.createdCategories.isNotEmpty) ...[
                 const SizedBox(height: 4),
-                Text(
-                  'New categories: ${outcome.createdCategories.join(', ')}',
-                  style: TextStyle(fontSize: 12.5, color: c.mutedForeground),
+                _CreatedLine(
+                  label: 'New categories',
+                  names: outcome.createdCategories,
                 ),
               ],
               if (outcome.stopReason != null) ...[
@@ -990,6 +1056,29 @@ class _Report extends ConsumerWidget {
             child: const Text('Done'),
           ),
         ),
+      ],
+    );
+  }
+}
+
+/// `New accounts: Import Test` — the label translated, the names verbatim.
+class _CreatedLine extends StatelessWidget {
+  const _CreatedLine({required this.label, required this.names});
+
+  final String label;
+  final List<String> names;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = TextStyle(
+      fontSize: 12.5,
+      color: context.colors.mutedForeground,
+    );
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('$label: ', style: style),
+        Expanded(child: _Verbatim(names.join(', '), style: style)),
       ],
     );
   }

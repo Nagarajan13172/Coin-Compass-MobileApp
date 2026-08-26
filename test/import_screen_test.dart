@@ -1,4 +1,5 @@
 import 'package:coincompass/core/api/enums.dart';
+import 'package:coincompass/core/i18n/translated_text.dart' as cc;
 import 'package:coincompass/core/theme/app_theme.dart';
 import 'package:coincompass/features/accounts/data/accounts_repository.dart';
 import 'package:coincompass/features/accounts/domain/account.dart';
@@ -247,6 +248,86 @@ void main() {
       expect(find.text('Rows that will not be imported'), findsOneWidget);
       expect(find.text('L3'), findsOneWidget);
       expect(find.text('Import 1 transaction'), findsOneWidget);
+    });
+  });
+
+  group('user data is never machine-translated', () {
+    // The device walk in Tamil showed the chosen file as `சரிபார்க்கவும் 73.csv`
+    // and `ZZTest Alpha` as `Zztest ஆல்பா`, while `ZZTest Gamma` came back only
+    // lower-cased — the same column rendered three ways. The stored data was
+    // always right; the *preview* was not, which is the one screen whose whole
+    // job is showing what will be written.
+    //
+    // `Text.rich` is the documented bypass in TranslatedText, so these assert
+    // the user-data sites took the span path and the app-copy sites did not.
+    bool isVerbatim(WidgetTester tester, String text) {
+      final widgets = tester
+          .widgetList<cc.Text>(find.byType(cc.Text))
+          .where((w) => w.textSpan?.toPlainText() == text || w.data == text);
+      expect(widgets, isNotEmpty, reason: '"$text" is not on screen at all');
+      return widgets.every((w) => w.data == null && w.textSpan != null);
+    }
+
+    testWidgets('the filename bypasses the translator', (tester) async {
+      await pump(
+        tester,
+        csv: '$header\n2026-08-24,expense,500,INR,HDFC,,,Chai,,',
+        accounts: [account('a1', 'HDFC')],
+      );
+      await choose(tester);
+      expect(isVerbatim(tester, 'statement.csv'), isTrue);
+    });
+
+    testWidgets('an unmatched account name bypasses the translator',
+        (tester) async {
+      await pump(
+        tester,
+        csv: '$header\n2026-08-24,expense,500,INR,Import Test,,,Chai,,',
+      );
+      await choose(tester);
+      expect(isVerbatim(tester, 'Import Test'), isTrue);
+    });
+
+    testWidgets('a payee in the preview bypasses the translator',
+        (tester) async {
+      await pump(
+        tester,
+        csv: '$header\n2026-08-24,expense,500,INR,HDFC,,,ZZTest Alpha,,',
+        accounts: [account('a1', 'HDFC')],
+      );
+      await choose(tester);
+      expect(isVerbatim(tester, 'ZZTest Alpha'), isTrue);
+    });
+
+    testWidgets('a created account name in the report bypasses the translator',
+        (tester) async {
+      await pump(
+        tester,
+        csv: '$header\n2026-08-24,expense,500,INR,HDFC,,,Chai,,',
+        accounts: [account('a1', 'HDFC')],
+        runner: _FixedOutcomeRunner(
+          const ImportOutcome(
+            written: 1,
+            failures: [],
+            createdAccounts: ['Import Test'],
+            createdCategories: [],
+            stopped: false,
+          ),
+        ),
+      );
+      await choose(tester);
+      await tester.tap(find.text('Import 1 transaction'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(isVerbatim(tester, 'Import Test'), isTrue);
+      // The label beside it is app copy and must stay translatable.
+      expect(isVerbatim(tester, 'New accounts: '), isFalse);
+    });
+
+    testWidgets('app copy still goes through the translator', (tester) async {
+      await pump(tester, csv: null);
+      expect(isVerbatim(tester, 'Import transactions'), isFalse);
     });
   });
 

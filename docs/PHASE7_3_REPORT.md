@@ -196,6 +196,11 @@ are stacked now. Tamil runs to **173%** of English on labels this shape (see
 `PHASE7_1_REPORT.md`), so a side-by-side pair could not have survived the
 language toggle either.
 
+> Stacking turned out to be necessary and **not sufficient** — the device found
+> the same buttons overflowing again in Tamil at full card width, and the real
+> fix was in `AppButton` itself. See *Three defects only the device could show*
+> below.
+
 ## Localisation
 
 The import feature's user-facing strings are rendered through the app's `Text`,
@@ -210,34 +215,104 @@ never on `message`, and a test pins that contract.
 
 ## Verified on hardware
 
-Walked on the owner's phone (CPH2569, Android 15, 360x804dp) on 25 Aug 2026,
-against the live account, with a five-row test CSV pushed to `/sdcard/Download`.
+Walked on the owner's phone (CPH2569, Android 15, 360x804dp) on 25 Aug 2026 —
+first in English against a five-row test file, then **for real** against the live
+account with the app in Tamil.
+
+### The dry run
 
 - **The file picker opens and filters.** This is the piece `flutter test` could
   not reach — `file_picker` is a method channel with no implementation under the
   test binding. The Android SAF picker appears and lists only the CSV.
 - **`/reports/import` is reachable** from the Reports header, and the bottom nav
   keeps **Reports** lit, which is why it is mounted there.
-- **Import sits beside Export CSV** and both fit on one 360dp row.
-- **The date-ambiguity card fires.** Every row of the test file used `DD/MM`
-  values under 13, and the preview asked *"03/04 could be 3 April or 4 March"*
-  rather than silently choosing.
-- **Typed category matching holds.** `Food` reported "No **expense** category
-  with this name" and `Salary` "No **income** category", and the category's third
-  button read **"Leave blank"** where the account's read "Skip these rows" — the
-  asymmetry that exists because the API requires an account and does not require
-  a category.
-- **The stacked decision buttons render without overflow**, which is the fix for
-  the 5.4px `RenderFlex` the widget test caught.
-- **Blocked rows name the spreadsheet line.** L2-L6, with L4 correctly reporting
-  *both* the source and destination account of the transfer row, and L5 reporting
-  `"oops" is not an amount this app can read.`
+- **The date-ambiguity card fires.** Every row used `DD/MM` values under 13, and
+  the preview asked *"03/04 could be 3 April or 4 March"* rather than choosing.
+- **Typed category matching holds.** `Food` reported "No **expense** category"
+  and `Salary` "No **income** category", and the category's third button read
+  **"Leave blank"** where the account's read "Skip these rows".
+- **Blocked rows name the spreadsheet line.** L2-L6, with L4 reporting *both*
+  accounts of the transfer row and L5 reporting `"oops" is not an amount this
+  app can read.`
 - **The run button stayed shut** — *"5 names need a decision"*, disabled.
 
-**The import itself was not run.** The device is signed into the owner's real
-account, and every remaining step writes real transactions to it. Everything up
-to the write boundary is verified; the boundary itself is where a person has to
-say yes.
+### The real import
+
+Three rows into a purpose-made `Import Test` account, no category, so exactly
+one record would be created. Predicted before running, then checked:
+
+| | before | predicted | after |
+|---|---|---|---|
+| Income | ₹0 | ₹222 | **₹222** |
+| Expense | ₹13,312 | ₹13,756 | **₹13,756** |
+| Net | −₹13,312 | −₹13,534 | **−₹13,534** |
+| Transactions | 2 | 5 | **5** |
+| Accounts | 0 | 1 | **1** |
+
+Every figure landed exactly. The report read *"3 transactions added from
+verify-73.csv · New accounts: Import Test"*, and opening a row confirmed every
+field round-tripped: payee `ZZTest Gamma`, note `7.3 verification`, account
+`Import Test`, category blank, 22 Aug 2026.
+
+Then cleaned up — three transactions swiped away, the account deleted — and the
+baseline came back to ₹13,312 / 2 transactions / no accounts / −₹2,00,00,000.
+(The transactions are soft-deleted: gone from every view and every balance, still
+recoverable in the app's deleted list, because the API has no purge endpoint.)
+
+### Three defects only the device could show
+
+All three are Tamil-only, and every widget test in this repo runs in English.
+
+**1. `AppButton` overflowed, three times on one screen** — 1.3px on "Skip these
+rows", 12px on "Import 3 transactions", 126px on "Import another file". The
+widget centred a `Row` of icon + *unconstrained* `Text`; a `Row` sized to its
+children hands unbounded width to that `Text`, so a long label paints past the
+button instead of ellipsising. Tamil runs to 173% of English (PHASE7_1_REPORT),
+which is what exposed it.
+
+This was a latent bug in a **shared** widget, not in the importer — every button
+in the app had it. `AppButton` now wraps its label in `Flexible` with
+`TextOverflow.ellipsis`; ellipsis rather than wrap because the shared theme
+fixes button height at 46-48px, so a second line would be clipped.
+`test/app_button_overflow_test.dart` pins all three real strings at 360dp, and
+fails with a `RenderFlex overflowed` without the fix.
+
+Worth noting the earlier 360dp fix in the preview was *stacking* those buttons,
+with a comment predicting exactly this risk. Stacking was necessary and not
+sufficient: it fixed English, and Tamil still overflowed the full card width.
+
+**2. User data was machine-translated on the way to the screen.** `core/ui.dart`
+swaps `Text` for one that sends its content to ML Kit — right for UI copy, wrong
+for data. The screen showed the chosen file as `சரிபார்க்கவும் 73.csv` (the
+filename `verify-73.csv`, translated, so it no longer matched anything in the
+user's file manager), `ZZTest Alpha` as `Zztest ஆல்பா`, and `ZZTest Gamma` as
+`Zztest gamma` — the same column rendered three different ways. The account about
+to be created displayed as `இறக்குமதி சோதனை` when the record it creates is named
+`Import Test`.
+
+The *data* was never wrong: drafts carry `row.payee` and `ref.name` from the
+parsed model, and the device confirmed the stored payee is `ZZTest Gamma`. But a
+preview whose entire job is "see exactly what will be added" was showing
+something other than what would be added. Every user-data site now renders
+through `Text.rich`, the documented bypass, and `import_screen_test.dart`
+asserts the user-data sites take the span path while app copy does not.
+
+**This is a general problem and only this screen is fixed.** Any screen showing
+a payee, account, category or note has it.
+
+**3. Two cosmetic issues left for the 7.1 owner**, both outside this feature:
+
+- `AppSelect`'s `hint` stayed English (`Use an existing one…`) in an otherwise
+  Tamil screen. `hintText` builds its own paragraph rather than a `Text`, which
+  `translated_text.dart` documents as needing explicit handling — `AppTextField`
+  got it, `AppSelect` did not.
+- The intro paragraph came back duplicated: *"இது ஒரு CSV இது ஒரு CSV ஏற்றுமதி
+  இறக்குமதி இருந்து ஏற்றுமதி."* Same failure mode as the "on this phone on this
+  phone" duplication already fixed in 7.1.
+
+The mono CSV-header block deliberately stayed English throughout — it is a
+literal the user must reproduce, and it is a `SelectableText`, not the app's
+`Text`.
 
 ## Not done
 
@@ -248,4 +323,5 @@ say yes.
   transaction. The backend has no idempotency key, so catching this means
   fetching the file's date range and matching on (date, amount, type, account).
   It is the highest-value thing left in this area and is not built.
-- **A real import against a real account.** See above.
+- **Duplicate detection**, still the highest-value gap: the real import above
+  would double every row if the same file were imported twice.

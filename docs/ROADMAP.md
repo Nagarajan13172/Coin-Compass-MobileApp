@@ -292,6 +292,6 @@ both.
 |---|---|---|
 | 7.1 | Tamil localisation | [~] 7.1a toggle + fallback done; 7.1c font done and device-verified (no tofu). 7.1b — ~1,240 hardcoded strings to extract — not started. See `PHASE7_1_REPORT.md` |
 | 7.2 | Google OAuth sign-in | Web uses a browser redirect via `/api/auth/oauth/:provider` |
-| 7.3 | CSV import | [x] Client-side: parse on device, resolve names to ids, create via `POST /transactions` (no server import endpoint exists). Preview asks before writing; nothing auto-created. CSV only — no xlsx, no duplicate detection. See `PHASE7_3_REPORT.md` |
+| 7.3 | CSV import | [x] Client-side: parse on device, resolve names to ids, create via `POST /transactions` (no server import endpoint exists). Preview asks before writing; nothing auto-created. **Device-verified against the live account** — 3 rows imported, every figure exact, then cleaned up. Found and fixed a shared `AppButton` overflow and user data being machine-translated in the preview. CSV only — no xlsx, no duplicate detection. See `PHASE7_3_REPORT.md` |
 | 7.4 | Push notifications | Backend currently has in-app notifications only; would need FCM + a backend change |
 | 7.5 | iOS build | Project is already configured for iOS; needs signing + on-device test |
