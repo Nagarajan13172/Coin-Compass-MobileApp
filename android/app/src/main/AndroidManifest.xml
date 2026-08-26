@@ -11,6 +11,14 @@
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
     <uses-permission android:name="android.permission.USE_FINGERPRINT"/>
 
+    <!-- 7.4 — device alerts. Android 13 (API 33) made posting notifications a
+         runtime permission; below that it is granted at install. Asked for when
+         the user turns the feature on in Settings, never at launch. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- The periodic background check reschedules itself after a reboot, so it
+         survives the phone being restarted. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+
     <!-- USE_FINGERPRINT implies a *required* fingerprint feature, which would
          hide the app from devices without a sensor. The app lock is optional,
          so say so. -->

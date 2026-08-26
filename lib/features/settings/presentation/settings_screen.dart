@@ -19,6 +19,7 @@ import '../../../core/widgets/error_retry.dart';
 import '../../../core/widgets/loading_shimmer.dart';
 import '../../../core/widgets/screen_header.dart';
 import '../../../core/widgets/section_header.dart';
+import '../../notifications/presentation/device_alerts_card.dart';
 import '../data/settings_repository.dart';
 import '../domain/app_settings.dart';
 import 'profile_card.dart';
@@ -115,6 +116,11 @@ class SettingsScreen extends ConsumerWidget {
           // preference should not sit above the wallet and currency ones, and
           // it must not push a /settings failure's Retry off the first screen.
           const _Section(child: _LanguageCard()),
+          // 7.4 — device alerts. Below Language and above Sign out, next to the
+          // other device-scoped settings rather than the account-scoped ones
+          // above: this is a per-phone switch, not something stored on the
+          // server, so a second device is unaffected by it.
+          const _Section(child: DeviceAlertsCard()),
 
           const _Section(child: _SignOutCard()),
           _Section(child: _AppInfoCard(settings: settings.valueOrNull)),

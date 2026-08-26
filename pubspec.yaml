@@ -48,6 +48,8 @@ dependencies:
   # Dart, no platform code — it cannot repeat the flutter_secure_storage
   # compileSdk problem.
   crypto: ^3.0.7
+  flutter_local_notifications: ^22.3.0
+  workmanager: ^0.10.9
 
 dev_dependencies:
   flutter_test:

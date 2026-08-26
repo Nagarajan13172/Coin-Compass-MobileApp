@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:workmanager/workmanager.dart';
 
 import 'core/api/api_client.dart';
 import 'core/api/stale_ledger.dart';
@@ -14,6 +15,8 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'features/auth/presentation/auth_providers.dart';
 import 'features/lock/presentation/app_lock_gate.dart';
+import 'features/notifications/data/device_notifier.dart';
+import 'features/notifications/data/notification_alerts.dart';
 import 'features/settings/data/settings_repository.dart';
 import 'features/wealth_lock/presentation/wealth_lock_providers.dart';
 import 'features/settings/domain/app_settings.dart';
@@ -25,6 +28,16 @@ Future<void> main() async {
   // session restore, prefs back theme + locale.
   final apiClient = await ApiClient.create();
   final prefs = await SharedPreferences.getInstance();
+
+  // 7.4 — hands WorkManager the background entry point. Registration only; it
+  // schedules nothing, so a user who never turns device alerts on never has a
+  // task. Wrapped because the plugin is unavailable under `flutter test` and a
+  // throw here would take down the whole app before its first frame.
+  try {
+    await Workmanager().initialize(backgroundCallbackDispatcher);
+  } catch (_) {
+    // No WorkManager on this platform. Resume-time checks still work.
+  }
 
   runApp(
     ProviderScope(
@@ -44,15 +57,51 @@ class CoinCompassApp extends ConsumerStatefulWidget {
   ConsumerState<CoinCompassApp> createState() => _CoinCompassAppState();
 }
 
-class _CoinCompassAppState extends ConsumerState<CoinCompassApp> {
+class _CoinCompassAppState extends ConsumerState<CoinCompassApp>
+    with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Validate the persisted mt_session cookie exactly once. AuthController
     // swallows 401s and network errors, so this can never block startup.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(authControllerProvider.notifier).restore();
+      _wireNotificationTaps();
+      // 7.4 — catch up on anything that arrived while the app was closed. The
+      // background task may not have run at all: WorkManager's 15 minutes is a
+      // floor that Doze stretches, so opening the app is the reliable trigger.
+      ref.read(deviceAlertsProvider).checkNow();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Every return to the foreground, not just cold start — the common case is
+    // the app sitting in the background for hours.
+    if (state == AppLifecycleState.resumed) {
+      ref.read(deviceAlertsProvider).checkNow();
+    }
+  }
+
+  /// A tapped notification carries the in-app path the web uses for the same
+  /// row (`/budgets`, `/recurring`). Routing happens here because this is the
+  /// only place with both the notifier and the router.
+  void _wireNotificationTaps() {
+    final notifier = ref.read(deviceNotifierProvider);
+    if (notifier is! LocalDeviceNotifier) return;
+    notifier.onOpen = (path) {
+      // `go`, not `push`: a notification is a jump to a destination, not a step
+      // deeper into wherever the user happened to be.
+      ref.read(routerProvider).go(path);
+    };
+    notifier.initialise();
   }
 
   @override
