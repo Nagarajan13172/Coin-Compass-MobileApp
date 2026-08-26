@@ -1,6 +1,9 @@
 import '../../../core/ui.dart';
 import '../../../core/utils/money.dart';
 import '../../upi/data/upi_service.dart';
+import '../../upi/domain/upi_qr.dart';
+import '../../upi/domain/upi_request.dart';
+import '../../upi/presentation/upi_scan_sheet.dart';
 import '../../upi/domain/upi_result.dart';
 import '../../upi/presentation/upi_pay_sheet.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -107,6 +110,10 @@ class _TransactionFormSheetState extends ConsumerState<TransactionFormSheet> {
   bool _hydrating = true;
 
   bool _busy = false;
+
+  /// 7.7 — the VPA from a scanned QR, carried to the pay sheet so the payment
+  /// app opens with the payee and amount already filled in.
+  Vpa? _scannedVpa;
 
   String? _amountError;
   String? _accountError;
@@ -306,6 +313,31 @@ class _TransactionFormSheetState extends ConsumerState<TransactionFormSheet> {
   }
 
   // ── save ─────────────────────────────────────────────────────────────────
+
+  /// 7.7 — a scanned QR fills the form.
+  ///
+  /// The amount is only written when the code fixes one; a shop-counter QR sets
+  /// no amount and overwriting what the user already typed would be worse than
+  /// leaving it. The note is appended rather than replaced for the same reason.
+  void _onScanned(UpiQrPayload payload) {
+    setState(() {
+      _scannedVpa = payload.payeeVpa;
+      _payee.text = payload.payeeName;
+
+      if (payload.hasAmount) {
+        _amount.text = payload.amount!.toStringAsFixed(
+          payload.amount! % 1 == 0 ? 0 : 2,
+        );
+        _amountError = null;
+      }
+
+      final note = payload.note;
+      if (note != null && note.isNotEmpty && _note.text.trim().isEmpty) {
+        _note.text = note;
+      }
+      _payeeError = null;
+    });
+  }
 
   /// 7.6 — the payment app came back saying something happened.
   ///
@@ -569,12 +601,15 @@ class _TransactionFormSheetState extends ConsumerState<TransactionFormSheet> {
                       // time would never notice it being typed and would sit
                       // disabled forever. Listening here also keeps every
                       // keystroke from rebuilding the whole sheet.
+                      _ScanQrButton(onScanned: _onScanned),
+                      const SizedBox(height: 8),
                       ValueListenableBuilder<TextEditingValue>(
                         valueListenable: _amount,
                         builder: (context, value, _) => _PayWithUpiButton(
                           amount: parseAmount(value.text),
                           payeeName: _payee.text,
                           note: _note.text,
+                          scannedVpa: _scannedVpa,
                           onPaid: _onUpiPaid,
                         ),
                       ),
@@ -865,12 +900,14 @@ class _PayWithUpiButton extends StatelessWidget {
     required this.amount,
     required this.payeeName,
     required this.note,
+    required this.scannedVpa,
     required this.onPaid,
   });
 
   final num? amount;
   final String payeeName;
   final String note;
+  final Vpa? scannedVpa;
   final ValueChanged<UpiResult> onPaid;
 
   @override
@@ -887,10 +924,33 @@ class _PayWithUpiButton extends StatelessWidget {
                 amount: amount!,
                 payeeName: payeeName,
                 note: note.trim().isEmpty ? null : note.trim(),
+                initialVpa: scannedVpa,
               );
               if (result != null) onPaid(result);
             }
           : null,
     );
   }
+}
+
+/// Opens the QR scanner and hands what it read back to the form.
+///
+/// Always enabled, unlike the pay button: scanning is how the amount gets
+/// filled in for a merchant code, so requiring an amount first would put the
+/// steps in the wrong order.
+class _ScanQrButton extends StatelessWidget {
+  const _ScanQrButton({required this.onScanned});
+
+  final ValueChanged<UpiQrPayload> onScanned;
+
+  @override
+  Widget build(BuildContext context) => AppButton(
+    label: 'Scan a UPI QR',
+    icon: LucideIcons.scanLine,
+    variant: AppButtonVariant.outlined,
+    onPressed: () async {
+      final payload = await UpiScanSheet.show(context);
+      if (payload != null) onScanned(payload);
+    },
+  );
 }

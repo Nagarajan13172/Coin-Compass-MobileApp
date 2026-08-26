@@ -29,11 +29,17 @@ class UpiPaySheet extends ConsumerStatefulWidget {
     required this.amount,
     required this.payeeName,
     this.note,
+    this.initialVpa,
   });
 
   final num amount;
   final String payeeName;
   final String? note;
+
+  /// Supplied when the payee came from a scanned QR. It wins over anything
+  /// remembered for the same payee name: the code in front of the user now is
+  /// more current than a VPA saved weeks ago, and a shop can change its handle.
+  final Vpa? initialVpa;
 
   /// Null when nothing was attempted.
   static Future<UpiResult?> show(
@@ -41,6 +47,7 @@ class UpiPaySheet extends ConsumerStatefulWidget {
     required num amount,
     required String payeeName,
     String? note,
+    Vpa? initialVpa,
   }) {
     return showModalBottomSheet<UpiResult>(
       context: context,
@@ -50,6 +57,7 @@ class UpiPaySheet extends ConsumerStatefulWidget {
         amount: amount,
         payeeName: payeeName,
         note: note,
+        initialVpa: initialVpa,
       ),
     );
   }
@@ -86,6 +94,17 @@ class _UpiPaySheetState extends ConsumerState<UpiPaySheet> {
   }
 
   Future<void> _loadRemembered() async {
+    // A scanned code wins outright — no lookup, no chance of a stale saved VPA
+    // overwriting the one the user is standing in front of.
+    if (widget.initialVpa != null) {
+      setState(() {
+        _loadedRemembered = true;
+        _vpa = widget.initialVpa;
+        _vpaController.text = widget.initialVpa!.value;
+      });
+      return;
+    }
+
     final book = await ref.read(upiPayeeBookProvider.future);
     if (!mounted) return;
     final remembered = book.lookup(widget.payeeName);
