@@ -6,8 +6,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/money.dart';
 import '../../../core/widgets/app_button.dart';
-import '../../../core/widgets/app_text_field.dart';
-import '../data/upi_payee_book.dart';
 import '../data/upi_service.dart';
 import '../domain/upi_request.dart';
 import '../domain/upi_qr.dart';
@@ -74,13 +72,6 @@ class UpiPaySheet extends ConsumerStatefulWidget {
 }
 
 class _UpiPaySheetState extends ConsumerState<UpiPaySheet> {
-  final _vpaController = TextEditingController();
-
-  Vpa? _vpa;
-  bool _remember = true;
-  bool _loadedRemembered = false;
-  String? _vpaError;
-
   UpiApp? _paying;
   UpiResult? _result;
 
@@ -88,106 +79,34 @@ class _UpiPaySheetState extends ConsumerState<UpiPaySheet> {
   /// back. Nothing was reported, so the sheet has to ask.
   UpiApp? _askedAfterOpening;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadRemembered();
-  }
-
-  @override
-  void dispose() {
-    _vpaController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadRemembered() async {
-    // A scanned code wins outright — no lookup, no chance of a stale saved VPA
-    // overwriting the one the user is standing in front of.
-    final scanned = widget.scanned;
-    if (scanned != null) {
-      setState(() {
-        _loadedRemembered = true;
-        _vpa = scanned.payeeVpa;
-        _vpaController.text = scanned.payeeVpa.value;
-      });
-      return;
-    }
-
-    final book = await ref.read(upiPayeeBookProvider.future);
-    if (!mounted) return;
-    final remembered = book.lookup(widget.payeeName);
-    setState(() {
-      _loadedRemembered = true;
-      if (remembered != null) {
-        _vpa = remembered;
-        _vpaController.text = remembered.value;
-      }
-    });
-  }
-
-  void _onVpaChanged(String raw) {
-    final parsed = Vpa.tryParse(raw);
-    setState(() {
-      _vpa = parsed;
-      // Only complain once there is enough typed to be wrong — an error on the
-      // first keystroke is noise, not help.
-      _vpaError = raw.trim().length < 3 || parsed != null
-          ? null
-          : 'That is not a UPI ID. It looks like name@bank.';
-    });
-  }
-
-  UpiRequest? get _request {
-    final scanned = widget.scanned;
-    // A scan replays its own string; only a hand-typed payee builds a new link.
-    if (scanned != null) {
-      return UpiRequest.fromScan(scanned, amount: widget.amount);
-    }
-
-    final vpa = _vpa;
-    if (vpa == null) return null;
-    return UpiRequest(
-      payeeVpa: vpa,
-      payeeName: widget.payeeName,
-      amount: widget.amount,
-      note: widget.note,
-    );
-  }
-
-  /// Two paths, and which one runs depends on whether a UPI ID was given.
+  /// Opens the chosen app. It never sends a pre-filled payment.
   ///
-  ///  * **With one** — a real `upi://pay` link, so the app opens on a payment
-  ///    screen with the payee and amount already filled in, and answers with a
-  ///    status when it is done.
-  ///  * **Without one** — the app is simply opened, and the payee is chosen
-  ///    inside it: a QR scan, a saved contact, a phone number. UPI's own link
-  ///    cannot express that (`pa` is required), and nothing comes back, so the
-  ///    sheet asks whether the payment happened.
+  /// ## Why the amount is not handed over
   ///
-  /// The second is the common case. Requiring a UPI ID up front made the app
-  /// tiles untappable, which is not what "open my payment app" means.
+  /// It was, and it did not work. The link was correct — verified on the
+  /// device, `pa` with a literal `@`, the right amount, and Google Pay accepted
+  /// it and went to its PIN screen. The **bank** then declined, every time,
+  /// with "you've exceeded the bank limit for this payment" on a payment of ₹1,
+  /// on every phone and every linked account, while the same QR scanned inside
+  /// Google Pay went through.
+  ///
+  /// NPCI's intent flow is built for *merchant* apps, and banks may refuse an
+  /// unsigned intent from an app that is not registered with a PSP. That is a
+  /// business arrangement, not a bug — no change here fixes it.
+  ///
+  /// So the scan does what it can genuinely do: it fills the **expense**, and
+  /// the payment happens in the app the owner already trusts with it. What is
+  /// lost is the pre-filled amount. What is gained is that it works.
+  ///
+  /// `UpiRequest`/`UpiRequest.fromScan` are kept and still tested: they are one
+  /// line from being reconnected if the app is ever registered with a PSP, or
+  /// if a merchant QR turns out to behave differently. See
+  /// `docs/PHASE7_7_REPORT.md`.
   Future<void> _pay(UpiApp app) async {
-    final request = _request;
     setState(() => _paying = app);
 
-    if (request != null) {
-      if (_remember) {
-        final book = await ref.read(upiPayeeBookProvider.future);
-        await book.remember(widget.payeeName, request.payeeVpa);
-      }
-      final result = await ref.read(upiServiceProvider).pay(
-        app: app,
-        request: request,
-      );
-      if (!mounted) return;
-      setState(() {
-        _paying = null;
-        _result = result;
-      });
-      return;
-    }
-
     await ref.read(upiServiceProvider).openApp(app);
+
     if (!mounted) return;
     setState(() {
       _paying = null;
@@ -224,13 +143,6 @@ class _UpiPaySheetState extends ConsumerState<UpiPaySheet> {
           : _Chooser(
               amount: widget.amount,
               payeeName: widget.payeeName,
-              vpaController: _vpaController,
-              vpa: _vpa,
-              vpaError: _vpaError,
-              onVpaChanged: _onVpaChanged,
-              remember: _remember,
-              onRememberChanged: (v) => setState(() => _remember = v),
-              loadedRemembered: _loadedRemembered,
               blocker: blocker,
               paying: _paying,
               onPay: _pay,
@@ -330,13 +242,6 @@ class _Chooser extends ConsumerWidget {
   const _Chooser({
     required this.amount,
     required this.payeeName,
-    required this.vpaController,
-    required this.vpa,
-    required this.vpaError,
-    required this.onVpaChanged,
-    required this.remember,
-    required this.onRememberChanged,
-    required this.loadedRemembered,
     required this.blocker,
     required this.paying,
     required this.onPay,
@@ -344,13 +249,6 @@ class _Chooser extends ConsumerWidget {
 
   final num amount;
   final String payeeName;
-  final TextEditingController vpaController;
-  final Vpa? vpa;
-  final String? vpaError;
-  final ValueChanged<String> onVpaChanged;
-  final bool remember;
-  final ValueChanged<bool> onRememberChanged;
-  final bool loadedRemembered;
   final String? blocker;
   final UpiApp? paying;
   final ValueChanged<UpiApp> onPay;
@@ -366,120 +264,63 @@ class _Chooser extends ConsumerWidget {
         _AmountHeader(amount: amount, payeeName: payeeName),
         const SizedBox(height: 16),
 
-        if (!loadedRemembered)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
-            child: Center(child: CircularProgressIndicator()),
-          )
-        else ...[
-          AppTextField(
-            controller: vpaController,
-            label: 'Their UPI ID (optional)',
-            hint: 'Leave blank to pick inside the app',
-            errorText: vpaError,
-            keyboardType: TextInputType.emailAddress,
-            onChanged: onVpaChanged,
+        if (blocker != null) ...[
+          Text(blocker!, style: TextStyle(fontSize: 12.5, color: c.destructive)),
+          const SizedBox(height: 12),
+        ],
+
+        Text(
+          'Choose an app',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: c.mutedForeground,
           ),
-          const SizedBox(height: 6),
-          Row(
+        ),
+        const SizedBox(height: 2),
+        Text(
+          'Opens the app so you can pay there. You will be asked afterwards '
+          'whether it went through.',
+          style: TextStyle(fontSize: 11.5, color: c.mutedForeground),
+        ),
+        const SizedBox(height: 10),
+
+        switch (apps) {
+          AsyncLoading() => const Padding(
+            padding: EdgeInsets.symmetric(vertical: 20),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          AsyncError() => Text(
+            'Could not read the payment apps on this phone.',
+            style: TextStyle(fontSize: 13, color: c.mutedForeground),
+          ),
+          AsyncData(value: final list) when list.isEmpty => Text(
+            'No UPI app found on this phone. Install one — Google Pay, '
+            'PhonePe, Paytm — and it will appear here.',
+            style: TextStyle(fontSize: 13, color: c.mutedForeground),
+          ),
+          AsyncData(value: final list) => Wrap(
+            spacing: 10,
+            runSpacing: 10,
             children: [
-              Checkbox(
-                value: remember,
-                onChanged: (v) => onRememberChanged(v ?? false),
-              ),
-              // The payee is often still blank at this point — the amount is
-              // typed first — and interpolating it produced "Remember this for
-              // , on this phone only".
-              Expanded(
-                child: payeeName.trim().isEmpty
-                    ? Text(
-                        'Remember this UPI ID on this phone only',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          color: c.mutedForeground,
-                        ),
-                      )
-                    : Text.rich(
-                        TextSpan(
-                          children: [
-                            const TextSpan(text: 'Remember this for '),
-                            // The payee's own name — never translated.
-                            TextSpan(text: payeeName.trim()),
-                            const TextSpan(text: ', on this phone only'),
-                          ],
-                        ),
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          color: c.mutedForeground,
-                        ),
-                      ),
-              ),
+              for (final app in list)
+                _AppTile(
+                  app: app,
+                  busy: paying?.packageName == app.packageName,
+                  enabled: blocker == null && paying == null,
+                  onTap: () => onPay(app),
+                ),
             ],
           ),
+          _ => const SizedBox.shrink(),
+        },
 
-          if (blocker != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              blocker!,
-              style: TextStyle(fontSize: 12.5, color: c.destructive),
-            ),
-          ],
-
-          const SizedBox(height: 16),
-          Text(
-            'Choose an app',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.mutedForeground),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            vpa == null
-                ? 'Opens the app so you can scan or pick who to pay there. '
-                    'You will be asked afterwards whether it went through.'
-                : 'Opens the app with the amount and payee already filled in.',
-            style: TextStyle(fontSize: 11.5, color: c.mutedForeground),
-          ),
-          const SizedBox(height: 10),
-
-          switch (apps) {
-            AsyncLoading() => const Padding(
-              padding: EdgeInsets.symmetric(vertical: 20),
-              child: Center(child: CircularProgressIndicator()),
-            ),
-            AsyncError() => Text(
-              'Could not read the payment apps on this phone.',
-              style: TextStyle(fontSize: 13, color: c.mutedForeground),
-            ),
-            AsyncData(value: final list) when list.isEmpty => Text(
-              'No UPI app found on this phone. Install one — Google Pay, '
-              'PhonePe, Paytm — and it will appear here.',
-              style: TextStyle(fontSize: 13, color: c.mutedForeground),
-            ),
-            AsyncData(value: final list) => Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                for (final app in list)
-                  _AppTile(
-                    app: app,
-                    busy: paying?.packageName == app.packageName,
-                    // Tappable without a UPI ID: that path opens the app and
-                    // asks afterwards. Only a bad amount or an in-flight
-                    // payment closes it.
-                    enabled: blocker == null && paying == null,
-                    onTap: () => onPay(app),
-                  ),
-              ],
-            ),
-            _ => const SizedBox.shrink(),
-          },
-
-          const SizedBox(height: 14),
-          Text(
-            'CoinCompass hands the amount to the app you choose. It never sees '
-            'your UPI PIN, and it only records the expense after you confirm.',
-            style: TextStyle(fontSize: 11.5, color: c.mutedForeground),
-          ),
-        ],
+        const SizedBox(height: 14),
+        Text(
+          'CoinCompass opens the app and never sees your UPI PIN. It only '
+          'records the expense after you confirm you paid.',
+          style: TextStyle(fontSize: 11.5, color: c.mutedForeground),
+        ),
       ],
     );
   }

@@ -211,6 +211,48 @@ with the real string ended it. The values are the owner's own, on the owner's
 own device, readable only by someone who already has developer access — which is
 a small price for never having to guess at this again.
 
+## What the pre-filled amount cost, and why it was given up
+
+After the `%40` fix the link was correct — verified on the device, `pa` with a
+literal `@`, right amount — and **Google Pay accepted it and went to its PIN
+screen**. The bank still declined, every time, with *"you've exceeded the bank
+limit for this payment"* on a payment of **₹1**, on every phone and every linked
+account, while the same QR scanned inside Google Pay went through.
+
+At that point the link is not the variable. What is left is *who is allowed to
+initiate the payment*: NPCI's intent flow is built for **merchant** apps, and a
+bank may refuse an unsigned intent from an app that is not registered with a
+PSP. That is a business arrangement, not a defect, and no code change reaches
+it.
+
+So the pre-filled amount was given up and the flow the owner originally asked
+for became the only one:
+
+    scan → fills the EXPENSE → open the payment app → pay there → confirm
+
+The scan still earns its place: it reads the payee and the amount off the code
+so neither has to be typed, and the payment happens in the app the owner already
+trusts with it. What is lost is the pre-fill. What is gained is that it works.
+
+`UpiRequest` and `UpiRequest.fromScan` are **kept and still tested**. They are
+one line from being reconnected if the app is ever registered with a PSP, or if
+a merchant QR turns out to behave differently from a personal one — which was
+never tested, because the QR in hand was a friend's personal Google Pay code.
+
+### What it cost to learn
+
+Four fixes were made before the real defect was found, each reasoned from what a
+QR *probably* contains rather than from what the app *actually sent*:
+
+1. rebuilt the link, dropping `mc` — broke merchant QRs;
+2. replayed the whole string — carried a stale `sign`;
+3. blocklist instead of allowlist — leaked `mc=0000`, `orgid`, `purpose`;
+4. **`pa=…%40…`** — the actual bug, found in one round by logging the string.
+
+Every one of those was a genuine improvement, and none of them was the problem.
+The lesson is the ordering: **instrument first.** The diagnostic that found it
+took ten minutes and should have been the first thing built, not the fifth.
+
 ## Platform
 
 `mobile_scanner` 7.4.0, QR format only — a UPI code is never a barcode, and
