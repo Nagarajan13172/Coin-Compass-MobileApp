@@ -2,7 +2,6 @@ import '../../../core/ui.dart';
 import '../../../core/utils/money.dart';
 import '../../upi/data/upi_service.dart';
 import '../../upi/domain/upi_qr.dart';
-import '../../upi/domain/upi_request.dart';
 import '../../upi/presentation/upi_scan_sheet.dart';
 import '../../upi/domain/upi_result.dart';
 import '../../upi/presentation/upi_pay_sheet.dart';
@@ -111,9 +110,12 @@ class _TransactionFormSheetState extends ConsumerState<TransactionFormSheet> {
 
   bool _busy = false;
 
-  /// 7.7 — the VPA from a scanned QR, carried to the pay sheet so the payment
-  /// app opens with the payee and amount already filled in.
-  Vpa? _scannedVpa;
+  /// 7.7 — the scanned QR, carried whole to the pay sheet.
+  ///
+  /// The whole payload, not just its VPA: a merchant payment has to replay the
+  /// scanned string, `mc`/`sign`/`orgid` and all, or the payment app treats it
+  /// as person-to-person and the merchant refuses it.
+  UpiQrPayload? _scanned;
 
   String? _amountError;
   String? _accountError;
@@ -321,7 +323,7 @@ class _TransactionFormSheetState extends ConsumerState<TransactionFormSheet> {
   /// leaving it. The note is appended rather than replaced for the same reason.
   void _onScanned(UpiQrPayload payload) {
     setState(() {
-      _scannedVpa = payload.payeeVpa;
+      _scanned = payload;
       _payee.text = payload.payeeName;
 
       if (payload.hasAmount) {
@@ -609,7 +611,7 @@ class _TransactionFormSheetState extends ConsumerState<TransactionFormSheet> {
                           amount: parseAmount(value.text),
                           payeeName: _payee.text,
                           note: _note.text,
-                          scannedVpa: _scannedVpa,
+                          scanned: _scanned,
                           onPaid: _onUpiPaid,
                         ),
                       ),
@@ -900,14 +902,14 @@ class _PayWithUpiButton extends StatelessWidget {
     required this.amount,
     required this.payeeName,
     required this.note,
-    required this.scannedVpa,
+    required this.scanned,
     required this.onPaid,
   });
 
   final num? amount;
   final String payeeName;
   final String note;
-  final Vpa? scannedVpa;
+  final UpiQrPayload? scanned;
   final ValueChanged<UpiResult> onPaid;
 
   @override
@@ -924,7 +926,7 @@ class _PayWithUpiButton extends StatelessWidget {
                 amount: amount!,
                 payeeName: payeeName,
                 note: note.trim().isEmpty ? null : note.trim(),
-                initialVpa: scannedVpa,
+                scanned: scanned,
               );
               if (result != null) onPaid(result);
             }

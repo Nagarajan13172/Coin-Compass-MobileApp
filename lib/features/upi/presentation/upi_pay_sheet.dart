@@ -10,6 +10,7 @@ import '../../../core/widgets/app_text_field.dart';
 import '../data/upi_payee_book.dart';
 import '../data/upi_service.dart';
 import '../domain/upi_request.dart';
+import '../domain/upi_qr.dart';
 import '../domain/upi_result.dart';
 
 /// Phase 7.6 — pay the amount you just typed, from inside the app.
@@ -29,17 +30,23 @@ class UpiPaySheet extends ConsumerStatefulWidget {
     required this.amount,
     required this.payeeName,
     this.note,
-    this.initialVpa,
+    this.scanned,
   });
 
   final num amount;
   final String payeeName;
   final String? note;
 
-  /// Supplied when the payee came from a scanned QR. It wins over anything
-  /// remembered for the same payee name: the code in front of the user now is
-  /// more current than a VPA saved weeks ago, and a shop can change its handle.
-  final Vpa? initialVpa;
+  /// Supplied when the payee came from a scanned QR.
+  ///
+  /// Carries the whole payload, not just its VPA: paying a merchant means
+  /// replaying the scanned string with all of `mc`, `sign`, `orgid` and the
+  /// merchant ids intact, because a rebuilt link is treated as a
+  /// person-to-person transfer and refused. See `UpiRequest.scannedRaw`.
+  ///
+  /// It also wins over anything remembered for the same payee name: the code in
+  /// front of the user now is more current than a VPA saved weeks ago.
+  final UpiQrPayload? scanned;
 
   /// Null when nothing was attempted.
   static Future<UpiResult?> show(
@@ -47,7 +54,7 @@ class UpiPaySheet extends ConsumerStatefulWidget {
     required num amount,
     required String payeeName,
     String? note,
-    Vpa? initialVpa,
+    UpiQrPayload? scanned,
   }) {
     return showModalBottomSheet<UpiResult>(
       context: context,
@@ -57,7 +64,7 @@ class UpiPaySheet extends ConsumerStatefulWidget {
         amount: amount,
         payeeName: payeeName,
         note: note,
-        initialVpa: initialVpa,
+        scanned: scanned,
       ),
     );
   }
@@ -96,11 +103,12 @@ class _UpiPaySheetState extends ConsumerState<UpiPaySheet> {
   Future<void> _loadRemembered() async {
     // A scanned code wins outright — no lookup, no chance of a stale saved VPA
     // overwriting the one the user is standing in front of.
-    if (widget.initialVpa != null) {
+    final scanned = widget.scanned;
+    if (scanned != null) {
       setState(() {
         _loadedRemembered = true;
-        _vpa = widget.initialVpa;
-        _vpaController.text = widget.initialVpa!.value;
+        _vpa = scanned.payeeVpa;
+        _vpaController.text = scanned.payeeVpa.value;
       });
       return;
     }
@@ -130,6 +138,12 @@ class _UpiPaySheetState extends ConsumerState<UpiPaySheet> {
   }
 
   UpiRequest? get _request {
+    final scanned = widget.scanned;
+    // A scan replays its own string; only a hand-typed payee builds a new link.
+    if (scanned != null) {
+      return UpiRequest.fromScan(scanned, amount: widget.amount);
+    }
+
     final vpa = _vpa;
     if (vpa == null) return null;
     return UpiRequest(

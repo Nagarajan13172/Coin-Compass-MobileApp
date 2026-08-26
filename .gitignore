@@ -108,3 +108,9 @@ Desktop.ini
 *.tmp
 *.bak
 *~
+
+# Built APKs kept for sideloading. Deliberately NOT committed: git keeps every
+# binary forever, so a 46MB APK per build would live in history permanently and
+# every clone would pay for it. The file stays here on disk for installing on a
+# phone; publishing belongs in a GitHub Release, not in the tree.
+/dist/

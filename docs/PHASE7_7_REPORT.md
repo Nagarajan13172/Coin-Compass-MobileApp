@@ -82,6 +82,49 @@ each payment app honours a **pre-filled amount** from a third-party caller. That
 is per-app policy, it has tightened over the years, and only a real payment
 settles it.
 
+## The defect real payments found
+
+Scanning worked. **Paying did not** — every scanned QR came back "payment
+failed" or "exceeded for this account", on every phone tried.
+
+The cause was in this app, not in the payment apps. `toUri()` **rebuilt** the
+link from the handful of fields the parser understands:
+
+    pa, pn, am, cu, tn
+
+A real merchant QR carries much more: `mc` (merchant category code), `sign` (the
+merchant signature on a Bharat/dynamic QR), `orgid`, `mode`, and merchant ids
+like `mid`/`msid`. Rebuilding threw all of them away, so what reached the
+payment app was a bare **person-to-person transfer to a merchant VPA**. Two
+consequences, and they are exactly the two errors reported:
+
+- merchant VPAs commonly **refuse P2P** outright → *"payment failed"*;
+- without `mc`, the transaction is metered against **P2P limits** rather than
+  merchant ones → *"exceeded for this account"*.
+
+### The fix: replay, never rebuild
+
+`UpiQrPayload` now keeps the scanned string byte for byte, and
+`UpiRequest.fromScan` replays it:
+
+| case | what is sent |
+|---|---|
+| QR fixed the amount, user accepted it | the string **untouched** — not re-encoded, not reordered |
+| QR fixed no amount | the string plus `&am=…` (and `&cu=INR` only if absent) |
+| user typed a different amount | `am` replaced in place; every other field kept |
+
+The first case matters most: a signed QR's `sign` covers the exact bytes, so
+even a faithful round-trip through `Uri` can invalidate it. The string is
+returned as scanned.
+
+`fromScan` also takes **no note**. Adding `tn` to a scanned link changes the
+bytes the signature covers, and the merchant's own note is already in the
+string — so the form's note reaches the *ledger* and never the payment.
+
+Seven tests pin this, including that `mc`, `sign`, `orgid`, `mode` and `tr` all
+survive, and that an accepted amount round-trips to the original string
+character for character.
+
 ## Platform
 
 `mobile_scanner` 7.4.0, QR format only — a UPI code is never a barcode, and

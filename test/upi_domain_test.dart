@@ -1,3 +1,4 @@
+import 'package:coincompass/features/upi/domain/upi_qr.dart';
 import 'package:coincompass/features/upi/domain/upi_request.dart';
 import 'package:coincompass/features/upi/domain/upi_result.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -134,6 +135,81 @@ void main() {
         amount: 100001,
       );
       expect(request.blocker, UpiRequest.amountBlocker(100001));
+    });
+  });
+
+  group('a scanned QR is replayed, never rebuilt', () {
+    // THE bug this suite exists for. Rebuilding a link from the handful of
+    // fields this app understands drops `mc`, `sign`, `orgid`, `mode` and the
+    // merchant ids — and the payment app then treats a merchant payment as
+    // person-to-person, which merchants refuse ("payment failed") and which is
+    // metered against P2P limits ("exceeded for this account"). It failed on
+    // every phone it was tried on.
+    const merchantQr =
+        'upi://pay?pa=chaikada@okhdfcbank&pn=Chai%20Kada&am=250.00&cu=INR'
+        '&mc=5812&tr=TXN0099&sign=MEUCIQDabc123&orgid=159761&mode=01';
+
+    UpiQrPayload scan(String raw) => UpiQr.parse(raw).payload!;
+
+    test('an accepted amount replays the string byte for byte', () {
+      final request = UpiRequest.fromScan(scan(merchantQr), amount: 250.00);
+      expect(request.toUri().toString(), merchantQr);
+    });
+
+    test('every merchant field survives', () {
+      final sent = UpiRequest.fromScan(scan(merchantQr), amount: 250.00)
+          .toUri()
+          .queryParameters;
+
+      // These are exactly what the old rebuild threw away.
+      expect(sent['mc'], '5812');
+      expect(sent['sign'], 'MEUCIQDabc123');
+      expect(sent['orgid'], '159761');
+      expect(sent['mode'], '01');
+      expect(sent['tr'], 'TXN0099');
+    });
+
+    test('an open-amount QR gets the amount appended, nothing else touched', () {
+      const openQr =
+          'upi://pay?pa=kirana@ybl&pn=Kirana&mc=5411&sign=XYZ&orgid=159761';
+      final uri = UpiRequest.fromScan(scan(openQr), amount: 340.5).toUri();
+
+      expect(uri.queryParameters['am'], '340.50');
+      expect(uri.queryParameters['cu'], 'INR');
+      expect(uri.queryParameters['mc'], '5411');
+      expect(uri.queryParameters['sign'], 'XYZ');
+      // The original text is still a prefix — nothing before `am` was rewritten.
+      expect(uri.toString(), startsWith(openQr));
+    });
+
+    test('an overridden amount replaces only am, keeping the rest', () {
+      final uri = UpiRequest.fromScan(scan(merchantQr), amount: 500).toUri();
+      expect(uri.queryParameters['am'], '500.00');
+      expect(uri.queryParameters['mc'], '5812');
+      expect(uri.queryParameters['sign'], 'MEUCIQDabc123');
+      expect(uri.queryParameters['pa'], 'chaikada@okhdfcbank');
+    });
+
+    test('a QR with no currency gets INR only when it has none', () {
+      const noCu = 'upi://pay?pa=shop@ybl&pn=Shop';
+      final uri = UpiRequest.fromScan(scan(noCu), amount: 10).toUri();
+      expect(uri.queryParameters['cu'], 'INR');
+      expect('cu='.allMatches(uri.toString()).length, 1);
+    });
+
+    test('a hand-typed payee still builds a link, as before', () {
+      final request = UpiRequest(
+        payeeVpa: vpa('hari@oksbi'),
+        payeeName: 'Hari',
+        amount: 100,
+      );
+      expect(request.isFromScan, isFalse);
+      expect(request.toUri().queryParameters['pa'], 'hari@oksbi');
+    });
+
+    test('a scanned request knows it came from a scan', () {
+      expect(UpiRequest.fromScan(scan(merchantQr), amount: 250).isFromScan,
+          isTrue);
     });
   });
 

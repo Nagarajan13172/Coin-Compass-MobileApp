@@ -9,6 +9,8 @@
 /// pure: no channel, no plugin, no phone.
 library;
 
+import 'upi_qr.dart';
+
 /// A payee's UPI address — `name@bank`.
 ///
 /// Deliberately strict. A VPA is not free text: it is the thing money is sent
@@ -57,7 +59,28 @@ class UpiRequest {
     required this.amount,
     this.note,
     this.transactionRef,
+    this.scannedRaw,
+    this.scannedAmount,
   });
+
+  /// A payment that came from a scanned QR.
+  ///
+  /// Carries the scanned string so [toUri] can replay it rather than rebuild
+  /// it — see [scannedRaw] for why that distinction decides whether a merchant
+  /// payment succeeds at all.
+  /// Takes no note on purpose: adding `tn` to a scanned link changes the bytes
+  /// a signed QR was signed over, and the merchant's own `tn` is already in the
+  /// string. The form's note still reaches the *ledger* — it just does not
+  /// reach the payment.
+  UpiRequest.fromScan(
+    UpiQrPayload payload, {
+    required this.amount,
+  })  : note = null,
+        payeeVpa = payload.payeeVpa,
+        payeeName = payload.payeeName,
+        transactionRef = payload.transactionRef,
+        scannedRaw = payload.raw,
+        scannedAmount = payload.amount;
 
   final Vpa payeeVpa;
 
@@ -73,6 +96,22 @@ class UpiRequest {
   /// The app's own reference, echoed back in the result so a return can be
   /// matched to the request that caused it.
   final String? transactionRef;
+
+  /// The scanned QR verbatim, when this payment came from one.
+  ///
+  /// A merchant QR carries `mc`, `sign`, `orgid`, `mode` and merchant ids that
+  /// this app neither understands nor needs to. Rebuilding a link from the few
+  /// fields it does understand drops all of them, and the payment app then
+  /// treats a *merchant* payment as person-to-person — which merchants refuse,
+  /// and which is metered against the wrong limits. Replaying the original
+  /// avoids the whole question.
+  final String? scannedRaw;
+
+  /// The amount the QR itself fixed, if any. Used to tell "the user accepted
+  /// the QR's amount" from "the user typed a different one".
+  final num? scannedAmount;
+
+  bool get isFromScan => scannedRaw != null;
 
   /// Exactly two decimals, no grouping, no symbol — `1234.50`.
   ///
@@ -93,6 +132,9 @@ class UpiRequest {
   /// percent-encoded — a note containing `&` would otherwise inject a
   /// parameter, and a payee name with a space would break the link outright.
   Uri toUri() {
+    final raw = scannedRaw;
+    if (raw != null) return _scannedUri(raw);
+
     final trimmedNote = note?.trim();
     return Uri(
       scheme: 'upi',
@@ -110,6 +152,48 @@ class UpiRequest {
           'tr': transactionRef!,
       },
     );
+  }
+
+  /// The scanned link, with the amount filled in only if it has to be.
+  ///
+  /// Three cases, and the first is the important one:
+  ///
+  ///  * **The QR fixed the amount and the user accepted it** — the string is
+  ///    returned *untouched*. Not re-encoded, not reordered, not normalised. A
+  ///    signed QR's `sign` covers the exact bytes, so re-serialising it through
+  ///    `Uri` can invalidate the signature even when every value survives.
+  ///  * **The QR fixed no amount** — the common shop-counter shape. `am` (and
+  ///    `cu` if absent) is appended and nothing else is disturbed. Open QRs are
+  ///    designed to be completed this way.
+  ///  * **The user typed a different amount than the QR asked for** — `am` is
+  ///    replaced. This is the one case that can break a signature, and it is
+  ///    also the only case where the user has explicitly overruled the code in
+  ///    front of them.
+  Uri _scannedUri(String raw) {
+    final existing = Uri.parse(raw);
+    final hasAmount = scannedAmount != null;
+
+    if (hasAmount && scannedAmount == amount) return existing;
+
+    if (!hasAmount) {
+      final separator = existing.query.isEmpty ? '?' : '&';
+      final needsCurrency = !existing.queryParameters.keys
+          .any((k) => k.toLowerCase() == 'cu');
+      return Uri.parse(
+        '$raw$separator'
+        'am=$formattedAmount${needsCurrency ? '&cu=INR' : ''}',
+      );
+    }
+
+    // Replace `am` in place, leaving every other parameter — and their order —
+    // as the merchant wrote them.
+    final rebuilt = <String, String>{
+      for (final entry in existing.queryParameters.entries)
+        entry.key: entry.key.toLowerCase() == 'am'
+            ? formattedAmount
+            : entry.value,
+    };
+    return existing.replace(queryParameters: rebuilt);
   }
 
   /// Why an amount cannot be sent over UPI, or null when it can.

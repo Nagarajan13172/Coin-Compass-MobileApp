@@ -23,6 +23,7 @@ class UpiQrPayload {
     this.merchantCode,
     this.transactionRef,
     this.currency = 'INR',
+    required this.raw,
   });
 
   final Vpa payeeVpa;
@@ -43,6 +44,21 @@ class UpiQrPayload {
 
   final String? transactionRef;
   final String currency;
+
+  /// **The scanned string, byte for byte.**
+  ///
+  /// This is the field that matters most, and the one the first version did not
+  /// keep. A merchant QR carries far more than a payee and an amount — `mc`
+  /// (merchant category), `sign`, `orgid`, `mode`, `mid`/`msid` — and
+  /// reconstructing a link from the handful of fields this app understands
+  /// throws all of it away. What reaches the payment app is then a bare
+  /// person-to-person transfer to a *merchant* VPA, which merchants routinely
+  /// refuse ("payment failed") and which is metered against P2P limits rather
+  /// than merchant ones ("exceeded for this account").
+  ///
+  /// So paying from a scan replays this string instead of rebuilding one. See
+  /// `UpiRequest.fromScan`.
+  final String raw;
 
   bool get hasAmount => amount != null;
   bool get isMerchant => merchantCode != null && merchantCode!.isNotEmpty;
@@ -137,6 +153,7 @@ abstract final class UpiQr {
 
     return UpiQrResult.usable(
       UpiQrPayload(
+        raw: text,
         payeeVpa: vpa,
         payeeName: _cleanName(fields['pn']) ?? vpa.account,
         amount: _amount(fields['am']),
