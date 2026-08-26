@@ -36,7 +36,25 @@ class AppButton extends StatelessWidget {
                 Icon(icon, size: 18),
                 const SizedBox(width: 8),
               ],
-              Text(label),
+              // 7.1/7.3 — `Flexible`, not a bare `Text`. A `Row` sized to its
+              // children hands an unbounded width to an unconstrained `Text`,
+              // so a label wider than the button *overflows* rather than
+              // ellipsising. In English that almost never happens; the device
+              // walk in Tamil overflowed three buttons on the import screen at
+              // once (1.3px, 12px and 126px), because Tamil runs up to 173% of
+              // the English width — see PHASE7_1_REPORT.
+              //
+              // Ellipsis rather than wrap: these buttons have a fixed 46-48px
+              // height from the shared theme, so a second line would be clipped
+              // instead of shown.
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ),
             ],
           );
 
