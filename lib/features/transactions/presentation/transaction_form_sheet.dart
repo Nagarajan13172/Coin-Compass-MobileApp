@@ -1,4 +1,8 @@
 import '../../../core/ui.dart';
+import '../../../core/utils/money.dart';
+import '../../upi/data/upi_service.dart';
+import '../../upi/domain/upi_result.dart';
+import '../../upi/presentation/upi_pay_sheet.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -303,6 +307,23 @@ class _TransactionFormSheetState extends ConsumerState<TransactionFormSheet> {
 
   // ── save ─────────────────────────────────────────────────────────────────
 
+  /// 7.6 — the payment app came back saying something happened.
+  ///
+  /// The note gets the UPI reference so the row can be tied to the payment
+  /// afterwards; nothing is saved here, because the user still has to press the
+  /// form's own Save. The deep-link response is not proof of payment, and this
+  /// app does not record money on the strength of it.
+  void _onUpiPaid(UpiResult result) {
+    final reference = result.transactionId;
+    if (reference == null) return;
+    final existing = _note.text.trim();
+    setState(() {
+      _note.text = existing.isEmpty
+          ? 'UPI $reference'
+          : '$existing · UPI $reference';
+    });
+  }
+
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
 
@@ -535,6 +556,29 @@ class _TransactionFormSheetState extends ConsumerState<TransactionFormSheet> {
                         }
                       },
                     ),
+                    // 7.6 — pay the amount you just typed, from here. Expense
+                    // only: UPI sends money out, so offering it on an income
+                    // row would be a control that cannot do what it says.
+                    // Android only — there is no UPI intent contract on iOS.
+                    if (_type == TransactionType.expense &&
+                        ref.watch(upiServiceProvider).isSupported) ...[
+                      const SizedBox(height: 12),
+                      // Rebuilt from the controller rather than from form
+                      // state: `AmountField.onChanged` only calls setState to
+                      // clear an error, so a button reading the amount at build
+                      // time would never notice it being typed and would sit
+                      // disabled forever. Listening here also keeps every
+                      // keystroke from rebuilding the whole sheet.
+                      ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: _amount,
+                        builder: (context, value, _) => _PayWithUpiButton(
+                          amount: parseAmount(value.text),
+                          payeeName: _payee.text,
+                          note: _note.text,
+                          onPaid: _onUpiPaid,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 18),
                     ..._accountFields(),
                     if (!_isTransfer) ...[
@@ -809,3 +853,44 @@ class _TransactionFormSheetState extends ConsumerState<TransactionFormSheet> {
 
 /// `expense` / `income` / `primary` — the token that colours the whole sheet
 /// for the selected type.
+
+/// The entry point into [UpiPaySheet].
+///
+/// Disabled rather than hidden when the amount is not yet usable: hiding it
+/// would make the button appear and disappear as digits are typed, and a
+/// control that moves under the thumb is worse than one that is visibly not
+/// ready yet.
+class _PayWithUpiButton extends StatelessWidget {
+  const _PayWithUpiButton({
+    required this.amount,
+    required this.payeeName,
+    required this.note,
+    required this.onPaid,
+  });
+
+  final num? amount;
+  final String payeeName;
+  final String note;
+  final ValueChanged<UpiResult> onPaid;
+
+  @override
+  Widget build(BuildContext context) {
+    final ready = amount != null && amount! > 0;
+    return AppButton(
+      label: ready ? 'Pay ${Money.format(amount!)} with UPI' : 'Pay with UPI',
+      icon: LucideIcons.smartphone,
+      variant: AppButtonVariant.outlined,
+      onPressed: ready
+          ? () async {
+              final result = await UpiPaySheet.show(
+                context,
+                amount: amount!,
+                payeeName: payeeName,
+                note: note.trim().isEmpty ? null : note.trim(),
+              );
+              if (result != null) onPaid(result);
+            }
+          : null,
+    );
+  }
+}

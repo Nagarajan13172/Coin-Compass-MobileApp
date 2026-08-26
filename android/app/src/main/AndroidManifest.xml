@@ -84,5 +84,13 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- 7.6 — Android 11+ hides installed packages unless they are
+             declared. Without this, queryIntentActivities for upi://pay
+             returns an EMPTY LIST rather than an error, so the payment sheet
+             would simply look as though no UPI app were installed. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="upi" android:host="pay"/>
+        </intent>
     </queries>
 </manifest>
