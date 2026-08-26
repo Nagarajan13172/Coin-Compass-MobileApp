@@ -122,32 +122,36 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             const SizedBox(height: 10),
             AppButton(label: 'Sign in', busy: state.busy, onPressed: _submit),
             const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(child: Divider(color: c.border)),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Text(
-                    'or continue with',
-                    style: TextStyle(fontSize: 13, color: c.mutedForeground),
-                  ),
+            // 7.2 — the social block is drawn from `GET /auth/providers`
+            // rather than hardcoded. Before this the screen always offered
+            // Google, which happened to be right for this deployment and would
+            // have gone on being offered if the server turned it off.
+            //
+            // While the call is in flight, and if it fails, nothing is drawn:
+            // a provider button that cannot work is worse than no button, and
+            // email sign-in — the thing the user is already looking at — is
+            // unaffected either way.
+            ...switch (ref.watch(authProvidersConfigProvider)) {
+              AsyncData(value: final providers) when providers.hasAny => [
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: c.border)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        'or continue with',
+                        style: TextStyle(fontSize: 13, color: c.mutedForeground),
+                      ),
+                    ),
+                    Expanded(child: Divider(color: c.border)),
+                  ],
                 ),
-                Expanded(child: Divider(color: c.border)),
+                const SizedBox(height: 14),
+                if (providers.google) const _GoogleButton(),
+                const SizedBox(height: 18),
               ],
-            ),
-            const SizedBox(height: 14),
-            AppButton(
-              label: 'Google',
-              variant: AppButtonVariant.outlined,
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Google sign-in is coming soon on mobile.'),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 18),
+              _ => const <Widget>[],
+            },
             // Wrap, not Row: at large system font scales the prompt and the
             // link no longer fit on one 280dp line, and a Row would overflow.
             Wrap(
@@ -179,4 +183,39 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       ),
     );
   }
+}
+
+/// Google is configured on the server, but a mobile app cannot complete the
+/// flow without a backend change — see `docs/PHASE7_2_REPORT.md`.
+///
+/// The session is an httpOnly `mt_session` cookie. An external browser would
+/// complete the sign-in and keep the cookie in *its* jar, where Dio cannot
+/// reach it; an embedded WebView could share a jar, but Google refuses OAuth in
+/// WebViews. So the button explains rather than pretends — and says where sign
+/// in *does* work, which is more use than "coming soon".
+class _GoogleButton extends StatelessWidget {
+  const _GoogleButton();
+
+  @override
+  Widget build(BuildContext context) => AppButton(
+    label: 'Google',
+    variant: AppButtonVariant.outlined,
+    onPressed: () => showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Google sign-in is not available in the app yet'),
+        content: const Text(
+          'Signing in with Google needs a change on the server before the app '
+          'can use it. Your email and password work here, and Google works on '
+          'the CoinCompass website.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    ),
+  );
 }

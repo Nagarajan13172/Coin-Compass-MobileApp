@@ -6,6 +6,7 @@ import '../../../core/api/stale_ledger.dart';
 import '../../settings/domain/app_settings.dart';
 import '../data/auth_repository.dart';
 import '../domain/app_user.dart';
+import '../domain/auth_providers_config.dart';
 
 enum AuthStatus {
   /// Cold start — we haven't asked the server yet.
@@ -439,6 +440,17 @@ final currentUserProvider = Provider<AppUser?>(
 /// `GET /auth/2fa/status` — what the Settings screen's two-factor card reads.
 /// Note it does NOT read `AppUser.twoFactorEnabled`, which is on the user
 /// object but is not what the web renders. Invalidate after any 2FA write.
+/// Which third-party sign-ins the server has configured.
+///
+/// Read by the login screen so the social block reflects the deployment rather
+/// than a hardcoded list. Not `autoDispose`: the answer is deployment
+/// configuration, it does not change while the app is open, and re-fetching it
+/// on every return to /login would put a network call in front of a user who is
+/// simply retrying a password.
+final authProvidersConfigProvider = FutureProvider<AuthProvidersConfig>(
+  (ref) => ref.watch(authRepositoryProvider).providers(),
+);
+
 final twoFactorStatusProvider = FutureProvider.autoDispose<TwoFactorStatus>(
   (ref) => ref.watch(authRepositoryProvider).twoFactorStatus(),
 );

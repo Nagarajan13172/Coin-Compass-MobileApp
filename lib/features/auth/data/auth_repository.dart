@@ -8,6 +8,7 @@ import '../../../core/api/endpoints.dart';
 import '../../../core/api/json.dart';
 import '../../settings/domain/app_settings.dart';
 import '../domain/app_user.dart';
+import '../domain/auth_providers_config.dart';
 
 /// Outcome of a sign-in attempt. The backend may demand a second factor, in
 /// which case no session cookie is issued yet.
@@ -149,6 +150,14 @@ class AuthRepository {
     } finally {
       await _api.clearSession();
     }
+  }
+
+  /// Which third-party sign-ins this deployment has configured.
+  ///
+  /// Unauthenticated — the login screen calls it before anyone has signed in.
+  Future<AuthProvidersConfig> providers() async {
+    final json = await _api.getJson(Endpoints.authProviders);
+    return AuthProvidersConfig.fromJson(json);
   }
 
   Future<void> forgotPassword(String email) =>
