@@ -1,5 +1,6 @@
 import '../../../core/ui.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:flutter/foundation.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -60,6 +61,11 @@ class _UpiScanSheetState extends State<UpiScanSheet> {
     if (_found != null) return;
 
     for (final barcode in capture.barcodes) {
+      // Diagnostic: the raw code, exactly as printed. Pairs with UPI-OUT in
+      // upi_service.dart so a failure can be read as "this went in, that came
+      // out" rather than guessed at.
+      debugPrint('UPI-QR-IN <- ${barcode.rawValue}');
+
       final result = UpiQr.parse(barcode.rawValue);
       if (result.isUsable) {
         setState(() {

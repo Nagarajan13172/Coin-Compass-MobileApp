@@ -138,83 +138,92 @@ void main() {
     });
   });
 
-  group('a scanned QR becomes an intent: descriptive fields kept, session fields dropped', () {
-    // Two real failures shaped this, one after the other.
+  group('a scanned QR is translated into an intent, not forwarded as one', () {
+    // Three real failures shaped this, each teaching the same lesson from a
+    // different side: a QR and an intent are different things that happen to
+    // share some field names.
     //
-    // FIRST: the link was rebuilt from the five fields the parser understood,
-    // which dropped `mc` — so a merchant payment reached the app as
-    // person-to-person, and merchants refuse that ("payment failed",
-    // "exceeded for this account").
+    // 1. The link was REBUILT from five fields, dropping `mc` — so a merchant
+    //    payment arrived as person-to-person and merchants refuse that.
+    // 2. The whole string was REPLAYED — so a stale `sign` and `mode=02` came
+    //    with it, and a signature over content that had since gained an amount
+    //    is invalid by construction.
+    // 3. A BLOCKLIST banned `sign`/`mode` and let everything else through — so
+    //    a Google Pay personal QR forwarded `mc=0000`, `orgid` and `purpose`,
+    //    asserting a merchant category on a P2P transfer. ₹1 to
+    //    prithivi2804raj@okicici was declined with "you've exceeded the bank
+    //    limit for this payment".
     //
-    // SECOND: replaying the whole string fixed that but carried `sign` and
-    // `mode=02` across. A ₹100 payment to a personal PhonePe QR then showed the
-    // right payee and right amount in Google Pay and was declined by ICICI with
-    // "you've exceeded the bank limit" — a generic decline. The same QR scanned
-    // *inside* Google Pay worked, because there the signature still matched.
-    //
-    // A signature over content that has since changed is a validation failure;
-    // no signature is merely an unsigned intent.
+    // Hence an allowlist: nothing leaks through one.
+
+    /// A Google Pay personal QR — the exact shape of failure 3.
+    const personalQr =
+        'upi://pay?pa=prithivi2804raj@okicici&pn=Prithiviraj%20B&cu=INR'
+        '&mc=0000&mode=02&purpose=00&orgid=159761&sign=MEUCIQDxyz789';
+
+    /// A real merchant QR — the shape of failure 1.
     const merchantQr =
         'upi://pay?pa=chaikada@okhdfcbank&pn=Chai%20Kada&am=250.00&cu=INR'
         '&mc=5812&tr=TXN0099&sign=MEUCIQDabc123&orgid=159761&mode=01';
 
-    /// A personal PhonePe QR: no amount, but signed and marked as scanned.
-    const personalQr =
-        'upi://pay?pa=9786452324@axl&pn=SATHISH%20KUMAR&mc=0000&mode=02'
-        '&purpose=00&sign=MEUCIQDxyz789';
-
     UpiQrPayload scan(String raw) => UpiQr.parse(raw).payload!;
-
     Map<String, String> sentFor(String qr, num amount) =>
         UpiRequest.fromScan(scan(qr), amount: amount).toUri().queryParameters;
 
-    test('the payee-describing fields all survive', () {
-      final sent = sentFor(merchantQr, 250.00);
-      // Exactly what the first version threw away.
-      expect(sent['pa'], 'chaikada@okhdfcbank');
-      expect(sent['pn'], 'Chai Kada');
-      expect(sent['mc'], '5812');
-      expect(sent['tr'], 'TXN0099');
-      expect(sent['orgid'], '159761');
+    test('a personal QR sends only the payee, amount and currency', () {
+      final sent = sentFor(personalQr, 1);
+      expect(sent, {
+        'pa': 'prithivi2804raj@okicici',
+        'pn': 'Prithiviraj B',
+        'cu': 'INR',
+        'am': '1.00',
+      });
     });
 
-    test('the QR-session fields do not', () {
-      final sent = sentFor(merchantQr, 250.00);
+    test('mc=0000 means NOT a merchant, so it is not forwarded', () {
+      // Sending it asserts a merchant category on a P2P transfer.
+      expect(sentFor(personalQr, 1).containsKey('mc'), isFalse);
+    });
+
+    test('QR-origin fields never reach the intent', () {
+      final sent = sentFor(personalQr, 1);
+      for (final field in ['sign', 'mode', 'orgid', 'purpose']) {
+        expect(sent.containsKey(field), isFalse, reason: field);
+      }
+    });
+
+    test('a real merchant keeps its category and reference', () {
+      final sent = sentFor(merchantQr, 250);
+      expect(sent['mc'], '5812', reason: 'what stops P2M being metered as P2P');
+      expect(sent['tr'], 'TXN0099');
+      expect(sent['pa'], 'chaikada@okhdfcbank');
+      expect(sent['am'], '250.00');
+    });
+
+    test('a merchant QR still sheds its QR-origin fields', () {
+      final sent = sentFor(merchantQr, 250);
       expect(sent.containsKey('sign'), isFalse);
       expect(sent.containsKey('mode'), isFalse);
+      expect(sent.containsKey('orgid'), isFalse);
     });
 
-    test('a stale signature is never sent after the amount changes', () {
-      // The exact shape of the ₹100 failure: an open QR, signed, amount added.
-      final sent = sentFor(personalQr, 100);
-      expect(sent['am'], '100.00');
-      expect(sent.containsKey('sign'), isFalse,
-          reason: 'the signature no longer covers this content');
-      expect(sent.containsKey('mode'), isFalse,
-          reason: 'this arrives as an intent, not as a scan');
+    test('an unknown future field cannot leak through', () {
+      // The blocklist's failure mode, pinned so it cannot return.
+      const odd = 'upi://pay?pa=shop@ybl&pn=Shop&somethingNew=1&mtid=xyz';
+      final sent = sentFor(odd, 50);
+      expect(sent.keys.toSet(), {'pa', 'pn', 'am', 'cu'});
     });
 
-    test('an open QR still gets its amount and currency', () {
-      final sent = sentFor(personalQr, 340.5);
-      expect(sent['am'], '340.50');
-      expect(sent['cu'], 'INR');
-      expect(sent['pa'], '9786452324@axl');
-      expect(sent['mc'], '0000', reason: 'still describes the payee');
-      expect(sent['purpose'], '00');
+    test('the amount is always the one being paid, not the QR\'s', () {
+      expect(sentFor(merchantQr, 500)['am'], '500.00');
+      expect(sentFor(personalQr, 340.5)['am'], '340.50');
     });
 
-    test('an overridden amount replaces the QR\'s own', () {
-      final sent = sentFor(merchantQr, 500);
-      expect(sent['am'], '500.00');
-      expect(sent['mc'], '5812');
-    });
-
-    test('an unsigned QR is unaffected by any of this', () {
-      const plain = 'upi://pay?pa=kirana@ybl&pn=Kirana&mc=5411';
-      final sent = sentFor(plain, 60);
+    test('a note on the QR survives, since it describes the payment', () {
+      const withNote = 'upi://pay?pa=shop@ybl&pn=Shop&tn=Bill%2012&mc=5411';
+      final sent = sentFor(withNote, 60);
+      expect(sent['tn'], 'Bill 12');
       expect(sent['mc'], '5411');
-      expect(sent['am'], '60.00');
-      expect(sent['cu'], 'INR');
     });
 
     test('a hand-typed payee still builds a link, as before', () {
@@ -226,12 +235,77 @@ void main() {
       expect(request.isFromScan, isFalse);
       expect(request.toUri().queryParameters['pa'], 'hari@oksbi');
     });
+  });
 
-    test('a scanned request knows it came from a scan', () {
-      expect(
-        UpiRequest.fromScan(scan(merchantQr), amount: 250).isFromScan,
-        isTrue,
-      );
+  group('the VPA keeps its @ — the defect that broke every payment', () {
+    // Google Pay showed the right payee and the right ₹1, then ICICI declined
+    // with "you've exceeded the bank limit for this payment". On every phone,
+    // on every linked bank account, while the same QR scanned inside Google Pay
+    // worked. Captured from the device, the link this app actually sent was:
+    //
+    //   upi://pay?pa=prithivi2804raj%40okicici&pn=…&am=1.00&cu=INR
+    //
+    // `Uri(queryParameters:)` percent-encodes `@`. A VPA without a literal `@`
+    // is not a VPA — the payment app decodes it for DISPLAY, which is why the
+    // screen always looked right, and the network gets a malformed address.
+
+    test('a hand-typed payee sends a literal @', () {
+      final uri = UpiRequest(
+        payeeVpa: vpa('prithivi2804raj@okicici'),
+        payeeName: 'Prithiviraj B',
+        amount: 1,
+      ).toUri().toString();
+
+      expect(uri, contains('pa=prithivi2804raj@okicici'));
+      expect(uri, isNot(contains('%40')));
+    });
+
+    test('a scanned payee sends a literal @', () {
+      const qr = 'upi://pay?pa=prithivi2804raj@okicici&pn=Prithiviraj%20B'
+          '&cu=INR&mc=0000&mode=02&sign=abc';
+      final uri = UpiRequest.fromScan(UpiQr.parse(qr).payload!, amount: 1)
+          .toUri()
+          .toString();
+
+      expect(uri, contains('pa=prithivi2804raj@okicici'));
+      expect(uri, isNot(contains('%40')));
+    });
+
+    test('it still reads back correctly as a URI', () {
+      final uri = UpiRequest(
+        payeeVpa: vpa('prithivi2804raj@okicici'),
+        payeeName: 'Prithiviraj B',
+        amount: 1,
+      ).toUri();
+      expect(uri.queryParameters['pa'], 'prithivi2804raj@okicici');
+      expect(uri.queryParameters['pn'], 'Prithiviraj B');
+      expect(uri.queryParameters['am'], '1.00');
+    });
+
+    test('everything else is still escaped — a note cannot inject a param', () {
+      final uri = UpiRequest(
+        payeeVpa: vpa('shop@ybl'),
+        payeeName: 'Ram & Co.',
+        amount: 50,
+        note: 'rent & water',
+      ).toUri();
+
+      expect(uri.toString(), contains('%26'));
+      expect(uri.queryParameters['tn'], 'rent & water');
+      expect(uri.queryParameters['pn'], 'Ram & Co.');
+      expect(uri.queryParameters.containsKey('water'), isFalse);
+    });
+
+    test('a space is %20, never +', () {
+      // `Uri.encodeQueryComponent` uses `+` for spaces, which UPI reads
+      // literally.
+      final uri = UpiRequest(
+        payeeVpa: vpa('shop@ybl'),
+        payeeName: 'Chai Kada',
+        amount: 10,
+      ).toUri().toString();
+      expect(uri, contains('pn=Chai%20Kada'));
+      expect(uri, isNot(contains('+')));
     });
   });
 

@@ -136,70 +136,114 @@ class UpiRequest {
     if (raw != null) return _scannedUri(raw);
 
     final trimmedNote = note?.trim();
-    return Uri(
-      scheme: 'upi',
-      host: 'pay',
-      queryParameters: {
-        'pa': payeeVpa.value,
-        'pn': payeeName.trim().isEmpty ? payeeVpa.account : payeeName.trim(),
-        'am': formattedAmount,
-        'cu': 'INR',
-        if (trimmedNote != null && trimmedNote.isNotEmpty)
-          'tn': trimmedNote.length > maxNoteLength
-              ? trimmedNote.substring(0, maxNoteLength)
-              : trimmedNote,
-        if (transactionRef != null && transactionRef!.isNotEmpty)
-          'tr': transactionRef!,
-      },
-    );
+    return _upiUri({
+      'pa': payeeVpa.value,
+      'pn': payeeName.trim().isEmpty ? payeeVpa.account : payeeName.trim(),
+      'am': formattedAmount,
+      'cu': 'INR',
+      if (trimmedNote != null && trimmedNote.isNotEmpty)
+        'tn': trimmedNote.length > maxNoteLength
+            ? trimmedNote.substring(0, maxNoteLength)
+            : trimmedNote,
+      if (transactionRef != null && transactionRef!.isNotEmpty)
+        'tr': transactionRef!,
+    });
   }
 
-  /// Fields that describe a **QR session**, not the payment.
+  /// Percent-encoding that leaves `@` alone.
   ///
-  /// `sign` is a signature over the QR's own bytes and `mode=02` asserts "this
-  /// was scanned by the app performing it". Neither is true once the code has
-  /// been read by CoinCompass and handed to a payment app as an *intent* — and
-  /// carrying them across is worse than dropping them:
+  /// **This is what three "the bank declined" fixes were chasing.**
+  /// `Uri(queryParameters: …)` — and `Uri.encodeComponent` — encode `@` as
+  /// `%40`, so a payee address went out as
   ///
-  ///  * a signature that no longer matches its content is a **validation
-  ///    failure**, whereas no signature is simply an unsigned intent;
-  ///  * appending the amount to an open QR changes the very bytes `sign`
-  ///    covers, so any modification invalidates it by construction.
+  ///     pa=prithivi2804raj%40okicici
   ///
-  /// This is what a ₹100 payment to a personal PhonePe QR died on: Google Pay
-  /// displayed the right payee and the right amount, then ICICI declined with
-  /// "you've exceeded the bank limit" — a generic decline, not a real limit.
-  /// The same QR scanned inside Google Pay worked, because there the signature
-  /// still matched what had been scanned.
+  /// A VPA without a literal `@` is not a VPA. The payment app decodes it
+  /// happily *for display*, which is why the payee and amount always looked
+  /// right on screen, and then hands the network a malformed address — which
+  /// comes back as a generic decline, rendered by Google Pay as "you've
+  /// exceeded the bank limit for this payment" on a payment of ₹1.
   ///
-  /// Everything that *describes the payee* — `pa`, `pn`, `mc`, `tr`, `tn`,
-  /// `purpose`, `orgid` — is kept, which is what stops a merchant payment being
-  /// treated as person-to-person.
-  static const Set<String> _qrSessionFields = {'sign', 'signtype', 'mode'};
+  /// RFC 3986 permits `@` unescaped in a query; Dart is simply stricter than
+  /// the grammar. Everything else is encoded normally, so a note containing
+  /// `&` still cannot inject a parameter.
+  static String _encodeValue(String value) =>
+      Uri.encodeComponent(value).replaceAll('%40', '@');
 
-  /// The scanned link, converted into an intent.
+  /// Builds `upi://pay?…` by hand, for the reason above. `Uri` cannot express
+  /// this, so the string is assembled and only then parsed back.
+  static Uri _upiUri(Map<String, String> params) => Uri.parse(
+    'upi://pay?${params.entries.map((e) => '${e.key}=${_encodeValue(e.value)}').join('&')}',
+  );
+
+  /// The only fields an **intent** carries.
   ///
-  /// Descriptive fields are replayed exactly as the code carried them; the
-  /// QR-session fields above are dropped; and the amount is filled in when the
-  /// QR left it open, which is the shape of every personal and counter QR.
+  /// An allowlist, not a blocklist. The blocklist version of this banned
+  /// `sign` and `mode` and let everything else through — which meant a Google
+  /// Pay *personal* QR forwarded `mc=0000`, `orgid=159761` and `purpose=00`
+  /// into a person-to-person payment. Anything not thought of leaks through a
+  /// blocklist; nothing leaks through an allowlist.
+  ///
+  /// This is the set NPCI's linking spec defines for intent flows. Everything
+  /// else in a QR describes **the QR** — how it was generated, by whom, and a
+  /// signature over its bytes — and none of that survives being read by one app
+  /// and handed to another.
+  static const Set<String> _intentFields = {
+    'pa', // payee address — the only field money follows
+    'pn', // payee name
+    'am', // amount
+    'cu', // currency
+    'tn', // note
+    'tr', // transaction reference
+    'mc', // merchant category — see below, only for real merchants
+  };
+
+  /// `mc=0000` is a QR's way of saying **"not a merchant"**.
+  ///
+  /// Forwarding it as an intent parameter says the opposite: it asserts a
+  /// merchant category on what is a person-to-person transfer, and the bank
+  /// declines — in ICICI's words, *"you've exceeded the bank limit for this
+  /// payment"*, on a payment of **₹1**.
+  static bool _isRealMerchant(String? mc) {
+    final code = mc?.trim();
+    if (code == null || code.isEmpty) return false;
+    // "0000" and any all-zero variant mean no category.
+    return int.tryParse(code) != 0;
+  }
+
+  /// The scanned code, reduced to an intent.
+  ///
+  /// A QR and an intent are different things carrying overlapping data. Reading
+  /// a QR and handing a payment app an intent means **translating** between
+  /// them, not forwarding one as the other:
+  ///
+  ///  * `sign` signs the QR's own bytes, and filling in an amount changes them,
+  ///    so any signature is invalid by construction — and a signature that does
+  ///    not match is a validation failure where none at all is merely an
+  ///    unsigned intent;
+  ///  * `mode=02` claims the paying app scanned this itself, which stopped
+  ///    being true the moment CoinCompass read it;
+  ///  * `orgid` and `purpose` describe the QR's origin, not this payment;
+  ///  * `mc=0000` says "no merchant", so sending it asserts the opposite.
+  ///
+  /// What is left is the payee, the amount, and — for an actual merchant — the
+  /// category and reference that keep it from being metered as P2P.
   Uri _scannedUri(String raw) {
     final existing = Uri.parse(raw);
 
-    final params = <String, String>{
-      for (final entry in existing.queryParameters.entries)
-        if (!_qrSessionFields.contains(entry.key.toLowerCase()))
-          entry.key: entry.key.toLowerCase() == 'am'
-              ? formattedAmount
-              : entry.value,
-    };
+    final params = <String, String>{};
+    for (final entry in existing.queryParameters.entries) {
+      final key = entry.key.toLowerCase();
+      if (!_intentFields.contains(key)) continue;
+      if (key == 'mc' && !_isRealMerchant(entry.value)) continue;
+      if (key == 'am') continue; // set below, from what the user is paying
+      params[key] = entry.value;
+    }
 
-    // An open QR carries no `am` at all, so it has to be added rather than
-    // replaced. `cu` likewise: UPI defaults to INR, but saying so is free and
-    // some PSPs are fussier than the spec.
     params['am'] = formattedAmount;
-    params.putIfAbsent('cu', () => 'INR');
+    params['cu'] = 'INR';
 
-    return existing.replace(queryParameters: params);
+    return _upiUri(params);
   }
 
   /// Why an amount cannot be sent over UPI, or null when it can.

@@ -162,6 +162,55 @@ person-to-person, which was the first defect. `sign` and `mode` going is what
 stops a stale signature being validated, which was the second. Both failures
 came from treating the two groups as one thing.
 
+## The defect that actually broke every payment
+
+Three fixes above were reasoned from what a QR *probably* contains. All three
+were real improvements. **None of them was the bug.**
+
+The bug was found in one round by logging what the app actually sent:
+
+    UPI-OUT -> upi://pay?pa=prithivi2804raj%40okicici&pn=…&am=1.00&cu=INR
+
+**`pa=prithivi2804raj%40okicici`.** `Uri(queryParameters: …)` percent-encodes
+`@` as `%40`, and a payee address without a literal `@` is not a payee address.
+
+Why it took four attempts to see: the payment app **decodes `%40` for display**.
+Google Pay showed the right person, the verified banking name and the right
+amount every single time — so the link looked correct at the only point anyone
+could observe it. Only the network saw the malformed address, and the decline
+came back as *"You've exceeded the bank limit for this payment. Retry with a
+smaller amount."* on a payment of **₹1**.
+
+Every symptom follows from it:
+
+| symptom | explanation |
+|---|---|
+| right payee and amount on screen | the app decodes `%40` to display it |
+| ₹1 declined as a "limit" | generic decline for a malformed VPA |
+| failed on every phone | the encoding is in this app, not the phones |
+| failed on every linked bank account | ditto |
+| the same QR worked scanned inside Google Pay | Google Pay builds its own link, with a literal `@` |
+
+RFC 3986 permits `@` unescaped in a query; Dart is simply stricter than the
+grammar. Both the scan path and the hand-typed path now build the query by hand
+through one encoder that leaves `@` alone and escapes everything else, so a note
+containing `&` still cannot inject a parameter and a space is still `%20` rather
+than `+`.
+
+Verified on the device, same method that found it:
+
+    UPI-OUT -> upi://pay?pa=prithivi2804raj@okicici&pn=…&am=1.00&cu=INR
+
+and Google Pay proceeded to its PIN screen rather than declining.
+
+### The diagnostic stays
+
+`UPI-QR-IN` and `UPI-OUT` log the exact code read and the exact link sent.
+Four rounds were spent reasoning about what was probably being sent; one round
+with the real string ended it. The values are the owner's own, on the owner's
+own device, readable only by someone who already has developer access — which is
+a small price for never having to guess at this again.
+
 ## Platform
 
 `mobile_scanner` 7.4.0, QR format only — a UPI code is never a barcode, and

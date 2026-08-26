@@ -112,9 +112,16 @@ class MethodChannelUpiService implements UpiService {
     required UpiRequest request,
   }) async {
     try {
+      final uri = request.toUri().toString();
+      // Diagnostic. Three fixes for "the bank declined" were reasoned from what
+      // a QR *probably* contains rather than what this app *actually* sends;
+      // this prints the exact string so the next one is not a fourth guess.
+      // Visible with: adb logcat -s flutter | grep UPI
+      debugPrint('UPI-OUT -> $uri');
+
       final response = await _channel.invokeMethod<String>('pay', {
         'packageName': app.packageName,
-        'uri': request.toUri().toString(),
+        'uri': uri,
       });
       return UpiResult.parse(response);
     } on PlatformException catch (error) {
