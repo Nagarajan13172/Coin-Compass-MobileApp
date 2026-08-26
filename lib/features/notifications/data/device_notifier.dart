@@ -80,11 +80,18 @@ class LocalDeviceNotifier implements DeviceNotifier {
   Future<void> _initialise() async {
     await _plugin.initialize(
       settings: const InitializationSettings(
-        // The monochrome layer 6.7 already ships for Material You themed icons
-        // is the right shape for a status-bar icon too: Android renders the
-        // small icon as a silhouette, so the full-colour launcher icon would
-        // come out as a white blob.
-        android: AndroidInitializationSettings('ic_launcher_monochrome'),
+        // `drawable`, NOT `mipmap`. The plugin resolves this name with
+        // `getIdentifier(name, "drawable", pkg)`, so a mipmap-only asset
+        // resolves to 0 and `setSmallIcon` dies with a NullPointerException
+        // *inside the plugin* — the check runs, decides correctly, and then
+        // throws on the way to the shade. Found on the device: nothing
+        // appeared and nothing was persisted.
+        //
+        // The art is 6.7's Material You monochrome layer, copied into
+        // `drawable-*`: Android draws a status-bar icon from its alpha channel
+        // alone, so a silhouette is exactly right and the full-colour launcher
+        // icon would come out a white blob.
+        android: AndroidInitializationSettings('ic_stat_coincompass'),
         iOS: DarwinInitializationSettings(
           // Asked for explicitly in [requestPermission] instead, so the prompt
           // appears when the user turns the feature on rather than at launch.
@@ -154,16 +161,19 @@ class LocalDeviceNotifier implements DeviceNotifier {
       title: alert.title,
       body: alert.body,
       payload: alert.payload,
-      notificationDetails: const NotificationDetails(
+      notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           alertsChannelId,
           'Account alerts',
           importance: Importance.defaultImportance,
           priority: Priority.defaultPriority,
-          // The body is a full sentence and routinely longer than one line.
-          styleInformation: BigTextStyleInformation(''),
+          // The body is a full sentence and routinely longer than one line, so
+          // the expanded form gets the same text rather than an empty string —
+          // `BigTextStyleInformation('')` renders an expanded notification with
+          // nothing in it.
+          styleInformation: BigTextStyleInformation(alert.body),
         ),
-        iOS: DarwinNotificationDetails(),
+        iOS: const DarwinNotificationDetails(),
       ),
     );
   }

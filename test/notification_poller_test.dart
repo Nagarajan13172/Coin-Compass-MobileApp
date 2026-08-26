@@ -77,6 +77,25 @@ void main() {
     });
   });
 
+  group('turning it on', () {
+    // Regression: the device had POST_NOTIFICATIONS granted and the switch
+    // still refused, because setEnabled asked Android to *request* a permission
+    // it already had — and Android returns false once the decision is made.
+    test('an already-granted permission does not need requesting', () async {
+      notifier.permitted = true;
+      notifier.requestReturns = false; // what Android really returns
+
+      final poller = await pollerWith();
+      expect(poller.isEnabled, isTrue);
+      expect(await notifier.hasPermission(), isTrue);
+      expect(
+        notifier.requestCalls,
+        0,
+        reason: 'nothing should have been requested',
+      );
+    });
+  });
+
   group('the first check adopts', () {
     test('an existing feed is remembered, not announced', () async {
       final poller = await pollerWith();
@@ -199,6 +218,12 @@ class _FakeNotifier implements DeviceNotifier {
   final List<DeviceAlert> posted = [];
   bool permitted = true;
 
+  /// Android returns false from a request once the decision is already made —
+  /// including when it was already granted. Defaults to that behaviour so a
+  /// test cannot accidentally rely on requesting an already-granted permission.
+  bool requestReturns = false;
+  int requestCalls = 0;
+
   @override
   Future<void> initialise() async {}
 
@@ -206,7 +231,10 @@ class _FakeNotifier implements DeviceNotifier {
   Future<bool> hasPermission() async => permitted;
 
   @override
-  Future<bool> requestPermission() async => permitted;
+  Future<bool> requestPermission() async {
+    requestCalls++;
+    return requestReturns;
+  }
 
   @override
   Future<void> post(DeviceAlert alert) async => posted.add(alert);

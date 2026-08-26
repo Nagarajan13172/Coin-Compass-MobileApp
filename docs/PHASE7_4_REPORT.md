@@ -102,20 +102,66 @@ and said why.
 
 ## Verified on hardware
 
-CPH2569, Android 15, in Tamil.
+CPH2569, Android 15, in Tamil, against the live account.
 
-- The card renders in Settings, correctly **off by default**, no overflow.
-- **The permission-denied path is correct** — tapping the switch with
-  POST_NOTIFICATIONS denied left it off and explained what to do.
+Before the permission was granted, the **denied path** was confirmed: tapping
+the switch left it off and explained what to do, rather than claiming a state
+the app was not in.
 
-**Not verified: the happy path.** Android refuses synthetic taps on permission
-toggles by design (`adb shell pm grant` is rejected on this ROM, and `input tap`
-does not reach the system permission switch), so the grant has to be a real
-human tap. Once notifications are allowed for CoinCompass in system settings,
-the remaining path to check is: toggle on → first check adopts silently → a new
-server notification arrives → it rings → tapping it opens the right screen.
+With `POST_NOTIFICATIONS` granted, the whole path:
 
-The logic underneath is covered by 22 tests that do not need a phone.
+| | |
+|---|---|
+| Toggle | Turns on and stays on |
+| Background task | `androidx.work.systemjobscheduler` job registered for the package |
+| First check | *"Caught up… you will be told about the next one"*, and **nothing rang** — the six unread in the feed were adopted silently |
+| A burst | With the seen-list cleared, the same six became new: **five rang, one did not**, and all six were recorded. The shade grouped them under "CoinCompass" with a badge of **5** |
+| Content | `Recurring posted — Recurring posted 1 transaction (₹12,312).` and `Low balance — Cash is overdrawn (−₹7,50,633).` Indian grouping and the real minus sign, straight out of `NotificationCopy.of()` |
+| Tap | Opened `/recurring`, whose two rules are the −₹1,000 and −₹12,312 the notifications named |
+
+The burst was produced by clearing `notifications.surfaced` while leaving
+`notifications.adopted` set — no code was changed for the test, so the path
+exercised is the real one with real data.
+
+### Three defects the device found
+
+Every one of them would have shipped. All three are invisible to a widget test,
+because none of this code path exists off-device.
+
+**1. An already-granted permission turned the feature off.** `setEnabled` called
+`requestNotificationsPermission()` unconditionally, and Android returns **false**
+once the decision has been made — *including when it was already granted*. So
+the switch refused to turn on for exactly the users who had said yes. `dumpsys`
+said `granted=true` while the app insisted Android had refused. Now it checks
+first and only asks when there is something to ask for.
+
+**2. The small icon resolved to nothing.** `AndroidInitializationSettings` takes
+a name the plugin looks up with `getIdentifier(name, "drawable", pkg)`. 6.7's
+monochrome layer lives in `mipmap-*`, so it resolved to `0` and `setSmallIcon`
+died with a `NullPointerException` *inside the plugin*: the check ran, decided
+correctly, and threw on the way to the shade. The art is now copied into
+`drawable-*` as `ic_stat_coincompass`.
+
+**3. An empty `BigTextStyleInformation` was silently dropped.** With the icon
+fixed, `show()` returned without error, the ids were recorded — and **nothing
+appeared**. `BigTextStyleInformation('')` builds an expanded notification with
+no content, and Android discards it without a log line. Passing the real body
+fixed it, which is what it should always have been.
+
+The third is the one worth remembering: no exception, no log, correct state
+written, and no notification. Only looking at the phone could have caught it.
+
+### Two things to decide, not defects
+
+- **The notifications are in English while the app is in Tamil.**
+  `NotificationCopy.of()` is domain code composing strings directly; there is no
+  widget tree in a notification, so nothing passes through the translating
+  `Text`. Consistent behaviour would need the copy translated at compose time.
+- **Amounts appear in the shade, and on the lock screen.** `Cash is overdrawn
+  (−₹7,50,633)` is now visible without unlocking the phone, in an app that has
+  both an app lock and a wealth lock. The channel uses the system default
+  visibility; a finance app may want `VISIBILITY_PRIVATE`, or copy that names
+  the event without the figure.
 
 ## Platform notes
 

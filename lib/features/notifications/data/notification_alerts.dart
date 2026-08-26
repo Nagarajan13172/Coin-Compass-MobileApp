@@ -61,7 +61,15 @@ class DeviceAlertsController {
       return false;
     }
 
-    final granted = await _ref.read(deviceNotifierProvider).requestPermission();
+    // Ask only when there is something to ask for. Android's
+    // `requestNotificationsPermission()` returns false once the decision has
+    // already been made — including when it was already **granted** — so
+    // requesting unconditionally made the switch refuse to turn on for a user
+    // who had allowed notifications. Found on the device: `dumpsys` said
+    // `granted=true` while the toggle insisted Android had refused.
+    final notifier = _ref.read(deviceNotifierProvider);
+    final granted =
+        await notifier.hasPermission() || await notifier.requestPermission();
     if (!granted) return false;
 
     await poller.setEnabled(true);
