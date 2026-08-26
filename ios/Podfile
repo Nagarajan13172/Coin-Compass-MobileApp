@@ -1,5 +1,10 @@
 # Uncomment this line to define a global platform for your project
-# platform :ios, '13.0'
+# 7.5 — pinned, not commented out. `google_mlkit_commons` (added by 7.1's
+# runtime translation) requires iOS 15.5, and CocoaPods otherwise assumes 13.0
+# from the Xcode project and fails the whole install with a version conflict
+# rather than a useful message. Raising this is not a free choice: it drops iOS
+# 13 and 14 devices, which ML Kit already made unsupportable.
+platform :ios, '15.5'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'

@@ -6,6 +6,12 @@
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<!-- 7.5 — required by Apple whenever LocalAuthentication may use Face ID.
+	     Without it iOS does not fail the call, it TERMINATES the app, so the
+	     app lock would crash the first time it tried to unlock. Android needed
+	     no equivalent, which is why it was never noticed. -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>CoinCompass uses Face ID to unlock the app and your hidden net worth.</string>
 	<key>CFBundleDisplayName</key>
 	<string>CoinCompass</string>
 	<key>CFBundleExecutable</key>
