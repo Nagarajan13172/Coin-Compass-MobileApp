@@ -138,63 +138,83 @@ void main() {
     });
   });
 
-  group('a scanned QR is replayed, never rebuilt', () {
-    // THE bug this suite exists for. Rebuilding a link from the handful of
-    // fields this app understands drops `mc`, `sign`, `orgid`, `mode` and the
-    // merchant ids — and the payment app then treats a merchant payment as
-    // person-to-person, which merchants refuse ("payment failed") and which is
-    // metered against P2P limits ("exceeded for this account"). It failed on
-    // every phone it was tried on.
+  group('a scanned QR becomes an intent: descriptive fields kept, session fields dropped', () {
+    // Two real failures shaped this, one after the other.
+    //
+    // FIRST: the link was rebuilt from the five fields the parser understood,
+    // which dropped `mc` — so a merchant payment reached the app as
+    // person-to-person, and merchants refuse that ("payment failed",
+    // "exceeded for this account").
+    //
+    // SECOND: replaying the whole string fixed that but carried `sign` and
+    // `mode=02` across. A ₹100 payment to a personal PhonePe QR then showed the
+    // right payee and right amount in Google Pay and was declined by ICICI with
+    // "you've exceeded the bank limit" — a generic decline. The same QR scanned
+    // *inside* Google Pay worked, because there the signature still matched.
+    //
+    // A signature over content that has since changed is a validation failure;
+    // no signature is merely an unsigned intent.
     const merchantQr =
         'upi://pay?pa=chaikada@okhdfcbank&pn=Chai%20Kada&am=250.00&cu=INR'
         '&mc=5812&tr=TXN0099&sign=MEUCIQDabc123&orgid=159761&mode=01';
 
+    /// A personal PhonePe QR: no amount, but signed and marked as scanned.
+    const personalQr =
+        'upi://pay?pa=9786452324@axl&pn=SATHISH%20KUMAR&mc=0000&mode=02'
+        '&purpose=00&sign=MEUCIQDxyz789';
+
     UpiQrPayload scan(String raw) => UpiQr.parse(raw).payload!;
 
-    test('an accepted amount replays the string byte for byte', () {
-      final request = UpiRequest.fromScan(scan(merchantQr), amount: 250.00);
-      expect(request.toUri().toString(), merchantQr);
-    });
+    Map<String, String> sentFor(String qr, num amount) =>
+        UpiRequest.fromScan(scan(qr), amount: amount).toUri().queryParameters;
 
-    test('every merchant field survives', () {
-      final sent = UpiRequest.fromScan(scan(merchantQr), amount: 250.00)
-          .toUri()
-          .queryParameters;
-
-      // These are exactly what the old rebuild threw away.
+    test('the payee-describing fields all survive', () {
+      final sent = sentFor(merchantQr, 250.00);
+      // Exactly what the first version threw away.
+      expect(sent['pa'], 'chaikada@okhdfcbank');
+      expect(sent['pn'], 'Chai Kada');
       expect(sent['mc'], '5812');
-      expect(sent['sign'], 'MEUCIQDabc123');
-      expect(sent['orgid'], '159761');
-      expect(sent['mode'], '01');
       expect(sent['tr'], 'TXN0099');
+      expect(sent['orgid'], '159761');
     });
 
-    test('an open-amount QR gets the amount appended, nothing else touched', () {
-      const openQr =
-          'upi://pay?pa=kirana@ybl&pn=Kirana&mc=5411&sign=XYZ&orgid=159761';
-      final uri = UpiRequest.fromScan(scan(openQr), amount: 340.5).toUri();
-
-      expect(uri.queryParameters['am'], '340.50');
-      expect(uri.queryParameters['cu'], 'INR');
-      expect(uri.queryParameters['mc'], '5411');
-      expect(uri.queryParameters['sign'], 'XYZ');
-      // The original text is still a prefix — nothing before `am` was rewritten.
-      expect(uri.toString(), startsWith(openQr));
+    test('the QR-session fields do not', () {
+      final sent = sentFor(merchantQr, 250.00);
+      expect(sent.containsKey('sign'), isFalse);
+      expect(sent.containsKey('mode'), isFalse);
     });
 
-    test('an overridden amount replaces only am, keeping the rest', () {
-      final uri = UpiRequest.fromScan(scan(merchantQr), amount: 500).toUri();
-      expect(uri.queryParameters['am'], '500.00');
-      expect(uri.queryParameters['mc'], '5812');
-      expect(uri.queryParameters['sign'], 'MEUCIQDabc123');
-      expect(uri.queryParameters['pa'], 'chaikada@okhdfcbank');
+    test('a stale signature is never sent after the amount changes', () {
+      // The exact shape of the ₹100 failure: an open QR, signed, amount added.
+      final sent = sentFor(personalQr, 100);
+      expect(sent['am'], '100.00');
+      expect(sent.containsKey('sign'), isFalse,
+          reason: 'the signature no longer covers this content');
+      expect(sent.containsKey('mode'), isFalse,
+          reason: 'this arrives as an intent, not as a scan');
     });
 
-    test('a QR with no currency gets INR only when it has none', () {
-      const noCu = 'upi://pay?pa=shop@ybl&pn=Shop';
-      final uri = UpiRequest.fromScan(scan(noCu), amount: 10).toUri();
-      expect(uri.queryParameters['cu'], 'INR');
-      expect('cu='.allMatches(uri.toString()).length, 1);
+    test('an open QR still gets its amount and currency', () {
+      final sent = sentFor(personalQr, 340.5);
+      expect(sent['am'], '340.50');
+      expect(sent['cu'], 'INR');
+      expect(sent['pa'], '9786452324@axl');
+      expect(sent['mc'], '0000', reason: 'still describes the payee');
+      expect(sent['purpose'], '00');
+    });
+
+    test('an overridden amount replaces the QR\'s own', () {
+      final sent = sentFor(merchantQr, 500);
+      expect(sent['am'], '500.00');
+      expect(sent['mc'], '5812');
+    });
+
+    test('an unsigned QR is unaffected by any of this', () {
+      const plain = 'upi://pay?pa=kirana@ybl&pn=Kirana&mc=5411';
+      final sent = sentFor(plain, 60);
+      expect(sent['mc'], '5411');
+      expect(sent['am'], '60.00');
+      expect(sent['cu'], 'INR');
     });
 
     test('a hand-typed payee still builds a link, as before', () {
@@ -208,8 +228,10 @@ void main() {
     });
 
     test('a scanned request knows it came from a scan', () {
-      expect(UpiRequest.fromScan(scan(merchantQr), amount: 250).isFromScan,
-          isTrue);
+      expect(
+        UpiRequest.fromScan(scan(merchantQr), amount: 250).isFromScan,
+        isTrue,
+      );
     });
   });
 

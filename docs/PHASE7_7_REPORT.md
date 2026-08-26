@@ -125,6 +125,43 @@ Seven tests pin this, including that `mc`, `sign`, `orgid`, `mode` and `tr` all
 survive, and that an accepted amount round-trips to the original string
 character for character.
 
+## The second defect: a stale signature
+
+The replay fix above cured merchant QRs and broke personal ones.
+
+A ₹100 payment to a personal PhonePe QR (`9786452324@axl`) showed the **right
+payee, the right verified banking name and the right ₹100.00** in Google Pay,
+and was then declined by ICICI with *"Your money has not been debited — you've
+exceeded the bank limit for this payment."* ₹100 exceeds no real limit; banks
+map many unrelated decline codes onto that message.
+
+The decisive fact was that **the same QR scanned inside Google Pay worked.** So
+the link was at fault, not the account.
+
+The cause: replaying the string carried across `sign` and `mode=02`. Both
+describe a **QR session**, and neither is true once CoinCompass has read the code
+and handed a payment app an *intent*:
+
+- `sign` is a signature over the QR's own bytes. A personal QR carries no
+  amount, so filling one in changes the very content the signature covers — the
+  signature is invalid **by construction**. A signature that no longer matches
+  is a validation failure; no signature is merely an unsigned intent.
+- `mode=02` asserts "scanned by the app performing this payment", which stopped
+  being true the moment it arrived as an intent.
+
+### What is sent now
+
+A scanned QR is converted into an intent rather than replayed whole:
+
+| kept — describes the payee | dropped — describes the scan |
+|---|---|
+| `pa`, `pn`, `mc`, `tr`, `tn`, `purpose`, `orgid` | `sign`, `signType`, `mode` |
+
+`mc` staying is what keeps a merchant payment from being metered as
+person-to-person, which was the first defect. `sign` and `mode` going is what
+stops a stale signature being validated, which was the second. Both failures
+came from treating the two groups as one thing.
+
 ## Platform
 
 `mobile_scanner` 7.4.0, QR format only — a UPI code is never a barcode, and

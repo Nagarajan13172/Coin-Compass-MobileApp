@@ -154,46 +154,52 @@ class UpiRequest {
     );
   }
 
-  /// The scanned link, with the amount filled in only if it has to be.
+  /// Fields that describe a **QR session**, not the payment.
   ///
-  /// Three cases, and the first is the important one:
+  /// `sign` is a signature over the QR's own bytes and `mode=02` asserts "this
+  /// was scanned by the app performing it". Neither is true once the code has
+  /// been read by CoinCompass and handed to a payment app as an *intent* — and
+  /// carrying them across is worse than dropping them:
   ///
-  ///  * **The QR fixed the amount and the user accepted it** — the string is
-  ///    returned *untouched*. Not re-encoded, not reordered, not normalised. A
-  ///    signed QR's `sign` covers the exact bytes, so re-serialising it through
-  ///    `Uri` can invalidate the signature even when every value survives.
-  ///  * **The QR fixed no amount** — the common shop-counter shape. `am` (and
-  ///    `cu` if absent) is appended and nothing else is disturbed. Open QRs are
-  ///    designed to be completed this way.
-  ///  * **The user typed a different amount than the QR asked for** — `am` is
-  ///    replaced. This is the one case that can break a signature, and it is
-  ///    also the only case where the user has explicitly overruled the code in
-  ///    front of them.
+  ///  * a signature that no longer matches its content is a **validation
+  ///    failure**, whereas no signature is simply an unsigned intent;
+  ///  * appending the amount to an open QR changes the very bytes `sign`
+  ///    covers, so any modification invalidates it by construction.
+  ///
+  /// This is what a ₹100 payment to a personal PhonePe QR died on: Google Pay
+  /// displayed the right payee and the right amount, then ICICI declined with
+  /// "you've exceeded the bank limit" — a generic decline, not a real limit.
+  /// The same QR scanned inside Google Pay worked, because there the signature
+  /// still matched what had been scanned.
+  ///
+  /// Everything that *describes the payee* — `pa`, `pn`, `mc`, `tr`, `tn`,
+  /// `purpose`, `orgid` — is kept, which is what stops a merchant payment being
+  /// treated as person-to-person.
+  static const Set<String> _qrSessionFields = {'sign', 'signtype', 'mode'};
+
+  /// The scanned link, converted into an intent.
+  ///
+  /// Descriptive fields are replayed exactly as the code carried them; the
+  /// QR-session fields above are dropped; and the amount is filled in when the
+  /// QR left it open, which is the shape of every personal and counter QR.
   Uri _scannedUri(String raw) {
     final existing = Uri.parse(raw);
-    final hasAmount = scannedAmount != null;
 
-    if (hasAmount && scannedAmount == amount) return existing;
-
-    if (!hasAmount) {
-      final separator = existing.query.isEmpty ? '?' : '&';
-      final needsCurrency = !existing.queryParameters.keys
-          .any((k) => k.toLowerCase() == 'cu');
-      return Uri.parse(
-        '$raw$separator'
-        'am=$formattedAmount${needsCurrency ? '&cu=INR' : ''}',
-      );
-    }
-
-    // Replace `am` in place, leaving every other parameter — and their order —
-    // as the merchant wrote them.
-    final rebuilt = <String, String>{
+    final params = <String, String>{
       for (final entry in existing.queryParameters.entries)
-        entry.key: entry.key.toLowerCase() == 'am'
-            ? formattedAmount
-            : entry.value,
+        if (!_qrSessionFields.contains(entry.key.toLowerCase()))
+          entry.key: entry.key.toLowerCase() == 'am'
+              ? formattedAmount
+              : entry.value,
     };
-    return existing.replace(queryParameters: rebuilt);
+
+    // An open QR carries no `am` at all, so it has to be added rather than
+    // replaced. `cu` likewise: UPI defaults to INR, but saying so is free and
+    // some PSPs are fussier than the spec.
+    params['am'] = formattedAmount;
+    params.putIfAbsent('cu', () => 'INR');
+
+    return existing.replace(queryParameters: params);
   }
 
   /// Why an amount cannot be sent over UPI, or null when it can.
