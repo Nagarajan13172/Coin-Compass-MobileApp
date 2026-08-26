@@ -50,6 +50,7 @@ class UpiChannel(private val activity: Activity) {
         when (call.method) {
             "listApps" -> result.success(listApps())
             "pay" -> pay(call, result)
+            "openApp" -> openApp(call, result)
             else -> result.notImplemented()
         }
     }
@@ -140,6 +141,45 @@ class UpiChannel(private val activity: Activity) {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(uri)).setPackage(packageName)
         if (intent.resolveActivity(activity.packageManager) == null) {
             result.error("NO_APP", "That app can no longer handle payments.", null)
+            return
+        }
+
+        pending = result
+        try {
+            activity.startActivityForResult(intent, REQUEST_CODE)
+        } catch (error: Throwable) {
+            pending = null
+            result.error("LAUNCH_FAILED", error.message, null)
+        }
+    }
+
+    /**
+     * Opens a payment app at its own home screen, with no payment attached.
+     *
+     * This is the path for "just open PhonePe and let me pay however I like" —
+     * a QR scan, a saved contact, a phone number. UPI's own `upi://pay` link
+     * cannot express that: `pa` is required, so a link with no payee is
+     * rejected by the app after it opens.
+     *
+     * Nothing comes back from this. The app returns RESULT_CANCELED whenever
+     * the user navigates out, which says only that they came back — never
+     * whether they paid. The sheet therefore asks them.
+     */
+    private fun openApp(call: MethodCall, result: MethodChannel.Result) {
+        if (pending != null) {
+            result.error("BUSY", "A payment is already in progress.", null)
+            return
+        }
+
+        val packageName = call.argument<String>("packageName")
+        if (packageName.isNullOrBlank()) {
+            result.error("BAD_ARGS", "packageName is required.", null)
+            return
+        }
+
+        val intent = activity.packageManager.getLaunchIntentForPackage(packageName)
+        if (intent == null) {
+            result.error("NO_APP", "That app can no longer be opened.", null)
             return
         }
 

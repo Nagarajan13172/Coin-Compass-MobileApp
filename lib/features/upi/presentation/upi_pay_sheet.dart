@@ -69,6 +69,10 @@ class _UpiPaySheetState extends ConsumerState<UpiPaySheet> {
   UpiApp? _paying;
   UpiResult? _result;
 
+  /// Set when an app was opened with no payment attached and the user has come
+  /// back. Nothing was reported, so the sheet has to ask.
+  UpiApp? _askedAfterOpening;
+
   @override
   void initState() {
     super.initState();
@@ -117,26 +121,44 @@ class _UpiPaySheetState extends ConsumerState<UpiPaySheet> {
     );
   }
 
+  /// Two paths, and which one runs depends on whether a UPI ID was given.
+  ///
+  ///  * **With one** — a real `upi://pay` link, so the app opens on a payment
+  ///    screen with the payee and amount already filled in, and answers with a
+  ///    status when it is done.
+  ///  * **Without one** — the app is simply opened, and the payee is chosen
+  ///    inside it: a QR scan, a saved contact, a phone number. UPI's own link
+  ///    cannot express that (`pa` is required), and nothing comes back, so the
+  ///    sheet asks whether the payment happened.
+  ///
+  /// The second is the common case. Requiring a UPI ID up front made the app
+  /// tiles untappable, which is not what "open my payment app" means.
   Future<void> _pay(UpiApp app) async {
     final request = _request;
-    if (request == null || !request.isSendable) return;
-
     setState(() => _paying = app);
 
-    if (_remember) {
-      final book = await ref.read(upiPayeeBookProvider.future);
-      await book.remember(widget.payeeName, request.payeeVpa);
+    if (request != null) {
+      if (_remember) {
+        final book = await ref.read(upiPayeeBookProvider.future);
+        await book.remember(widget.payeeName, request.payeeVpa);
+      }
+      final result = await ref.read(upiServiceProvider).pay(
+        app: app,
+        request: request,
+      );
+      if (!mounted) return;
+      setState(() {
+        _paying = null;
+        _result = result;
+      });
+      return;
     }
 
-    final result = await ref.read(upiServiceProvider).pay(
-      app: app,
-      request: request,
-    );
-
+    await ref.read(upiServiceProvider).openApp(app);
     if (!mounted) return;
     setState(() {
       _paying = null;
-      _result = result;
+      _askedAfterOpening = app;
     });
   }
 
@@ -148,7 +170,17 @@ class _UpiPaySheetState extends ConsumerState<UpiPaySheet> {
 
     return _SheetBody(
       title: 'Pay with UPI',
-      child: _result != null
+      child: _askedAfterOpening != null
+          ? _AskIfPaid(
+              amount: widget.amount,
+              appLabel: _askedAfterOpening!.label,
+              onAnswer: (paid) => Navigator.of(context).pop(
+                paid
+                    ? const UpiResult(status: UpiStatus.unknown)
+                    : null,
+              ),
+            )
+          : _result != null
           ? _Outcome(
               result: _result!,
               amount: widget.amount,
@@ -309,8 +341,8 @@ class _Chooser extends ConsumerWidget {
         else ...[
           AppTextField(
             controller: vpaController,
-            label: 'Their UPI ID',
-            hint: 'name@bank',
+            label: 'Their UPI ID (optional)',
+            hint: 'Leave blank to pick inside the app',
             errorText: vpaError,
             keyboardType: TextInputType.emailAddress,
             onChanged: onVpaChanged,
@@ -365,6 +397,14 @@ class _Chooser extends ConsumerWidget {
             'Choose an app',
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.mutedForeground),
           ),
+          const SizedBox(height: 2),
+          Text(
+            vpa == null
+                ? 'Opens the app so you can scan or pick who to pay there. '
+                    'You will be asked afterwards whether it went through.'
+                : 'Opens the app with the amount and payee already filled in.',
+            style: TextStyle(fontSize: 11.5, color: c.mutedForeground),
+          ),
           const SizedBox(height: 10),
 
           switch (apps) {
@@ -389,7 +429,10 @@ class _Chooser extends ConsumerWidget {
                   _AppTile(
                     app: app,
                     busy: paying?.packageName == app.packageName,
-                    enabled: vpa != null && blocker == null && paying == null,
+                    // Tappable without a UPI ID: that path opens the app and
+                    // asks afterwards. Only a bad amount or an in-flight
+                    // payment closes it.
+                    enabled: blocker == null && paying == null,
                     onTap: () => onPay(app),
                   ),
               ],
@@ -505,6 +548,73 @@ class _AppTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// "Did it go through?" — the only honest question after opening an app that
+/// reports nothing.
+///
+/// Nothing is assumed. The launcher intent carries no result, so the app coming
+/// back says only that the user returned; they may have paid, abandoned it, or
+/// gone to check something. Guessing "yes" here would put money in the ledger
+/// that never left the account, which is the one thing this feature must not
+/// do.
+class _AskIfPaid extends StatelessWidget {
+  const _AskIfPaid({
+    required this.amount,
+    required this.appLabel,
+    required this.onAnswer,
+  });
+
+  final num amount;
+  final String appLabel;
+  final ValueChanged<bool> onAnswer;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Icon(LucideIcons.circleHelp, size: 20, color: c.warning),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    const TextSpan(text: 'Did you pay in '),
+                    // The app's own name, as Android reports it.
+                    TextSpan(text: appLabel),
+                    const TextSpan(text: '?'),
+                  ],
+                ),
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'The payment app does not tell CoinCompass what happened, so only you '
+          'know. Recording it adds the expense; it does not move any money.',
+          style: TextStyle(fontSize: 13, color: c.mutedForeground),
+        ),
+        const SizedBox(height: 20),
+        AppButton(
+          label: 'Yes — record ${Money.format(amount)}',
+          icon: LucideIcons.check,
+          onPressed: () => onAnswer(true),
+        ),
+        const SizedBox(height: 8),
+        AppButton(
+          label: "No, I didn't pay",
+          variant: AppButtonVariant.outlined,
+          onPressed: () => onAnswer(false),
+        ),
+      ],
     );
   }
 }

@@ -33,7 +33,24 @@ the feature was designed around it.
 
 ## The design
 
-**Amount → sheet → app → result → you decide.**
+**Amount → sheet → app → back → you decide.**
+
+There are two paths, and the UPI ID decides which:
+
+**Without a UPI ID — the common one.** Tap an app, it opens at its own home
+screen, and you pick who to pay *there*: a QR scan, a saved contact, a phone
+number. Nothing comes back — a launcher intent carries no result — so the sheet
+asks **"Did you pay in GPay?"** and records only if you say yes.
+
+This is the path the owner actually wanted, and the first build did not have it.
+Requiring a UPI ID up front left every app tile greyed out and untappable, which
+is not what "open my payment app" means. UPI's own link cannot express
+"payee unknown" either: `pa` is required, so a link without one is rejected by
+the app after it opens.
+
+**With a UPI ID.** A real `upi://pay` link, so the app opens on a payment screen
+with payee and amount already filled in, and answers with a status when it is
+done.
 
 The sheet is the app's own, not the system chooser: it lists installed apps with
 their real launcher icons, so the choice happens inside CoinCompass, which is
@@ -77,6 +94,12 @@ accepts the link and *then* rejects it, which reads as this app being broken.
 
 ## Three defects the device found
 
+**0. The app tiles could not be tapped at all.** Not strictly a defect — the
+first build did exactly what it was designed to do — but the design was wrong.
+Every tile required a UPI ID first, so the sheet listed five apps and opened
+none of them. Fixed by making the ID optional and adding the open-and-ask path
+above, which is what the feature was for.
+
 **1. The button never enabled.** `AmountField.onChanged` only calls `setState`
 to clear an error, so a button reading the amount at build time never learned it
 had been typed and sat disabled forever. It is now rebuilt from the controller
@@ -107,7 +130,13 @@ app found on this phone" on a phone with five of them.
 
 ## Verified on hardware
 
-CPH2569, Android 15. The button appears on **Expense** only — UPI sends money
+CPH2569, Android 15. The whole flow, end to end: type ₹250 → **Pay ₹250 with
+UPI** → the sheet lists GPay, HDFC Bank App, Paytm, PhonePe and WhatsApp with
+their real icons → tap **GPay** → *Google Pay opens*
+(`com.google.android.apps.nbu.paisa.user/…MainActivity` takes focus) → come back
+→ **"Did you pay in GPay?"** with *Yes — record ₹250* and *No, I didn't pay*.
+
+The button appears on **Expense** only — UPI sends money
 out, so offering it on an income row would be a control that cannot do what it
 says — reads *"Pay ₹250 with UPI"*, and opens a sheet listing GPay, HDFC Bank
 App, Paytm, PhonePe and WhatsApp with their real icons, greyed until a UPI ID is

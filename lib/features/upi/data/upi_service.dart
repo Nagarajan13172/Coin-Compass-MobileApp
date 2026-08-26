@@ -55,6 +55,13 @@ abstract class UpiService {
     required UpiRequest request,
   });
 
+  /// Opens [app] at its own home screen with no payment attached, for when the
+  /// payee is chosen inside that app — a QR scan, a saved contact, a number.
+  ///
+  /// Returns when the user comes back. It cannot say whether they paid: the
+  /// launcher intent carries no result, so the caller has to ask.
+  Future<void> openApp(UpiApp app);
+
   /// UPI is an Indian mobile-payments scheme with an Android intent contract
   /// and no iOS equivalent, so this is false everywhere else — the entry point
   /// hides rather than offering something that cannot work.
@@ -85,6 +92,17 @@ class MethodChannelUpiService implements UpiService {
       return const [];
     } on MissingPluginException {
       return const [];
+    }
+  }
+
+  @override
+  Future<void> openApp(UpiApp app) async {
+    try {
+      await _channel.invokeMethod<String>('openApp', {
+        'packageName': app.packageName,
+      });
+    } on PlatformException {
+      // Opening failed, so there is nothing to have paid. The sheet stays put.
     }
   }
 
