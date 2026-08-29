@@ -47,8 +47,11 @@ String _navInsights(L l) => l.navInsights;
 String _navNotifications(L l) => l.navNotifications;
 String _navSettings(L l) => l.navSettings;
 
-/// The bottom bar's fifth slot, which opens the sheet rather than a route.
+/// The bottom bar's two action slots. Neither is a route: "More" opens a
+/// sheet, and "Scan" starts the Scan & Pay flow — so they have a label and an
+/// icon but no path to be active on.
 String navMoreLabel(L l) => l.navMore;
+String navScanLabel(L l) => l.navScan;
 
 const List<Destination> appDestinations = [
   Destination('/', _navDashboard, LucideIcons.layoutGrid),
@@ -70,15 +73,28 @@ const List<Destination> appDestinations = [
   Destination('/settings', _navSettings, LucideIcons.settings),
 ];
 
-/// The four tab slots either side of the centre FAB.
+/// The **route** tabs in the bottom bar, both to the left of the centre FAB.
+///
+/// The two slots on the right are actions rather than destinations — Scan and
+/// More — so they are built in `_BottomNav` from [navScanLabel] and
+/// [navMoreLabel] instead of living here.
+///
+/// A centred FAB needs the same number of slots either side of it, so the bar
+/// holds four and no more. 7.8 spent the fourth on Scan: a payment is made at
+/// a counter with one hand and cannot wait behind two taps, while Reports is
+/// read sitting down and lost nothing by moving into the More sheet, where it
+/// is now the first row.
 const List<Destination> tabDestinations = [
   Destination('/', _navDashboard, LucideIcons.layoutGrid),
   Destination('/transactions', _navTransactions, LucideIcons.arrowRightLeft),
-  Destination('/reports', _navReports, LucideIcons.chartPie),
 ];
 
 /// Everything reachable from the "More" sheet.
 const List<Destination> moreDestinations = [
+  // First row: 7.8 moved Reports off the bottom bar to make room for Scan, and
+  // a demoted destination that lands at the bottom of a 15-row sheet has been
+  // removed rather than moved.
+  Destination('/reports', _navReports, LucideIcons.chartPie),
   Destination('/calendar', _navCalendar, LucideIcons.calendar),
   Destination('/budgets', _navBudgets, LucideIcons.wallet),
   Destination('/goals', _navGoals, LucideIcons.goal),

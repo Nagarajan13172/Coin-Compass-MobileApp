@@ -75,6 +75,14 @@ class UpiResult {
   ///
   ///  * **keys are matched case-insensitively**, because apps disagree about
   ///    `Status` vs `status` and about `txnId` vs `txnid`;
+  ///  * **a bare status word is read as one.** Google Pay answers a declined
+  ///    intent with the single token `FAILURE` and no `=` anywhere in it. Split
+  ///    on `&` and matched on `key=value`, that produced no fields at all, so
+  ///    the status came out [UpiStatus.unknown] — and unknown is the branch
+  ///    that *asks the owner whether they paid*, leading with "Yes — record
+  ///    ₹1" for a payment the app had just said failed. Recording money that
+  ///    never left the account is the one outcome this class exists to prevent,
+  ///    so a response with no pairs in it is tried whole;
   ///  * an unrecognised status is [UpiStatus.unknown], never a default of
   ///    success or failure — guessing either way misinforms about money;
   ///  * `null` or empty is [UpiStatus.cancelled], which is what a back press
@@ -92,8 +100,13 @@ class UpiResult {
           pair.substring(index + 1).trim();
     }
 
+    // Only when there were no pairs to read. A response that *is* a query
+    // string but happens to omit `status` stays unknown — the whole string is
+    // not a status word there, and pretending otherwise would be a guess.
+    final status = fields['status'] ?? (fields.isEmpty ? response : null);
+
     return UpiResult(
-      status: _statusOf(fields['status']),
+      status: _statusOf(status),
       transactionId: _clean(fields['txnid']),
       transactionRef: _clean(fields['txnref']),
       responseCode: _clean(fields['responsecode']),

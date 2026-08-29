@@ -80,6 +80,10 @@
   "@navMore": {
     "description": "migrated from nav.more"
   },
+  "navScan": "Scan",
+  "@navScan": {
+    "description": "Bottom-nav slot that scans a UPI QR and pays it"
+  },
   "actionAdd": "Add",
   "@actionAdd": {
     "description": "migrated from action.add"

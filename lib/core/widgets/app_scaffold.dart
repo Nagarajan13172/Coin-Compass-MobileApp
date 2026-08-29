@@ -7,6 +7,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../features/auth/presentation/auth_providers.dart';
 import '../../features/notifications/data/notifications_repository.dart';
+import '../../features/upi/presentation/scan_pay_flow.dart';
 import '../api/stale_ledger.dart';
 import '../../l10n/app_localizations.dart';
 import '../i18n/locale_controller.dart';
@@ -400,7 +401,10 @@ class _BottomNav extends ConsumerWidget {
             children: [
               Row(
                 children: [
-                  for (final d in tabDestinations.take(2))
+                  // Two routes on the left, two actions on the right, and the
+                  // FAB centred in the gap between them. The count is what
+                  // keeps the FAB centred — see [tabDestinations].
+                  for (final d in tabDestinations)
                     Expanded(
                       child: _NavItem(
                         destination: d,
@@ -411,9 +415,20 @@ class _BottomNav extends ConsumerWidget {
                   const Expanded(child: SizedBox.shrink()),
                   Expanded(
                     child: _NavItem(
-                      destination: tabDestinations[2],
-                      active: _isActive(tabDestinations[2].path),
-                      onTap: () => context.go(tabDestinations[2].path),
+                      // 7.8 — scan a shop's UPI QR, pay it, and record the
+                      // expense. Never "active": it is an action, not a
+                      // destination, and nothing it opens is a route.
+                      destination: const Destination(
+                        '',
+                        navScanLabel,
+                        LucideIcons.scanLine,
+                      ),
+                      active: false,
+                      onTap: () => startScanAndPay(
+                        context,
+                        ref,
+                        location: location,
+                      ),
                     ),
                   ),
                   Expanded(

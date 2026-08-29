@@ -276,14 +276,51 @@ void main() {
     expect(find.byType(ImportScreen), findsNothing);
   });
 
-  testWidgets('the bottom nav reaches the real Reports screen', (tester) async {
+  testWidgets('the More sheet reaches the real Reports screen', (tester) async {
     await boot(tester);
-    // Reports is a tab, not a More row — it is one of the four slots either
-    // side of the centre FAB.
-    await tester.tap(find.text('Reports').first);
+    // 7.8 spent the bottom bar's fourth slot on Scan, so Reports moved into
+    // the More sheet — as its FIRST row, which is the part worth pinning: a
+    // demoted destination that lands at the bottom of a 15-row scroller has
+    // been removed rather than moved.
+    await tester.tap(find.text('More'));
+    await settle(tester);
+
+    final rows = find.descendant(
+      of: find.byType(MoreSheet),
+      matching: find.byType(ListTile),
+    );
+    expect(
+      find.descendant(of: rows.first, matching: find.text('Reports')),
+      findsOneWidget,
+      reason: 'Reports is the first More row',
+    );
+
+    await tester.tap(
+      find.descendant(of: find.byType(MoreSheet), matching: find.text('Reports')),
+    );
     await settle(tester);
     expect(find.byType(ReportsScreen), findsOneWidget);
     expect(find.text('Analyse your income and spending'), findsOneWidget);
+  });
+
+  testWidgets('the bottom bar carries a Scan slot, and it is not a route', (
+    tester,
+  ) async {
+    await boot(tester);
+
+    // The slot exists and is reachable from every shell screen — that is the
+    // whole point of it being in the bar rather than inside the transaction
+    // form, where 7.7 put the scanner.
+    expect(find.text('Scan'), findsOneWidget);
+    expect(find.byIcon(LucideIcons.scanLine), findsOneWidget);
+
+    // Four route-or-action slots plus the centre FAB. The count is load-bearing:
+    // the FAB is centred by having the same number of slots either side of it,
+    // so a fifth would push it off-centre.
+    for (final label in ['Dashboard', 'Transactions', 'Scan', 'More']) {
+      expect(find.text(label), findsWidgets, reason: label);
+    }
+    expect(find.text('Reports'), findsNothing, reason: 'moved into More');
   });
 
   testWidgets('the More sheet reaches every phase-5 screen', (tester) async {

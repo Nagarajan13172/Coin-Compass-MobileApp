@@ -93,7 +93,35 @@ void main() {
     test('omits optional fields rather than sending empties', () {
       final uri = request().toUri();
       expect(uri.queryParameters.containsKey('tn'), isFalse);
-      expect(uri.queryParameters.containsKey('tr'), isFalse);
+    });
+
+    test('a hand-typed P2P payment sends no reference', () {
+      // NPCI documents `tr` as mandatory for MERCHANT transactions and asks
+      // nothing of it for a person-to-person transfer. The device found the
+      // cost of assuming otherwise: ICICI declined ₹1 to a personal VPA that
+      // Google Pay had rendered perfectly, banking name and all. Same argument
+      // that already drops `mc=0000` — do not assert merchant-shaped things
+      // about a payment that declares itself not to be one.
+      expect(request().toUri().queryParameters.containsKey('tr'), isFalse);
+    });
+
+    test('a caller that supplied its own reference keeps it', () {
+      expect(request(ref: 'INVOICE99').toUri().queryParameters['tr'], 'INVOICE99');
+    });
+
+    test('one is still minted and held, just not sent', () {
+      // A response that echoes a reference back can still be matched against
+      // it; what changed is only whether it goes out on a P2P link.
+      final tr = request().transactionRef;
+      expect(tr, isNotEmpty);
+      expect(tr, matches(RegExp(r'^[A-Za-z0-9]{1,35}$')));
+    });
+
+    test('two requests never share a reference', () {
+      // A shared `tr` would be worse than none: a PSP that de-duplicates on it
+      // reads the second payment to the same shop as a replay of the first.
+      final refs = {for (var i = 0; i < 50; i++) request().transactionRef};
+      expect(refs.length, 50);
     });
 
     test('falls back to the VPA account when no name is given', () {
@@ -171,13 +199,35 @@ void main() {
         UpiRequest.fromScan(scan(qr), amount: amount).toUri().queryParameters;
 
     test('a personal QR sends only the payee, amount and currency', () {
-      final sent = sentFor(personalQr, 1);
-      expect(sent, {
+      // Exactly the minimal NPCI P2P intent — the four fields every working
+      // reference implementation sends, and nothing else.
+      expect(sentFor(personalQr, 1), {
         'pa': 'prithivi2804raj@okicici',
         'pn': 'Prithiviraj B',
         'cu': 'INR',
         'am': '1.00',
       });
+    });
+
+    test('mc=0000 means P2P, so no merchant reference is invented', () {
+      expect(sentFor(personalQr, 1).containsKey('tr'), isFalse);
+    });
+
+    test('a merchant QR with no reference of its own gets a fresh one', () {
+      // `tr` IS mandatory here — mc=5812 says this really is a merchant.
+      const shop = 'upi://pay?pa=chaikada@okhdfcbank&pn=Chai%20Kada&mc=5812';
+      final first = sentFor(shop, 250)['tr'];
+      final second = sentFor(shop, 250)['tr'];
+      expect(first, isNotNull);
+      expect(first, isNot(second), reason: 'a spent tr is itself a decline');
+    });
+
+    test("a merchant's own reference is kept, never replaced", () {
+      // A dynamic merchant QR carries the invoice number the shop expects to
+      // reconcile against. Inventing a different one settles it against
+      // nothing.
+      expect(sentFor(merchantQr, 250)['tr'], 'TXN0099');
+      expect(sentFor(merchantQr, 250)['tr'], 'TXN0099');
     });
 
     test('mc=0000 means NOT a merchant, so it is not forwarded', () {
@@ -309,6 +359,59 @@ void main() {
     });
   });
 
+  group('the payee-only link — payee handed over, amount left blank', () {
+    // A pre-set amount is the one thing separating this from the flow that
+    // demonstrably works: scanning inside Google Pay means TYPING the amount
+    // there and it goes through, while an intent carrying `am` was declined by
+    // the bank every time at ₹1. So the payee is handed over and the amount is
+    // not.
+    const personalQr =
+        'upi://pay?pa=prithivi2804raj@okicici&pn=Prithiviraj%20B&cu=INR'
+        '&mc=0000&mode=02&purpose=00&orgid=159761&sign=abc';
+
+    UpiRequest scanned(String qr, num amount) =>
+        UpiRequest.fromScan(UpiQr.parse(qr).payload!, amount: amount);
+
+    test('carries the payee and no amount', () {
+      final sent = scanned(personalQr, 1).payeeOnlyUri().queryParameters;
+      expect(sent['pa'], 'prithivi2804raj@okicici');
+      expect(sent['pn'], 'Prithiviraj B');
+      expect(sent['cu'], 'INR');
+      expect(sent.containsKey('am'), isFalse, reason: 'the whole point');
+    });
+
+    test('still keeps the @ literal', () {
+      final uri = scanned(personalQr, 1).payeeOnlyUri().toString();
+      expect(uri, contains('pa=prithivi2804raj@okicici'));
+      expect(uri, isNot(contains('%40')));
+    });
+
+    test('QR-session fields stay out of it', () {
+      final sent = scanned(personalQr, 1).payeeOnlyUri().queryParameters;
+      for (final f in ['sign', 'mode', 'orgid', 'purpose', 'mc']) {
+        expect(sent.containsKey(f), isFalse, reason: f);
+      }
+    });
+
+    test('a real merchant keeps its category', () {
+      const shop = 'upi://pay?pa=chaikada@okhdfcbank&pn=Chai%20Kada&mc=5812';
+      final sent = scanned(shop, 250).payeeOnlyUri().queryParameters;
+      expect(sent['mc'], '5812');
+      expect(sent.containsKey('am'), isFalse);
+    });
+
+    test('a hand-typed payee works too', () {
+      final sent = UpiRequest(
+        payeeVpa: vpa('hari@oksbi'),
+        payeeName: 'Hari',
+        amount: 500,
+      ).payeeOnlyUri().queryParameters;
+      expect(sent['pa'], 'hari@oksbi');
+      expect(sent['pn'], 'Hari');
+      expect(sent.containsKey('am'), isFalse);
+    });
+  });
+
   group('the response is not proof', () {
     test('reads a normal success', () {
       final result = UpiResult.parse(
@@ -366,6 +469,38 @@ void main() {
     test('the raw response is kept for anything unreadable', () {
       const raw = 'Status=WEIRD&somethingNew=1';
       expect(UpiResult.parse(raw).raw, raw);
+    });
+
+    test('a bare status word is read as one — the device found this', () {
+      // Google Pay answers a declined intent with exactly this: one token, no
+      // `=` anywhere. Matched only on `key=value` it produced no fields, the
+      // status came out unknown, and unknown is the branch that asks the owner
+      // whether they paid — leading with "Yes — record ₹1" for a payment
+      // Google Pay had just said failed.
+      final result = UpiResult.parse('FAILURE');
+      expect(result.status, UpiStatus.failure);
+      expect(result.mayHavePaid, isFalse, reason: 'the whole point');
+      expect(result.raw, 'FAILURE');
+    });
+
+    test('the other bare words too, and case does not matter', () {
+      expect(UpiResult.parse('SUCCESS').status, UpiStatus.success);
+      expect(UpiResult.parse('submitted').status, UpiStatus.pending);
+      expect(UpiResult.parse('  Failed  ').status, UpiStatus.failure);
+    });
+
+    test('a bare word that is not a status stays unknown', () {
+      // Still never a guess either way.
+      expect(UpiResult.parse('WHO_KNOWS').status, UpiStatus.unknown);
+    });
+
+    test('a real query string missing `status` is NOT read whole', () {
+      // The fallback applies only when there were no pairs at all. Here there
+      // are, so the whole string is not a status word and reading it as one
+      // would be the guess this class refuses to make.
+      final result = UpiResult.parse('txnId=X1&approvalRefNo=99');
+      expect(result.status, UpiStatus.unknown);
+      expect(result.transactionId, 'X1');
     });
 
     test('a value containing = survives', () {

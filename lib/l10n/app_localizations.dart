@@ -217,6 +217,12 @@ abstract class L {
   /// **'More'**
   String get navMore;
 
+  /// Bottom-nav slot that scans a UPI QR and pays it
+  ///
+  /// In en, this message translates to:
+  /// **'Scan'**
+  String get navScan;
+
   /// migrated from action.add
   ///
   /// In en, this message translates to:

@@ -45,14 +45,42 @@ class UpiApp {
   }
 }
 
+/// How much of the payment is handed to the payment app.
+///
+/// Three rungs, tried in this order, each one giving away less. The app always
+/// starts at the top: [prefilled] is the feature — scan the shop's code and
+/// approve it with a PIN, nothing retyped. The rungs below exist because a PSP
+/// can refuse a link this app has no way to make it accept, and being dropped
+/// one rung is better than being told to start again somewhere else.
+enum UpiHandover {
+  /// Payee **and amount**. The payment app opens on a filled-in payment ready
+  /// to approve.
+  prefilled,
+
+  /// Payee only — the amount is typed in the payment app. The retry when a
+  /// pre-filled link comes back refused.
+  payeeOnly,
+
+  /// The payment app's own home screen, nothing attached. The last resort, and
+  /// the only option when there is no VPA to pay to at all.
+  appOnly,
+}
+
 abstract class UpiService {
   /// Empty when nothing can pay — no UPI app, or a platform that has no UPI.
   Future<List<UpiApp>> installedApps();
 
-  /// Launches [request] in [packageName] and waits for the app to come back.
+  /// Launches [request] in [app] and waits for the app to come back.
+  ///
+  /// [handover] chooses how much of the payment goes with it. Every rung goes
+  /// out as a `upi://pay` intent through `startActivityForResult`, so all of
+  /// them can come back with a result — [UpiHandover.payeeOnly] included, since
+  /// the payment app still knows it was launched for a payment even when the
+  /// amount was typed inside it.
   Future<UpiResult> pay({
     required UpiApp app,
     required UpiRequest request,
+    UpiHandover handover = UpiHandover.prefilled,
   });
 
   /// Opens [app] at its own home screen with no payment attached, for when the
@@ -110,19 +138,29 @@ class MethodChannelUpiService implements UpiService {
   Future<UpiResult> pay({
     required UpiApp app,
     required UpiRequest request,
+    UpiHandover handover = UpiHandover.prefilled,
   }) async {
     try {
-      final uri = request.toUri().toString();
+      final uri = switch (handover) {
+        UpiHandover.prefilled => request.toUri(),
+        UpiHandover.payeeOnly => request.payeeOnlyUri(),
+        // Nothing here can launch a home screen; that is `openApp`. Treated as
+        // payee-only rather than thrown on, because refusing to pay at the last
+        // rung would strand the caller.
+        UpiHandover.appOnly => request.payeeOnlyUri(),
+      }.toString();
+
       // Diagnostic. Three fixes for "the bank declined" were reasoned from what
       // a QR *probably* contains rather than what this app *actually* sends;
       // this prints the exact string so the next one is not a fourth guess.
       // Visible with: adb logcat -s flutter | grep UPI
-      debugPrint('UPI-OUT -> $uri');
+      debugPrint('UPI-OUT (${handover.name}) -> $uri');
 
       final response = await _channel.invokeMethod<String>('pay', {
         'packageName': app.packageName,
         'uri': uri,
       });
+      debugPrint('UPI-IN  <- ${response ?? '(nothing)'}');
       return UpiResult.parse(response);
     } on PlatformException catch (error) {
       // A launch that never happened is not a failed payment, and must not be

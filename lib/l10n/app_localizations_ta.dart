@@ -69,6 +69,9 @@ class LTa extends L {
   String get navMore => 'More';
 
   @override
+  String get navScan => 'Scan';
+
+  @override
   String get actionAdd => 'Add';
 
   @override

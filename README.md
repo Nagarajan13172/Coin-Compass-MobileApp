@@ -27,6 +27,10 @@ flutter run
 Requires the Flutter SDK matching `environment.sdk: ^3.12.0` in
 [pubspec.yaml](pubspec.yaml).
 
+To run on a physical phone with no cable attached — `adb pair` on Android, the
+Xcode network handshake on iOS, plus the troubleshooting table — see
+[Wireless development](docs/WIRELESS_DEV.md).
+
 ## Project layout
 
 ```
@@ -49,3 +53,6 @@ flutter test
 
 - [Specification](docs/SPEC.md)
 - [Roadmap](docs/ROADMAP.md)
+- [Wireless development](docs/WIRELESS_DEV.md) — running on a phone over Wi-Fi
+- [Releasing](docs/RELEASE.md)
+- [Scan & pay (UPI)](docs/PHASE7_8_REPORT.md) — how the scan → pay → record flow works

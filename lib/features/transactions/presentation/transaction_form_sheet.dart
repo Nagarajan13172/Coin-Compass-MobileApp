@@ -39,12 +39,22 @@ import 'widgets/type_selector.dart';
 ///
 /// [initialDate] dates a new row, for callers that already have a day in hand —
 /// the Calendar's "Add on this day". Also ignored when [existing] is given.
+///
+/// [initialAmount], [initialPayee], [initialNote] and [initialScanned] are the
+/// 7.8 Scan-&-Pay entry point: a payment that has just been made carries its
+/// own amount, payee and UPI reference, and the owner should be confirming an
+/// account and a category rather than retyping what the QR already said. All
+/// four are ignored when [existing] is given.
 Future<Transaction?> showTransactionSheet(
   BuildContext context,
   WidgetRef ref, {
   Transaction? existing,
   TransactionType? initialType,
   DateTime? initialDate,
+  num? initialAmount,
+  String? initialPayee,
+  String? initialNote,
+  UpiQrPayload? initialScanned,
 }) {
   // Warm the picker caches so the account/category sheets open with data.
   ref.read(accountsProvider);
@@ -58,6 +68,10 @@ Future<Transaction?> showTransactionSheet(
       existing: existing,
       initialType: initialType,
       initialDate: initialDate,
+      initialAmount: initialAmount,
+      initialPayee: initialPayee,
+      initialNote: initialNote,
+      initialScanned: initialScanned,
     ),
   );
 }
@@ -70,6 +84,10 @@ class TransactionFormSheet extends ConsumerStatefulWidget {
     this.existing,
     this.initialType,
     this.initialDate,
+    this.initialAmount,
+    this.initialPayee,
+    this.initialNote,
+    this.initialScanned,
   });
 
   /// Null creates a transaction (POST); otherwise the sheet prefills and
@@ -81,6 +99,16 @@ class TransactionFormSheet extends ConsumerStatefulWidget {
 
   /// Which day a *new* row is dated. Defaults to today.
   final DateTime? initialDate;
+
+  /// What a *new* row starts out saying. Filled by the Scan & Pay flow from
+  /// the code that was scanned and the payment that was just made.
+  final num? initialAmount;
+  final String? initialPayee;
+  final String? initialNote;
+
+  /// The code the payment came from, so "Pay with UPI" inside the sheet pays
+  /// the same payee rather than starting over.
+  final UpiQrPayload? initialScanned;
 
   @override
   ConsumerState<TransactionFormSheet> createState() =>
@@ -141,10 +169,19 @@ class _TransactionFormSheetState extends ConsumerState<TransactionFormSheet> {
 
     _type = existing?.type ?? widget.initialType ?? TransactionType.expense;
     _amount = TextEditingController(
-      text: existing == null ? '' : _formatAmount(existing.amount),
+      text: existing != null
+          ? _formatAmount(existing.amount)
+          : widget.initialAmount != null
+          ? _formatAmount(widget.initialAmount!)
+          : '',
     );
-    _payee = TextEditingController(text: existing?.payee ?? '');
-    _note = TextEditingController(text: existing?.note ?? '');
+    _payee = TextEditingController(
+      text: existing?.payee ?? (existing == null ? widget.initialPayee : null) ?? '',
+    );
+    _note = TextEditingController(
+      text: existing?.note ?? (existing == null ? widget.initialNote : null) ?? '',
+    );
+    _scanned = existing == null ? widget.initialScanned : null;
     _tags = [...?existing?.tags];
     _oneoff = existing?.oneoff ?? false;
     _date =
